@@ -187,3 +187,19 @@ test('i18n: an unknown language falls back rather than blanking the page', () =>
 test('i18n: a missing key shows itself instead of rendering empty', () => {
   assert.equal(translator('pt')('no_such_key_at_all'), 'no_such_key_at_all')
 })
+
+test('board: a level mismatch is shown, not smoothed over', () => {
+  // A woman signing into a men's level still gets a place — but the board has
+  // to render her, not the slot's expectation, or the host never sees it.
+  const men = [
+    { id: 1, name: 'A', gender: 'M', partner: 'B' }, { id: 2, name: 'B', gender: 'M', partner: 'A' },
+    { id: 3, name: 'Sofia', gender: 'F', partner: '' },
+  ]
+  const { teams, waiting } = buildTeams(men)
+  const { board, reserves } = slots(teams, waiting, { courts: 1, category: 'M' })
+  assert.equal(reserves.length, 0)
+  const sofia = board.find((s) => s.player?.name === 'Sofia')
+  assert.ok(sofia, 'she is on the board')
+  assert.equal(sofia.want, 'M')
+  assert.equal(sofia.player.gender, 'F')
+})

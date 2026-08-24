@@ -190,8 +190,13 @@ export function boardMessage(t, prefix = '', lang = clubLanguage()) {
   lines.push('')
 
   for (const slot of board) {
-    const mark = SLOT[slot.want] || SLOT.M
-    lines.push(slot.player ? `${mark} ${slot.player.name}` : mark)
+    // An empty slot shows what the level is asking for; a taken one shows who is
+    // actually in it. They agree almost always — and when they don't, the board
+    // says so out loud: two 👦🏼 in a row on a mixed night, or one 👩🏻 in a
+    // men's list, is the mismatch a host needs to see before the draw.
+    const want = SLOT[slot.want] || SLOT.M
+    if (!slot.player) { lines.push(want); continue }
+    lines.push(`${SLOT[slot.player.gender] || want} ${slot.player.name}`)
   }
 
   if (reserves.length) {
