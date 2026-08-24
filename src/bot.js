@@ -3,6 +3,8 @@ import {
   getClub, listSignups, removeSignup,
 } from './db.js'
 import { buildTeams } from './formats/nonstop.js'
+import { humanWhen, parseWhen, validateWhen } from './dates.js'
+import { isMixedLevel, levelHelp, levelShort, parseLevel } from './levels.js'
 
 /**
  * The WhatsApp command language.
@@ -16,8 +18,15 @@ import { buildTeams } from './formats/nonstop.js'
 
 const KEYS = ['level', 'date', 'courts', 'duration', 'round']
 
-/** `!tournament non-stop level <MX-4> date <2026-09-05> courts <3> duration 90` */
-function parseTournament(rest) {
+/**
+ * `!tournament non-stop level <MX-4> date <2026-09-05> courts <3> duration 90`
+ *
+ * Returns `{ok:false, error}` rather than a tournament when the level or the
+ * date won't parse. The level used to be stored verbatim, so a typo opened a
+ * night nobody could self-select into and left the console with a value its
+ * picker could not show; the date used to stay the word "Friday" forever.
+ */
+function parseTournament(rest, { now = new Date() } = {}) {
   const clean = rest.replace(/[<>]/g, ' ')
   const out = { format: 'non-stop' }
   // Each key takes the words up to the next key, so a date can contain spaces.
@@ -30,13 +39,28 @@ function parseTournament(rest) {
   })
   const head = (hits[0] ? clean.slice(0, hits[0].index) : clean).trim()
   if (/americano/i.test(head)) out.format = 'americano'
+
+  const level = parseLevel(out.level)
+  if (!level.ok) return { ok: false, error: `${level.error}\n\n${levelHelp()}` }
+
+  // The date stays optional from the group — a host who knows the level but not
+  // the evening can still open the board — but if one is given it has to be real.
+  const when = parseWhen(out.date, { now })
+  if (!when.ok) return { ok: false, error: when.error }
+  const valid = validateWhen(when, { now })
+  if (!valid.ok) return { ok: false, error: valid.error }
+
   return {
-    format: out.format,
-    level: (out.level || '').toUpperCase(),
-    play_date: out.date || '',
-    courts: Number.parseInt(out.courts || '', 10) || 2,
-    duration_min: Number.parseInt(out.duration || '', 10) || 90,
-    round_min: Number.parseInt(out.round || '', 10) || 12,
+    ok: true,
+    value: {
+      format: out.format,
+      level: level.code,
+      play_date: when.date,
+      play_time: when.time,
+      courts: Number.parseInt(out.courts || '', 10) || 2,
+      duration_min: Number.parseInt(out.duration || '', 10) || 90,
+      round_min: Number.parseInt(out.round || '', 10) || 12,
+    },
   }
 }
 
@@ -83,8 +107,9 @@ export function handle(text, { waId = '', isHost = true } = {}) {
 
   if (cmd === 'tournament') {
     if (!isHost) return '🔒 Only the host can open a tournament.'
-    const t = createTournament(parseTournament(rest))
-    return openedMessage(t)
+    const parsedT = parseTournament(rest)
+    if (!parsedT.ok) return `⚠️ ${parsedT.error}`
+    return openedMessage(createTournament(parsedT.value))
   }
 
   if (cmd === 'in') {
@@ -111,6 +136,7 @@ export function handle(text, { waId = '', isHost = true } = {}) {
     return t ? signupMessage(t) : '🎾 No tournament is open yet.'
   }
 
+  if (cmd === 'levels') return levelHelp()
   if (cmd === 'help') return helpMessage()
   return null
 }
@@ -122,15 +148,16 @@ export function openedMessage(t) {
   const where = club.maps_url ? `\n📍 ${club.address || club.name} — ${club.maps_url}` : ''
   return [
     `🎾 ${b('Non-stop smash')} — ${club.name}`,
-    `🏆 Level: ${t.level || 'open'}`,
-    `📅 ${t.play_date || 'date TBC'}`,
+    `🏆 Level: ${t.level || 'open'} — ${levelShort(t.level).toLowerCase()}`,
+    `📅 ${humanWhen(t)}`,
     `🕒 ${t.duration_min} min · ${t.round_min} min rounds`,
     `🏟️ ${t.courts} court${t.courts === 1 ? '' : 's'}${where}`,
     '',
     `Sign up with ${b('!in')} — name, M/F, and your partner:`,
     '`!in Mike M partner Sofia`',
+    isMixedLevel(t.level) ? '🔀 Mixed level — one of each per pair.' : '',
     `Dropping out? ${b('!out')} and your name.`,
-  ].join('\n')
+  ].filter((l) => l !== '').join('\n')
 }
 
 /**
@@ -147,7 +174,7 @@ export function signupMessage(t, prefix = '') {
 
   if (prefix) lines.push(prefix, '')
   lines.push(`🎾 ${b(`Non-stop smash — ${t.level || 'open'}`)}`)
-  lines.push(`📅 ${t.play_date || 'date TBC'} · 🏟️ ${t.courts} court${t.courts === 1 ? '' : 's'}`)
+  lines.push(`📅 ${humanWhen(t)} · 🏟️ ${t.courts} court${t.courts === 1 ? '' : 's'}`)
   lines.push('')
 
   if (!teams.length && !waiting.length) {
@@ -185,12 +212,15 @@ export function helpMessage() {
     `🎾 ${b('Padel Tournament Planner')}`,
     '',
     b('Host'),
-    '`!tournament non-stop level MX-4 date Friday courts 3 duration 90`',
+    '`!tournament non-stop level MX-4 date 2026-09-05 19:00 courts 3 duration 90`',
     '',
     b('Players'),
     '`!in Mike M partner Sofia` — sign up as a pair',
     '`!out Mike` — cancel',
     '`!list` — who is in',
+    '`!levels` — what MX-4 means',
+    '',
+    '_Dates: `2026-09-05`, `5 Sep`, `sexta 19:00` or `Friday` all work._',
   ].join('\n')
 }
 

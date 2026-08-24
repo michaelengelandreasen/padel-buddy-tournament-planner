@@ -1,0 +1,194 @@
+/**
+ * When the tournament is played.
+ *
+ * The date was free text — "Friday 5 Sep, 19:00" — which reads well in WhatsApp
+ * and is useless everywhere else: a date picker can't open on it, a list can't
+ * sort by it, and "Friday" stays Friday forever. So the column holds an ISO
+ * `YYYY-MM-DD` plus a separate `HH:MM`, and the prose is generated on the way
+ * out. {@link parseWhen} is the funnel: the form posts ISO already, the bot
+ * posts whatever the host typed into the group, and both land in the same shape.
+ *
+ * Everything here works in the club's own timezone (`TZ` in compose), because
+ * "is this date in the past" is a question about the club's evening, not UTC's.
+ */
+
+const MONTHS = ['january', 'february', 'march', 'april', 'may', 'june', 'july',
+  'august', 'september', 'october', 'november', 'december']
+const DAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+// The club is in Matosinhos, so half the group will type the day or the month
+// in Portuguese. Matched by prefix, which is why "sabado" and "sábado" both land.
+const DAYS_PT = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado']
+const MONTHS_PT = ['janeiro', 'fevereiro', 'marco', 'abril', 'maio', 'junho', 'julho',
+  'agosto', 'setembro', 'outubro', 'novembro', 'dezembro']
+
+const pad = (n) => String(n).padStart(2, '0')
+
+/** Today, as the club sees it. */
+export const todayISO = (now = new Date()) =>
+  `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
+
+/** ISO string → a Date at local midnight, or null if it isn't a real calendar day. */
+export function toDate(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ''))
+  if (!m) return null
+  const [y, mo, d] = m.slice(1).map(Number)
+  const dt = new Date(y, mo - 1, d)
+  // Rejects 2026-02-30, which the constructor would happily roll into March.
+  return dt.getFullYear() === y && dt.getMonth() === mo - 1 && dt.getDate() === d ? dt : null
+}
+
+export const isISODate = (s) => toDate(s) !== null
+export const isTime = (s) => /^([01]\d|2[0-3]):[0-5]\d$/.test(String(s || ''))
+
+const shift = (dt, days) => new Date(dt.getFullYear(), dt.getMonth(), dt.getDate() + days)
+
+/**
+ * Pull a date and a time out of free text.
+ *
+ * Handles the forms a host types into a group chat: `2026-09-05`, `05/09/2026`,
+ * `5/9` (day first — this is Portugal, not Kansas), `5 Sep`, `Sep 5`, `Friday`,
+ * `tomorrow`, each optionally carrying `19:00`, `19h30` or `7pm`. A bare weekday
+ * or a date with no year resolves *forward*: "Friday" in December is January's
+ * Friday, never one that has already happened.
+ */
+export function parseWhen(input, { now = new Date() } = {}) {
+  const raw = String(input ?? '').trim()
+  if (!raw) return { ok: true, date: '', time: '' }
+
+  let s = raw.replace(/[<>()]/g, ' ').replace(/[,]/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase()
+
+  // Time first, so its digits can't be mistaken for a day of the month.
+  let time = ''
+  const ampm = s.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/)
+  const clock = s.match(/\b([01]?\d|2[0-3])\s*[:h.]\s*([0-5]\d)\b/)
+  if (ampm) {
+    let h = Number(ampm[1]) % 12
+    if (ampm[3] === 'pm') h += 12
+    time = `${pad(h)}:${ampm[2] || '00'}`
+    s = (s.slice(0, ampm.index) + ' ' + s.slice(ampm.index + ampm[0].length)).trim()
+  } else if (clock) {
+    time = `${pad(Number(clock[1]))}:${clock[2]}`
+    s = (s.slice(0, clock.index) + ' ' + s.slice(clock.index + clock[0].length)).trim()
+  }
+  s = s.replace(/\bat\b|\bàs\b|\bas\b/g, ' ').replace(/\s+/g, ' ').trim()
+  // Accents off, so "terça" and "terca" are the same word to the matcher below.
+  s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+
+  // "next friday" means the one after this week's; "this friday"/"on friday"
+  // mean the same as the bare weekday.
+  let strictlyNext = false
+  const lead = s.match(/^(next|this|on|proxima|proximo)\s+/)
+  if (lead) { strictlyNext = lead[1] === 'next'; s = s.slice(lead[0].length).trim() }
+
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const out = (dt) => ({ ok: true, date: todayISO(dt), time })
+
+  if (!s) return { ok: true, date: '', time }
+  if (/^(today|hoje)$/.test(s)) return out(today)
+  if (/^(tomorrow|amanhã|amanha)$/.test(s)) return out(shift(today, 1))
+
+  // ISO — the form's own output, and the one unambiguous written form.
+  const iso = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/)
+  if (iso) {
+    const v = `${iso[1]}-${pad(Number(iso[2]))}-${pad(Number(iso[3]))}`
+    return isISODate(v) ? { ok: true, date: v, time }
+      : { ok: false, error: `${raw} isn't a real date.` }
+  }
+
+  // A bare weekday: the next one, today included — a Friday night tournament
+  // gets announced on the Friday more often than not.
+  const dayOf = (text) => {
+    const hit = (list, i) => new RegExp(`^${list[i].slice(0, 5)}`).test(text) ||
+      new RegExp(`^${list[i].slice(0, 3)}\\w*$`).test(text)
+    return DAYS.findIndex((_, i) => hit(DAYS, i) || hit(DAYS_PT, i))
+  }
+
+  // "Friday 5 Sep" — once a real date follows, the weekday is decoration, and
+  // trusting it over the date is how you announce the wrong evening.
+  const head = s.split(' ')[0]
+  if (s.includes(' ') && dayOf(head) >= 0) s = s.slice(head.length).trim()
+
+  const dayIdx = dayOf(s)
+  if (dayIdx >= 0) {
+    const ahead = (dayIdx - today.getDay() + 7) % 7
+    return out(shift(today, ahead === 0 && strictlyNext ? 7 : ahead || (strictlyNext ? 7 : 0)))
+  }
+
+  // 5/9, 05/09/2026 — day first.
+  const slash = s.match(/^(\d{1,2})[/.](\d{1,2})(?:[/.](\d{2,4}))?$/)
+  if (slash) {
+    const [d, mo] = [Number(slash[1]), Number(slash[2])]
+    const year = slash[3] ? Number(slash[3].length === 2 ? `20${slash[3]}` : slash[3]) : null
+    return resolve(d, mo, year, today, time, raw)
+  }
+
+  // 5 sep / sep 5 / 5 september 2026
+  const words = s.match(/^(?:(\d{1,2})\s+)?([a-zç]{3,})(?:\s+(\d{1,2}))?(?:\s+(\d{4}))?$/)
+  if (words) {
+    const stem = words[2].slice(0, 3)
+    const mo = MONTHS.findIndex((m, i) =>
+      m.startsWith(stem) || MONTHS_PT[i].startsWith(stem))
+    const d = Number(words[1] || words[3])
+    if (mo >= 0 && d) return resolve(d, mo + 1, words[4] ? Number(words[4]) : null, today, time, raw)
+  }
+
+  return {
+    ok: false,
+    error: `I couldn't read "${raw}" as a date. Try 2026-09-05, 5 Sep, or Friday.`,
+  }
+}
+
+/** Fill in a missing year with the one that puts the date ahead of us, not behind. */
+function resolve(d, mo, year, today, time, raw) {
+  const bad = { ok: false, error: `${raw} isn't a real date.` }
+  if (mo < 1 || mo > 12 || d < 1 || d > 31) return bad
+  if (year) {
+    const v = `${year}-${pad(mo)}-${pad(d)}`
+    return isISODate(v) ? { ok: true, date: v, time } : bad
+  }
+  for (const y of [today.getFullYear(), today.getFullYear() + 1]) {
+    const v = `${y}-${pad(mo)}-${pad(d)}`
+    const dt = toDate(v)
+    if (dt && dt >= today) return { ok: true, date: v, time }
+  }
+  const v = `${today.getFullYear()}-${pad(mo)}-${pad(d)}`
+  return isISODate(v) ? { ok: true, date: v, time } : bad
+}
+
+/**
+ * The rules a stored date has to pass: real, not already played, not a decade
+ * out. The last one is a typo guard — `2062-09-05` is a slipped finger, and it
+ * would otherwise sit at the top of the list until someone noticed.
+ */
+export function validateWhen({ date, time }, { now = new Date() } = {}) {
+  if (date && !isISODate(date)) return { ok: false, error: `${date} isn't a real date.` }
+  if (time && !isTime(time)) return { ok: false, error: `${time} isn't a time — use 19:00.` }
+  if (date) {
+    const dt = toDate(date)
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    if (dt < today) return { ok: false, error: `${humanDate(date)} has already been played — pick a date from today on.` }
+    if (dt > shift(today, 730)) return { ok: false, error: `${humanDate(date)} is more than two years out — is that the year you meant?` }
+  }
+  return { ok: true }
+}
+
+/** `2026-09-05` → `Friday 5 September`, with the year only when it isn't this one. */
+export function humanDate(date, { now = new Date() } = {}) {
+  const dt = toDate(date)
+  if (!dt) return String(date || '')
+  const year = dt.getFullYear() === now.getFullYear() ? '' : ` ${dt.getFullYear()}`
+  const day = DAYS[dt.getDay()], month = MONTHS[dt.getMonth()]
+  return `${cap(day)} ${dt.getDate()} ${cap(month)}${year}`
+}
+
+/** The one-line form the board, the console and the TV all print. */
+export function humanWhen({ play_date, play_time }, { now = new Date(), tbc = 'Date TBC' } = {}) {
+  if (!play_date) return tbc
+  const d = humanDate(play_date, { now })
+  return play_time ? `${d}, ${play_time}` : d
+}
+
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1)
+
+/** Sort key that keeps blank dates last instead of first. */
+export const whenKey = (t) => t.play_date || '9999-99-99'

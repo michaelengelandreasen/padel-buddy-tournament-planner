@@ -5,6 +5,8 @@ import {
 } from './db.js'
 import { buildTeams, schedule, standings } from './formats/nonstop.js'
 import { handle, signupMessage } from './bot.js'
+import { parseWhen, validateWhen } from './dates.js'
+import { parseLevel } from './levels.js'
 import { transport } from './whatsapp/transport.js'
 import * as V from './views.js'
 
@@ -55,11 +57,31 @@ const routes = [
   ['GET', /^\/tournaments$/, () => ({ html: V.tournamentsPage({ tournaments: listTournaments() }) })],
   ['POST', /^\/tournaments$/, async (_m, req) => {
     const f = await body(req)
+    // The form offers only valid choices, so this is not about the browser — it
+    // is about anything else that can POST here. On a failure the page comes
+    // back with the reason and what was typed, not a redirect that eats both.
+    const bad = (error) => ({
+      html: V.tournamentsPage({ tournaments: listTournaments(), form: f, error }), code: 400,
+    })
+
+    const level = parseLevel(`${f.level_category ?? ''}-${f.level_grade ?? ''}`)
+    if (!level.ok) return bad(level.error)
+
+    const when = parseWhen(`${f.play_date ?? ''} ${f.play_time ?? ''}`.trim())
+    if (!when.ok) return bad(when.error)
+    if (!when.date) return bad('Pick the date the tournament is played.')
+    const valid = validateWhen(when)
+    if (!valid.ok) return bad(valid.error)
+
+    const num = (v, fallback, min, max) => {
+      const n = Number.parseInt(v, 10)
+      return Number.isFinite(n) && n >= min && n <= max ? n : fallback
+    }
     const t = createTournament({
-      level: f.level, play_date: f.play_date,
-      courts: Number(f.courts) || 2,
-      duration_min: Number(f.duration_min) || 90,
-      round_min: Number(f.round_min) || 12,
+      level: level.code, play_date: when.date, play_time: when.time,
+      courts: num(f.courts, 3, 1, 20),
+      duration_min: num(f.duration_min, 90, 10, 600),
+      round_min: num(f.round_min, 12, 5, 120),
     })
     return { to: `/t/${t.id}` }
   }],

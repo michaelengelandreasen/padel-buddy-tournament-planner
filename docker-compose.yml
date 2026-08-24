@@ -10,6 +10,9 @@ services:
     environment:
       PORT: "8080"
       DB_PATH: /app/data/planner.db
+      # The club's own clock. "Is this date in the past" and "which Friday is
+      # next" are questions about an evening in Matosinhos, not about UTC.
+      TZ: Europe/Lisbon
       # Which WhatsApp transport to use. "draft" formats messages for a human to
       # paste and never touches WhatsApp; see src/whatsapp/transport.js.
       WHATSAPP_TRANSPORT: draft
@@ -18,6 +21,7 @@ services:
       # Absolute host paths: the broker only permits binds under the real
       # projects volume, and ./ resolves through a symlink it doesn't accept.
       - ${PROJECTS_DIR}/padel-tournament-planner/src:/app/src
+      - ${PROJECTS_DIR}/padel-tournament-planner/scripts:/app/scripts
       - ${PROJECTS_DIR}/padel-tournament-planner/data:/app/data
     labels:
       - traefik.enable=true
