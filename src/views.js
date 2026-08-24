@@ -93,9 +93,29 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 .hint{color:var(--muted);font-size:.82rem;margin:6px 0 0}
 pre.msg{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--surface-2);
   border:1px solid var(--line);border-radius:12px;padding:14px;font-size:.9rem;margin:0}
-.score{display:flex;gap:6px;align-items:center;flex-wrap:nowrap}
-.score input{width:64px;flex:0 0 64px;text-align:center;padding:8px 4px}
-.score button{padding:8px 14px;flex:0 0 auto}
+/*
+ * One match, one form. The score box sits on its team's own line rather than
+ * beside the other team's — recording 11-5 from the side of a court should not
+ * need working out which box is whose. Save spans both lines on the right,
+ * because it belongs to the pair of them.
+ */
+.match{display:grid;grid-template-columns:1fr auto;gap:8px 14px;align-items:center;
+  background:var(--surface-2);border:1px solid var(--line);border-radius:12px;
+  padding:12px 14px;margin:10px 0}
+.match .court{grid-column:1/-1;font-weight:800;color:var(--accent);font-size:.74rem;
+  text-transform:uppercase;letter-spacing:.05em}
+.match .sides{min-width:0}
+.match .side{display:flex;align-items:center;gap:12px;padding:7px 0}
+.match .side+.side{border-top:1px solid var(--line)}
+.match .who{flex:1 1 auto;min-width:0;margin:0;font-size:1rem;font-weight:600;
+  color:var(--ink);overflow-wrap:anywhere;cursor:pointer}
+.match input{flex:0 0 68px;width:68px;text-align:center;padding:8px 4px;
+  font-variant-numeric:tabular-nums}
+.match button{padding:8px 18px}
+@media (max-width:480px){
+  .match{grid-template-columns:1fr}
+  .match button{width:100%}
+}
 .head{display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:space-between}
 
 @media (max-width:720px){
@@ -181,6 +201,24 @@ const statusLabel = (status, t) => t({
 /** Tables live inside a scroller so a wide one never widens the page itself. */
 const wrapTable = (inner, cls = '') =>
   `<div class="tablewrap"><table class="${cls}">${inner}</table></div>`
+
+/**
+ * One match as a form: the court, then a line per team with that team's box on
+ * it, then Save. Each name is the input's own <label>, so the accessible name is
+ * the team rather than "Score", and tapping a name focuses its box.
+ */
+const matchForm = (m, t) => `<form class="match" method="post" action="/matches/${m.id}/score">
+  <div class="court">${esc(m.court)}</div>
+  <div class="sides">
+    ${[['a', m.team_a, m.score_a], ['b', m.team_b, m.score_b]].map(([side, team, score]) => `
+    <div class="side">
+      <label class="who" for="m${m.id}${side}">${esc(team)}</label>
+      <input id="m${m.id}${side}" name="${side}" type="number" min="0" max="99"
+        inputmode="numeric" placeholder="–" value="${score ?? ''}">
+    </div>`).join('')}
+  </div>
+  <button class="btn ghost">${esc(t('save'))}</button>
+</form>`
 
 const levelCell = (code, t) => code
   ? `<span class="pill on">${esc(code)}</span> <span class="muted">${esc(levelShort(code, t))}</span>`
@@ -365,20 +403,8 @@ export function tournamentPage({ tournament: tour, teams, waiting, matches, tabl
     </div>
 
     <div class="card"><h3>${esc(t('schedule'))}</h3>
-      ${matches.length ? rounds.map((r) => `<h4>${esc(t('roundN', { n: r }))}</h4>${wrapTable(
-        `<thead><tr><th>${esc(t('court'))}</th><th>${esc(t('home'))}</th><th>${esc(t('away'))}</th>
-          <th style="width:180px">${esc(t('score'))}</th></tr></thead>
-        <tbody>${matches.filter((m) => m.round === r).map((m) => `<tr>
-          <td class="pos full">${esc(m.court)}</td>
-          <td class="lead full" data-l="">${esc(m.team_a)}</td>
-          <td class="full" data-l="v">${esc(m.team_b)}</td>
-          <td class="full"><form class="score" method="post" action="/matches/${m.id}/score">
-            <input name="a" type="number" min="0" max="99" inputmode="numeric"
-              aria-label="${esc(t('score'))} — ${esc(m.team_a)}" value="${m.score_a ?? ''}">
-            <input name="b" type="number" min="0" max="99" inputmode="numeric"
-              aria-label="${esc(t('score'))} — ${esc(m.team_b)}" value="${m.score_b ?? ''}">
-            <button class="btn ghost">${esc(t('save'))}</button>
-          </form></td></tr>`).join('')}</tbody>`, 'stack')}`).join('')
+      ${matches.length ? rounds.map((r) => `<h4>${esc(t('roundN', { n: r }))}</h4>${
+        matches.filter((m) => m.round === r).map((m) => matchForm(m, t)).join('')}`).join('')
         : `<p class="muted">${esc(t('noSchedule'))}</p>
            <form method="post" action="/t/${tour.id}/schedule"><div class="actions">
              <button ${teams.length < 2 ? 'disabled' : ''}>${esc(t('drawSchedule'))}</button></div></form>

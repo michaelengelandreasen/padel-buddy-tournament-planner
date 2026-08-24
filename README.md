@@ -17,8 +17,9 @@ Settings.
   `node:http` are enough, so there is nothing to install and nothing to audit.
 - **Web console** — club settings, courts, tournaments, results, standings, in
   English or Portuguese. Built phone-first: nothing makes the page scroll
-  sideways, wide tables collapse into labelled rows under 560px, and every tap
-  target clears 44px.
+  sideways, wide tables collapse into labelled rows under 560px, every tap target
+  clears 44px, and a match is entered as two lines — each team with its own score
+  box on it — so recording 11-5 from the side of a court needs no working out.
 - **Android app** — not built yet. It is an admin client over the REST API below,
   not a second source of truth.
 
