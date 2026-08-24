@@ -1,0 +1,33 @@
+name: padel-tournament-planner
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    # Runs as the project owner so the SQLite file it writes into the bind
+    # mount belongs to us, not to root.
+    user: "1000:1000"
+    working_dir: /app
+    environment:
+      PORT: "8080"
+      DB_PATH: /app/data/planner.db
+      # Which WhatsApp transport to use. "draft" formats messages for a human to
+      # paste and never touches WhatsApp; see src/whatsapp/transport.js.
+      WHATSAPP_TRANSPORT: draft
+    networks: [web]
+    volumes:
+      # Absolute host paths: the broker only permits binds under the real
+      # projects volume, and ./ resolves through a symlink it doesn't accept.
+      - ${PROJECTS_DIR}/padel-tournament-planner/src:/app/src
+      - ${PROJECTS_DIR}/padel-tournament-planner/data:/app/data
+    labels:
+      - traefik.enable=true
+      - 'traefik.http.routers.padel-tournament-planner.rule=Host(`padel-tournament-planner.mike.users.ctx7.dev`)'
+      - traefik.http.routers.padel-tournament-planner.entrypoints=websecure
+      - traefik.http.routers.padel-tournament-planner.tls=true
+      - traefik.http.routers.padel-tournament-planner.tls.certresolver=cloudflare
+      - 'traefik.http.routers.padel-tournament-planner.tls.domains[0].main=mike.users.ctx7.dev'
+      - 'traefik.http.routers.padel-tournament-planner.tls.domains[0].sans=*.mike.users.ctx7.dev'
+      - traefik.http.services.padel-tournament-planner.loadbalancer.server.port=8080
+
+networks:
+  web: { external: true }
