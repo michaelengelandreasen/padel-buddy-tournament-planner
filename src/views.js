@@ -120,7 +120,10 @@ pre.msg{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--surface-2);
   table.stack td:not([data-l])::before,table.stack td[data-l=""]::before{content:none}
   table.stack td:empty{display:none}
   table.stack td.pos{order:-2;flex:0 0 auto;font-weight:800;color:var(--brand);font-size:1.05rem}
-  table.stack td.lead{order:-1;flex:1 1 auto;font-weight:700;font-size:1.05rem;overflow-wrap:anywhere}
+  /* The title keeps the line to itself. Left to grow naturally, a short team
+     name leaves room for the first chip and every row wraps differently. */
+  table.stack td.lead{order:-1;flex:1 1 auto;min-width:calc(100% - 3.5rem);
+    font-weight:700;font-size:1.05rem;overflow-wrap:anywhere}
   table.stack td.full{flex:1 1 100%}
 }
 `
