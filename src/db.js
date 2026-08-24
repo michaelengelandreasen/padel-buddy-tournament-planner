@@ -3,6 +3,7 @@ import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { parseWhen } from './dates.js'
 import { parseLevel } from './levels.js'
+import { DEFAULT_LANGUAGE, isLanguage, translator } from './i18n.js'
 
 const path = process.env.DB_PATH || './data/planner.db'
 mkdirSync(dirname(path), { recursive: true })
@@ -25,7 +26,14 @@ db.exec(`
     id        INTEGER PRIMARY KEY CHECK (id = 1),
     name      TEXT NOT NULL DEFAULT '',
     address   TEXT NOT NULL DEFAULT '',
-    maps_url  TEXT NOT NULL DEFAULT ''
+    maps_url  TEXT NOT NULL DEFAULT '',
+    -- One club, one language: it drives this console and the messages the same
+    -- button posts to the group, which must never disagree with each other.
+    language  TEXT NOT NULL DEFAULT 'en',
+    -- The drop-out policy printed under every board, kept in both languages so
+    -- switching the club over doesn't silently drop the club's own wording.
+    rules_en  TEXT NOT NULL DEFAULT '',
+    rules_pt  TEXT NOT NULL DEFAULT ''
   );
   INSERT OR IGNORE INTO club (id, name) VALUES (1, 'Padel Club');
 
@@ -85,6 +93,19 @@ db.exec(`
  * parse is blanked, not guessed at — "date TBC" is honest, a made-up Friday is not.
  */
 function migrate() {
+  const clubCols = db.prepare('PRAGMA table_info(club)').all().map((c) => c.name)
+  for (const [col, def] of [['language', "'en'"], ['rules_en', "''"], ['rules_pt', "''"]]) {
+    if (!clubCols.includes(col)) {
+      db.exec(`ALTER TABLE club ADD COLUMN ${col} TEXT NOT NULL DEFAULT ${def}`)
+    }
+  }
+  // A club that never wrote its own policy gets the standard one, in both
+  // languages, rather than an empty block under every board.
+  for (const [col, lang] of [['rules_en', 'en'], ['rules_pt', 'pt']]) {
+    db.exec(`UPDATE club SET ${col} = '${
+      translator(lang)('dropoutDefault').replace(/'/g, "''")}' WHERE ${col} = ''`)
+  }
+
   const cols = db.prepare('PRAGMA table_info(tournaments)').all().map((c) => c.name)
   if (!cols.includes('play_time')) {
     db.exec("ALTER TABLE tournaments ADD COLUMN play_time TEXT NOT NULL DEFAULT ''")
@@ -112,10 +133,28 @@ const run = (sql, ...args) => db.prepare(sql).run(...args)
 
 export const getClub = () => one('SELECT * FROM club WHERE id = 1')
 
-export function saveClub({ name, address, maps_url }) {
-  run('UPDATE club SET name = ?, address = ?, maps_url = ? WHERE id = 1',
-    name ?? '', address ?? '', maps_url ?? '')
+/** The club's language, guaranteed to be one this app actually has strings for. */
+export function clubLanguage() {
+  const l = getClub()?.language
+  return isLanguage(l) ? l : DEFAULT_LANGUAGE
+}
+
+/** Only the keys given are written, so the language form can't blank the address. */
+export function saveClub(patch) {
+  const allowed = ['name', 'address', 'maps_url', 'language', 'rules_en', 'rules_pt']
+  const keys = allowed.filter((k) => patch[k] !== undefined)
+  if (!keys.length) return getClub()
+  const clean = (k) => (k === 'language' && !isLanguage(patch[k])
+    ? DEFAULT_LANGUAGE : String(patch[k] ?? ''))
+  run(`UPDATE club SET ${keys.map((k) => `${k} = ?`).join(', ')} WHERE id = 1`,
+    ...keys.map(clean))
   return getClub()
+}
+
+/** The drop-out policy in the club's current language, blank if it cleared it. */
+export function clubRules(lang = clubLanguage()) {
+  const club = getClub()
+  return (lang === 'pt' ? club.rules_pt : club.rules_en).trim()
 }
 
 export const listCourts = () => all('SELECT * FROM courts ORDER BY sort, id')

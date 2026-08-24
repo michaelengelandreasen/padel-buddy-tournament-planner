@@ -1,12 +1,13 @@
 import { createServer } from 'node:http'
 import {
-  addCourt, createTournament, deleteCourt, getClub, getTournament, listCourts,
+  addCourt, clubLanguage, createTournament, deleteCourt, getClub, getTournament, listCourts,
   listMatches, listSignups, listTournaments, recordScore, replaceMatches, saveClub,
 } from './db.js'
 import { buildTeams, schedule, standings } from './formats/nonstop.js'
 import { handle, signupMessage } from './bot.js'
 import { parseWhen, validateWhen } from './dates.js'
 import { parseLevel } from './levels.js'
+import { LANGUAGES, isLanguage, translator } from './i18n.js'
 import { transport } from './whatsapp/transport.js'
 import * as V from './views.js'
 
@@ -32,21 +33,39 @@ async function body(req) {
   return Object.fromEntries(new URLSearchParams(raw))
 }
 
-/** Everything a tournament view needs, derived in one place. */
+/**
+ * Everything a tournament view needs, derived in one place.
+ *
+ * The tournament is called `tournament`, not `t`: `t` is the translator every
+ * view also takes, and one object carrying both under the same name renders a
+ * page full of `undefined`.
+ */
 function view(id) {
-  const t = getTournament(id)
-  if (!t) return null
-  const { teams, waiting } = buildTeams(listSignups(t.id))
-  const matches = listMatches(t.id)
-  return { t, teams, waiting, matches, table: standings(teams, matches) }
+  const tournament = getTournament(id)
+  if (!tournament) return null
+  const { teams, waiting } = buildTeams(listSignups(tournament.id))
+  const matches = listMatches(tournament.id)
+  return { tournament, teams, waiting, matches, table: standings(teams, matches) }
 }
 
 const routes = [
-  ['GET', /^\/$/, () => ({ html: V.overview({
-    club: getClub(), tournaments: listTournaments(), courts: listCourts(), live: wa.live }) })],
+  ['GET', /^\/$/, (_m, _r, t) => ({ html: V.overview({
+    club: getClub(), tournaments: listTournaments(), courts: listCourts(), live: wa.live, t }) })],
 
-  ['GET', /^\/settings$/, () => ({ html: V.settings({ club: getClub(), courts: listCourts() }) })],
+  ['GET', /^\/settings$/, (_m, _r, t) =>
+    ({ html: V.settings({ club: getClub(), courts: listCourts(), t }) })],
   ['POST', /^\/settings$/, async (_m, req) => { saveClub(await body(req)); return { to: '/settings' } }],
+
+  // The header toggle. Same handler as the settings form, so there is one place
+  // the language is written and one place it is validated.
+  ['POST', /^\/language$/, async (_m, req) => {
+    const f = await body(req)
+    if (isLanguage(f.language)) saveClub({ language: f.language })
+    // Back to the page the toggle was pressed on — but only ever to a path on
+    // this site, never to whatever a form field happens to say.
+    const back = /^\/(?!\/)[\w/-]*$/.test(f.back || '') ? f.back : '/'
+    return { to: back }
+  }],
   ['POST', /^\/courts$/, async (_m, req) => {
     const f = await body(req)
     if (f.label?.trim()) addCourt(f.label.trim(), listCourts().length)
@@ -54,49 +73,51 @@ const routes = [
   }],
   ['POST', /^\/courts\/(\d+)\/delete$/, (m) => { deleteCourt(Number(m[1])); return { to: '/settings' } }],
 
-  ['GET', /^\/tournaments$/, () => ({ html: V.tournamentsPage({ tournaments: listTournaments() }) })],
-  ['POST', /^\/tournaments$/, async (_m, req) => {
+  ['GET', /^\/tournaments$/, (_m, _r, t) =>
+    ({ html: V.tournamentsPage({ tournaments: listTournaments(), t }) })],
+  ['POST', /^\/tournaments$/, async (_m, req, t) => {
     const f = await body(req)
     // The form offers only valid choices, so this is not about the browser — it
     // is about anything else that can POST here. On a failure the page comes
     // back with the reason and what was typed, not a redirect that eats both.
     const bad = (error) => ({
-      html: V.tournamentsPage({ tournaments: listTournaments(), form: f, error }), code: 400,
+      html: V.tournamentsPage({ tournaments: listTournaments(), form: f, error, t }), code: 400,
     })
+    const lang = t.lang
 
-    const level = parseLevel(`${f.level_category ?? ''}-${f.level_grade ?? ''}`)
+    const level = parseLevel(`${f.level_category ?? ''}-${f.level_grade ?? ''}`, { lang })
     if (!level.ok) return bad(level.error)
 
-    const when = parseWhen(`${f.play_date ?? ''} ${f.play_time ?? ''}`.trim())
+    const when = parseWhen(`${f.play_date ?? ''} ${f.play_time ?? ''}`.trim(), { lang })
     if (!when.ok) return bad(when.error)
-    if (!when.date) return bad('Pick the date the tournament is played.')
-    const valid = validateWhen(when)
+    if (!when.date) return bad(t('datePick'))
+    const valid = validateWhen(when, { lang })
     if (!valid.ok) return bad(valid.error)
 
     const num = (v, fallback, min, max) => {
       const n = Number.parseInt(v, 10)
       return Number.isFinite(n) && n >= min && n <= max ? n : fallback
     }
-    const t = createTournament({
+    const created = createTournament({
       level: level.code, play_date: when.date, play_time: when.time,
       courts: num(f.courts, 3, 1, 20),
       duration_min: num(f.duration_min, 90, 10, 600),
       round_min: num(f.round_min, 12, 5, 120),
     })
-    return { to: `/t/${t.id}` }
+    return { to: `/t/${created.id}` }
   }],
 
-  ['GET', /^\/t\/(\d+)$/, (m) => {
+  ['GET', /^\/t\/(\d+)$/, (m, _r, t) => {
     const v = view(Number(m[1]))
-    if (!v) return { html: V.page('Not found', '<h1>No such tournament</h1>'), code: 404 }
+    if (!v) return { html: V.page('404', '<h1>404</h1>', { t }), code: 404 }
     return { html: V.tournamentPage({ ...v, courts: listCourts(),
-      message: signupMessage(v.t) }) }
+      message: signupMessage(v.tournament, '', t.lang), t }) }
   }],
 
-  ['GET', /^\/t\/(\d+)\/tv$/, (m) => {
+  ['GET', /^\/t\/(\d+)\/tv$/, (m, _r, t) => {
     const v = view(Number(m[1]))
-    if (!v) return { html: '<h1>No such tournament</h1>', code: 404 }
-    return { html: V.tvPage({ ...v, club: getClub() }) }
+    if (!v) return { html: '<h1>404</h1>', code: 404 }
+    return { html: V.tvPage({ ...v, club: getClub(), t }) }
   }],
 
   ['POST', /^\/t\/(\d+)\/schedule$/, (m) => {
@@ -105,10 +126,10 @@ const routes = [
     // Courts the club configured, capped by what this tournament booked. A club
     // with six courts running a three-court night should not draw six.
     const courts = listCourts().map((c) => c.label)
-    const use = (courts.length ? courts : Array.from({ length: v.t.courts },
-      (_, i) => `Court ${i + 1}`)).slice(0, v.t.courts)
+    const use = (courts.length ? courts : Array.from({ length: v.tournament.courts },
+      (_, i) => `Court ${i + 1}`)).slice(0, v.tournament.courts)
     const { matches } = schedule(v.teams, use,
-      { durationMin: v.t.duration_min, roundMin: v.t.round_min })
+      { durationMin: v.tournament.duration_min, roundMin: v.tournament.round_min })
     replaceMatches(id, matches)
     return { to: `/t/${id}` }
   }],
@@ -119,13 +140,14 @@ const routes = [
     return { to: `/t/${row.tournament_id}` }
   }],
 
-  ['GET', /^\/whatsapp$/, () => ({ html: V.whatsappPage({ live: wa.live, outbox: wa.outbox() }) })],
-  ['POST', /^\/whatsapp\/simulate$/, async (_m, req) => {
+  ['GET', /^\/whatsapp$/, (_m, _r, t) =>
+    ({ html: V.whatsappPage({ live: wa.live, outbox: wa.outbox(), t }) })],
+  ['POST', /^\/whatsapp\/simulate$/, async (_m, req, t) => {
     const f = await body(req)
-    const reply = handle(f.text, { waId: f.wa_id || '', isHost: true })
+    const reply = handle(f.text, { waId: f.wa_id || '', isHost: true, lang: t.lang })
     if (reply) await wa.send(reply, { reason: 'reply' })
-    return { html: V.whatsappPage({ live: wa.live, outbox: wa.outbox(),
-      log: reply ?? '(the bot stayed quiet — not a command it knows)' }) }
+    return { html: V.whatsappPage({ live: wa.live, outbox: wa.outbox(), t,
+      log: reply ?? t('botStayedQuiet') }) }
   }],
 
   // ---- REST, for the Android console and any linked-device bridge ----
@@ -136,10 +158,15 @@ const routes = [
     return { json: { reply, transport: wa.name, live: wa.live } }
   }],
   ['GET', /^\/api\/club$/, () => ({ json: { club: getClub(), courts: listCourts() } })],
+  ['GET', /^\/api\/languages$/, () => ({ json: { current: clubLanguage(), available: LANGUAGES } })],
   ['GET', /^\/api\/tournaments$/, () => ({ json: listTournaments() })],
   ['GET', /^\/api\/tournaments\/(\d+)$/, (m) => {
     const v = view(Number(m[1]))
-    return v ? { json: { ...v, message: signupMessage(v.t) } } : { json: { error: 'not found' }, code: 404 }
+    if (!v) return { json: { error: 'not found' }, code: 404 }
+    // The payload keeps its `t` key: the Android client reads it, and renaming
+    // a field to match an internal rename is a breaking change for no gain.
+    const { tournament, ...rest } = v
+    return { json: { t: tournament, ...rest, message: signupMessage(tournament) } }
   }],
   ['GET', /^\/api\/outbox$/, () => ({ json: wa.outbox() })],
   ['GET', /^\/healthz$/, () => ({ json: { ok: true, transport: wa.name } })],
@@ -147,20 +174,23 @@ const routes = [
 
 createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x')
+  // One language per request, read once: every view and every parser gets the
+  // same `t`, so a page can never render half in one language and half in another.
+  const t = translator(clubLanguage())
   for (const [method, re, fn] of routes) {
     if (req.method !== method) continue
     const m = url.pathname.match(re)
     if (!m) continue
     try {
-      const out = await fn(m, req)
+      const out = await fn(m, req, t)
       if (out.to) return seeOther(res, out.to)
       if (out.json) return json(res, out.json, out.code || 200)
       return html(res, out.html, out.code || 200)
     } catch (err) {
       console.error(err)
-      return html(res, V.page('Error', `<h1>Something broke</h1><pre class="msg">${
-        String(err && err.message)}</pre>`), 500)
+      return html(res, V.page('Error', `<h1>⚠️</h1><pre class="msg">${
+        String(err && err.message)}</pre>`, { t }), 500)
     }
   }
-  html(res, V.page('Not found', '<h1>Not found</h1><p><a href="/">Back to the club</a></p>'), 404)
+  html(res, V.page('404', `<h1>404</h1><p><a href="/">${t('appName')}</a></p>`, { t }), 404)
 }).listen(PORT, () => console.log(`padel-tournament-planner on :${PORT} (whatsapp: ${wa.name})`))

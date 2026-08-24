@@ -12,8 +12,9 @@
  * with one hand.
  */
 
-import { CATEGORIES, GRADES, isMixedLevel, levelLabel, levelShort, parseLevel } from './levels.js'
+import { categories, grades, isMixedLevel, levelLabel, levelShort, parseLevel } from './levels.js'
 import { humanWhen, todayISO } from './dates.js'
+import { LANGUAGES, translator } from './i18n.js'
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
@@ -49,6 +50,10 @@ nav::-webkit-scrollbar{display:none}
 nav a{display:inline-flex;align-items:center;min-height:44px;padding:0 12px;border-radius:999px;
   text-decoration:none;color:var(--muted);font-weight:600;white-space:nowrap}
 nav a.on{color:var(--ink);background:var(--surface-2)}
+form.lang{display:flex;gap:2px;flex:0 0 auto;margin-left:8px}
+form.lang button{background:transparent;color:var(--muted);border:1px solid transparent;
+  min-height:44px;padding:0 10px;font-size:.82rem;font-weight:800;letter-spacing:.03em}
+form.lang button.on{color:var(--brand-ink);background:var(--brand)}
 
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
   padding:20px;margin:16px 0;min-width:0}
@@ -142,86 +147,122 @@ const LEVEL_JS = `
   c.addEventListener('change',paint);g.addEventListener('change',paint);paint();
 })();`
 
-export function page(title, body, { nav = '', script = '' } = {}) {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8">
+/**
+ * The language switch lives in the header because it is the one setting someone
+ * changes mid-task. It POSTs — switching language rewrites the club row, and a
+ * link that mutates state is a link a crawler or a prefetch can pull.
+ */
+const langToggle = (lang, here) => `<form class="lang" method="post" action="/language">${
+  here ? `<input type="hidden" name="back" value="${esc(here)}">` : ''}${
+  LANGUAGES.map((l) => `<button name="language" value="${l.code}"
+    class="${l.code === lang ? 'on' : ''}" aria-label="${esc(l.label)}"
+    ${l.code === lang ? 'aria-current="true"' : ''}>${l.short}</button>`).join('')}</form>`
+
+export function page(title, body, { nav = '', script = '', t = translator(), here = '' } = {}) {
+  return `<!doctype html><html lang="${t.lang}"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="dark">
 <title>${esc(title)}</title><style>${CSS}</style></head><body>
 <header class="top"><a class="brand" href="/"><span class="dot">P</span>
-<strong>Padel Tournament Planner</strong></a>
-<nav>${nav}</nav></header>
+<strong>${esc(t('appName'))}</strong></a>
+<nav>${nav}</nav>${langToggle(t.lang, here)}</header>
 <div class="wrap">${body}</div>${script ? `<script>${script}</script>` : ''}</body></html>`
 }
 
-const navFor = (here) => ['/', '/tournaments', '/settings', '/whatsapp']
-  .map((h, i) => `<a class="${here === h ? 'on' : ''}" href="${h}">${
-    ['Overview', 'Tournaments', 'Settings', 'WhatsApp'][i]}</a>`).join('')
+const navFor = (here, t) => [['/', 'navOverview'], ['/tournaments', 'navTournaments'],
+  ['/settings', 'navSettings'], ['/whatsapp', 'navWhatsapp']]
+  .map(([h, key]) => `<a class="${here === h ? 'on' : ''}" href="${h}">${esc(t(key))}</a>`).join('')
+
+/** Status values are stored in English; only their display is translated. */
+const statusLabel = (status, t) => t({
+  open: 'statusOpen', scheduled: 'statusScheduled', done: 'statusDone',
+}[status] || 'statusOpen')
 
 /** Tables live inside a scroller so a wide one never widens the page itself. */
 const wrapTable = (inner, cls = '') =>
   `<div class="tablewrap"><table class="${cls}">${inner}</table></div>`
 
-const levelCell = (code) => code
-  ? `<span class="pill on">${esc(code)}</span> <span class="muted">${esc(levelShort(code))}</span>`
-  : '<span class="muted">open</span>'
+const levelCell = (code, t) => code
+  ? `<span class="pill on">${esc(code)}</span> <span class="muted">${esc(levelShort(code, t))}</span>`
+  : `<span class="muted">${esc(t('statusOpen'))}</span>`
 
-export function overview({ club, tournaments, courts, live }) {
-  return page('Overview', `
+export function overview({ club, tournaments, courts, live, t }) {
+  return page(t('navOverview'), `
     <h1>${esc(club.name)}</h1>
-    <p class="muted">${esc(club.address) || 'No address set'}${
-      club.maps_url ? ` · <a href="${esc(club.maps_url)}">Open in Maps</a>` : ''}</p>
+    <p class="muted">${esc(club.address) || esc(t('noAddress'))}${
+      club.maps_url ? ` · <a href="${esc(club.maps_url)}">${esc(t('openInMaps'))}</a>` : ''}</p>
     <div class="grid">
-      <div class="card"><h3>Courts</h3>
-        <p class="muted">${courts.length ? courts.map((c) => esc(c.label)).join(' · ') : 'None yet'}</p>
-        <div class="actions"><a class="btn ghost" href="/settings">Manage courts</a></div></div>
-      <div class="card"><h3>WhatsApp</h3>
-        <p><span class="pill ${live ? 'on' : ''}">${live ? 'live' : 'draft mode'}</span></p>
-        <p class="muted">${live ? 'Posting to the group.'
-          : 'Messages are written for a human to paste.'}</p>
-        <div class="actions"><a class="btn ghost" href="/whatsapp">Open</a></div></div>
+      <div class="card"><h3>${esc(t('courts'))}</h3>
+        <p class="muted">${courts.length ? courts.map((c) => esc(c.label)).join(' · ') : esc(t('noneYet'))}</p>
+        <div class="actions"><a class="btn ghost" href="/settings">${esc(t('manageCourts'))}</a></div></div>
+      <div class="card"><h3>${esc(t('navWhatsapp'))}</h3>
+        <p><span class="pill ${live ? 'on' : ''}">${esc(live ? t('live') : t('draftMode'))}</span></p>
+        <p class="muted">${esc(live ? t('postingToGroup') : t('draftExplain'))}</p>
+        <div class="actions"><a class="btn ghost" href="/whatsapp">${esc(t('open'))}</a></div></div>
     </div>
-    <div class="card"><h3>Tournaments</h3>
-      ${tournaments.length ? wrapTable(`<thead><tr><th>When</th><th>Level</th>
-        <th class="num">Courts</th><th>Status</th><th></th></tr></thead><tbody>
-      ${tournaments.map((t) => `<tr>
-        <td class="lead" data-l="">${esc(humanWhen(t))}</td>
-        <td data-l="Level">${levelCell(t.level)}</td>
-        <td class="num" data-l="Courts">${t.courts}</td>
-        <td data-l="Status"><span class="pill">${esc(t.status)}</span></td>
-        <td class="full"><a class="tap" href="/t/${t.id}">Open</a></td></tr>`).join('')}</tbody>`, 'stack')
-        : '<p class="muted">None yet — open one from WhatsApp, or below.</p>'}
-      <div class="actions"><a class="btn" href="/tournaments">New tournament</a></div>
-    </div>`, { nav: navFor('/') })
+    <div class="card"><h3>${esc(t('tournaments'))}</h3>
+      ${tournaments.length ? wrapTable(`<thead><tr><th>${esc(t('when'))}</th><th>${esc(t('level'))}</th>
+        <th class="num">${esc(t('courts'))}</th><th>${esc(t('status'))}</th><th></th></tr></thead><tbody>
+      ${tournaments.map((x) => `<tr>
+        <td class="lead" data-l="">${esc(humanWhen(x, { lang: t.lang }))}</td>
+        <td data-l="${esc(t('level'))}">${levelCell(x.level, t)}</td>
+        <td class="num" data-l="${esc(t('courts'))}">${x.courts}</td>
+        <td data-l="${esc(t('status'))}"><span class="pill">${esc(statusLabel(x.status, t))}</span></td>
+        <td class="full"><a class="tap" href="/t/${x.id}">${esc(t('open'))}</a></td></tr>`).join('')}</tbody>`, 'stack')
+        : `<p class="muted">${esc(t('noTournaments'))}</p>`}
+      <div class="actions"><a class="btn" href="/tournaments">${esc(t('newTournament'))}</a></div>
+    </div>`, { nav: navFor('/', t), t, here: '/' })
 }
 
-export function settings({ club, courts }) {
-  return page('Settings', `
-    <h1>Settings</h1>
+export function settings({ club, courts, t }) {
+  return page(t('settings'), `
+    <h1>${esc(t('settings'))}</h1>
     <form class="card" method="post" action="/settings">
-      <h3>Club</h3>
-      <label for="cname">Club name</label>
+      <h3>${esc(t('club'))}</h3>
+      <label for="cname">${esc(t('clubName'))}</label>
       <input id="cname" name="name" value="${esc(club.name)}" required>
-      <label for="caddr">Address</label>
+      <label for="caddr">${esc(t('address'))}</label>
       <input id="caddr" name="address" value="${esc(club.address)}"
         placeholder="R. Gonçalves Zarco 1813, 4450-685 Matosinhos">
-      <label for="cmaps">Google Maps link</label>
+      <label for="cmaps">${esc(t('mapsLink'))}</label>
       <input id="cmaps" name="maps_url" type="url" value="${esc(club.maps_url)}"
         placeholder="https://maps.app.goo.gl/…">
-      <div class="actions"><button>Save club</button></div>
+      <div class="actions"><button>${esc(t('saveClub'))}</button></div>
     </form>
+
+    <form class="card" method="post" action="/settings">
+      <h3>${esc(t('language'))}</h3>
+      <p class="muted">${esc(t('languageHelp'))}</p>
+      <label for="lang">${esc(t('language'))}</label>
+      <select id="lang" name="language">${LANGUAGES.map((l) => `<option value="${l.code}"
+        ${l.code === t.lang ? 'selected' : ''}>${esc(l.label)}</option>`).join('')}</select>
+      <div class="actions"><button>${esc(t('save'))}</button></div>
+    </form>
+
+    <form class="card" method="post" action="/settings">
+      <h3>${esc(t('dropoutPolicy'))}</h3>
+      <p class="muted">${esc(t('dropoutPolicyHelp'))}</p>
+      <label for="rules_en">${esc(t('inEnglish'))}</label>
+      <textarea id="rules_en" name="rules_en" style="min-height:96px">${esc(club.rules_en)}</textarea>
+      <label for="rules_pt">${esc(t('inPortuguese'))}</label>
+      <textarea id="rules_pt" name="rules_pt" style="min-height:96px">${esc(club.rules_pt)}</textarea>
+      <div class="actions"><button>${esc(t('save'))}</button></div>
+    </form>
+
     <div class="card">
-      <h3>Courts</h3>
-      <p class="muted">Named, not numbered — the WhatsApp message and the TV view both say these out loud.</p>
+      <h3>${esc(t('courts'))}</h3>
+      <p class="muted">${esc(t('courtsHelp'))}</p>
       ${wrapTable(`<tbody>${courts.map((c) => `<tr><td>${esc(c.label)}</td>
         <td style="text-align:right;width:1%">
-        <form method="post" action="/courts/${c.id}/delete"><button class="btn danger">Remove</button></form>
-      </td></tr>`).join('') || '<tr><td class="muted">No courts yet</td></tr>'}</tbody>`)}
+        <form method="post" action="/courts/${c.id}/delete">
+          <button class="btn danger">${esc(t('remove'))}</button></form>
+      </td></tr>`).join('') || `<tr><td class="muted">${esc(t('noCourtsYet'))}</td></tr>`}</tbody>`)}
       <form class="row" method="post" action="/courts" style="margin-top:14px">
-        <div><label for="courtlabel">Add a court</label>
+        <div><label for="courtlabel">${esc(t('addCourt'))}</label>
           <input id="courtlabel" name="label" placeholder="Court 1 / Center" required></div>
-        <div style="flex:0 0 auto"><button>Add</button></div>
+        <div style="flex:0 0 auto"><button>${esc(t('add'))}</button></div>
       </form>
-    </div>`, { nav: navFor('/settings') })
+    </div>`, { nav: navFor('/settings', t), t, here: '/settings' })
 }
 
 /**
@@ -232,134 +273,141 @@ export function settings({ club, courts }) {
  * validator, it is a suggestion. The date is a real date input with `min` set to
  * today, and a time beside it — the pair is what the whole app stores now.
  */
-export function tournamentsPage({ tournaments, form = {}, error = '' }) {
+export function tournamentsPage({ tournaments, form = {}, error = '', t }) {
   const today = todayISO()
   const cat = form.level_category || 'MX'
   const grade = String(form.level_grade || 4)
-  const catOpts = CATEGORIES.map((c) => `<option value="${c.code}" data-label="${esc(c.label)}"
+  const catOpts = categories(t).map((c) => `<option value="${c.code}" data-label="${esc(c.label)}"
     ${c.code === cat ? 'selected' : ''}>${esc(c.label)} (${c.code})</option>`).join('')
-  const gradeOpts = GRADES.map((g) => `<option value="${g.grade}" data-label="${esc(g.label)}"
+  const gradeOpts = grades(t).map((g) => `<option value="${g.grade}" data-label="${esc(g.label)}"
     data-blurb="${esc(g.blurb)}" ${String(g.grade) === grade ? 'selected' : ''}
     >${g.grade} — ${esc(g.label)}</option>`).join('')
+  const cmd = '!tournament non-stop level MX-4 date 2026-09-05 11:00 courts 3 duration 120'
 
-  return page('Tournaments', `
-    <h1>New tournament</h1>
+  return page(t('newTournament'), `
+    <h1>${esc(t('newTournament'))}</h1>
     <form class="card" method="post" action="/tournaments">
       ${error ? `<p class="err">⚠️ ${esc(error)}</p>` : ''}
       <div class="row">
-        <div><label for="level_category">Category</label>
+        <div><label for="level_category">${esc(t('category'))}</label>
           <select id="level_category" name="level_category">${catOpts}</select></div>
-        <div><label for="level_grade">Skill level</label>
+        <div><label for="level_grade">${esc(t('skillLevel'))}</label>
           <select id="level_grade" name="level_grade">${gradeOpts}</select></div>
       </div>
-      <p class="hint" id="level_preview">Level 1 is competition, ${GRADES.length} is first-timers.</p>
+      <p class="hint" id="level_preview">${esc(t('levelHintFallback', { n: grades(t).length }))}</p>
       <div class="row">
-        <div><label for="play_date">Date</label>
+        <div><label for="play_date">${esc(t('date'))}</label>
           <input id="play_date" name="play_date" type="date" required
             min="${today}" value="${esc(form.play_date || today)}"></div>
-        <div><label for="play_time">Start time</label>
+        <div><label for="play_time">${esc(t('startTime'))}</label>
           <input id="play_time" name="play_time" type="time"
             value="${esc(form.play_time ?? '19:00')}"></div>
       </div>
       <div class="row">
-        <div><label for="courts">Courts</label>
+        <div><label for="courts">${esc(t('courts'))}</label>
           <input id="courts" name="courts" type="number" min="1" max="20"
             value="${esc(form.courts || 3)}"></div>
-        <div><label for="duration_min">Duration (min)</label>
+        <div><label for="duration_min">${esc(t('durationMin'))}</label>
           <input id="duration_min" name="duration_min" type="number" min="10" max="600"
             value="${esc(form.duration_min || 90)}"></div>
-        <div><label for="round_min">Round (min)</label>
+        <div><label for="round_min">${esc(t('roundMin'))}</label>
           <input id="round_min" name="round_min" type="number" min="5" max="120"
             value="${esc(form.round_min || 12)}"></div>
       </div>
-      <div class="actions"><button>Create</button></div>
-      <p class="note" style="margin-top:16px">The same thing happens from the group with
-        <span class="mono">!tournament non-stop level MX-4 date 2026-09-05 19:00 courts 3 duration 90</span>
-        — the bot runs the level and the date through the same checks this form does.</p>
+      <div class="actions"><button>${esc(t('create'))}</button></div>
+      <p class="note" style="margin-top:16px">${
+        esc(t('botDoesTheSame', { cmd: '\u0000' })).replace('\u0000',
+          `<span class="mono">${esc(cmd)}</span>`)}</p>
     </form>
-    ${tournaments.map((t) => `<div class="card"><div class="head">
-      <div style="min-width:0"><strong>${esc(t.level) || 'open'}</strong>
-        <span class="muted"> · ${esc(levelShort(t.level))}</span><br>
-        <span class="muted">${esc(humanWhen(t))} · ${t.courts} courts</span></div>
-      <a class="btn ghost" href="/t/${t.id}">Open</a></div></div>`).join('')}
-  `, { nav: navFor('/tournaments'), script: LEVEL_JS })
+    ${tournaments.map((x) => `<div class="card"><div class="head">
+      <div style="min-width:0"><strong>${esc(x.level) || esc(t('statusOpen'))}</strong>
+        <span class="muted"> · ${esc(levelShort(x.level, t))}</span><br>
+        <span class="muted">${esc(humanWhen(x, { lang: t.lang }))} · ${
+          esc(t('courtsN', { n: x.courts }))}</span></div>
+      <a class="btn ghost" href="/t/${x.id}">${esc(t('open'))}</a></div></div>`).join('')}
+  `, { nav: navFor('/tournaments', t), script: LEVEL_JS, t, here: '/tournaments' })
 }
 
-export function tournamentPage({ t, teams, waiting, matches, table, message, courts }) {
+export function tournamentPage({ tournament: tour, teams, waiting, matches, table, message, courts, t }) {
   const rounds = [...new Set(matches.map((m) => m.round))]
   // A mixed level asks every pair to be one of each. The host would otherwise
   // find out at the draw, which is too late to fix by messaging anyone.
-  const offLevel = isMixedLevel(t.level) ? teams.filter((x) => !x.mixed) : []
+  const offLevel = isMixedLevel(tour.level) ? teams.filter((x) => !x.mixed) : []
 
-  return page(`Tournament ${t.id}`, `
-    <h1>${esc(t.level) || 'Open'} · ${esc(humanWhen(t))}</h1>
-    <p class="muted">${esc(levelLabel(t.level))}</p>
-    <p class="muted">${t.courts} courts · ${t.duration_min} min · ${t.round_min} min rounds
-      · <span class="pill">${esc(t.status)}</span>
-      · <a href="/t/${t.id}/tv">TV view</a></p>
+  return page(`${tour.level || ''} ${humanWhen(tour, { lang: t.lang })}`.trim(), `
+    <h1>${esc(tour.level) || esc(t('statusOpen'))} · ${esc(humanWhen(tour, { lang: t.lang }))}</h1>
+    <p class="muted">${esc(levelLabel(tour.level, t))}</p>
+    <p class="muted">${esc(t('courtsN', { n: tour.courts }))} · ${
+      esc(t('minutes', { n: tour.duration_min }))} · ${esc(t('minRounds', { n: tour.round_min }))}
+      · <span class="pill">${esc(statusLabel(tour.status, t))}</span>
+      · <a href="/t/${tour.id}/tv">${esc(t('tvView'))}</a></p>
 
     <div class="grid">
-      <div class="card"><h3>Teams (${teams.length})</h3>
-        ${offLevel.length ? `<p class="err">${offLevel.length} of ${teams.length} pairs
-          ${offLevel.length === 1 ? 'is' : 'are'} not mixed, and this is a mixed level:
-          ${offLevel.map((x) => esc(x.name)).join(', ')}.</p>` : ''}
+      <div class="card"><h3>${esc(t('teams'))} (${teams.length})</h3>
+        ${offLevel.length ? `<p class="err">${esc(t('mixedWarning', {
+          bad: offLevel.length, total: teams.length,
+          verb: t(offLevel.length === 1 ? 'isNotAre' : 'areNotIs'),
+          names: offLevel.map((x) => x.name).join(', '),
+        }))}</p>` : ''}
         ${wrapTable(`<tbody>${teams.map((x, i) => `<tr><td class="pos">${i + 1}</td>
           <td class="lead">${esc(x.name)}</td>
-          <td>${x.mixed ? '<span class="pill on">mixed</span>' : ''}</td></tr>`).join('')
-          || '<tr><td class="muted">Nobody yet</td></tr>'}</tbody>`, 'stack')}
-        ${waiting.length ? `<h3 style="margin-top:16px">Waiting (${waiting.length})</h3>
+          <td>${x.mixed ? `<span class="pill on">${esc(t('mixed'))}</span>` : ''}</td></tr>`).join('')
+          || `<tr><td class="muted">${esc(t('nobodyYet'))}</td></tr>`}</tbody>`, 'stack')}
+        ${waiting.length ? `<h3 style="margin-top:16px">${esc(t('waiting'))} (${waiting.length})</h3>
           ${wrapTable(`<tbody>${waiting.map((p) => `<tr><td class="lead">${esc(p.name)}</td>
-            <td class="muted full">${p.partner ? `waiting on ${esc(p.partner)}` : 'no partner'}</td>
-            </tr>`).join('')}</tbody>`, 'stack')}` : ''}
+            <td class="muted full">${esc(p.partner ? t('waitingOn', { name: p.partner })
+              : t('noPartner'))}</td></tr>`).join('')}</tbody>`, 'stack')}` : ''}
       </div>
-      <div class="card"><h3>WhatsApp message</h3>
+      <div class="card"><h3>${esc(t('whatsappMessage'))}</h3>
         <pre class="msg">${esc(message)}</pre>
-        <div class="actions"><a class="btn ghost" href="/whatsapp">Outbox</a></div>
+        <div class="actions"><a class="btn ghost" href="/whatsapp">${esc(t('outbox'))}</a></div>
       </div>
     </div>
 
-    <div class="card"><h3>Schedule</h3>
-      ${matches.length ? rounds.map((r) => `<h4>Round ${r}</h4>${wrapTable(
-        `<thead><tr><th>Court</th><th>Home</th><th>Away</th><th style="width:180px">Score</th></tr></thead>
+    <div class="card"><h3>${esc(t('schedule'))}</h3>
+      ${matches.length ? rounds.map((r) => `<h4>${esc(t('roundN', { n: r }))}</h4>${wrapTable(
+        `<thead><tr><th>${esc(t('court'))}</th><th>${esc(t('home'))}</th><th>${esc(t('away'))}</th>
+          <th style="width:180px">${esc(t('score'))}</th></tr></thead>
         <tbody>${matches.filter((m) => m.round === r).map((m) => `<tr>
           <td class="pos full">${esc(m.court)}</td>
           <td class="lead full" data-l="">${esc(m.team_a)}</td>
           <td class="full" data-l="v">${esc(m.team_b)}</td>
           <td class="full"><form class="score" method="post" action="/matches/${m.id}/score">
             <input name="a" type="number" min="0" max="99" inputmode="numeric"
-              aria-label="Score for ${esc(m.team_a)}" value="${m.score_a ?? ''}">
+              aria-label="${esc(t('score'))} — ${esc(m.team_a)}" value="${m.score_a ?? ''}">
             <input name="b" type="number" min="0" max="99" inputmode="numeric"
-              aria-label="Score for ${esc(m.team_b)}" value="${m.score_b ?? ''}">
-            <button class="btn ghost">Save</button>
+              aria-label="${esc(t('score'))} — ${esc(m.team_b)}" value="${m.score_b ?? ''}">
+            <button class="btn ghost">${esc(t('save'))}</button>
           </form></td></tr>`).join('')}</tbody>`, 'stack')}`).join('')
-        : `<p class="muted">No schedule yet.</p>
-           <form method="post" action="/t/${t.id}/schedule"><div class="actions">
-             <button ${teams.length < 2 ? 'disabled' : ''}>Draw the schedule</button></div></form>
-           ${teams.length < 2 ? '<p class="hint">Two pairs is the minimum — there is nobody to play yet.</p>' : ''}
-           ${courts.length ? '' : '<p class="note">Add courts in Settings first — the draw needs somewhere to put the matches.</p>'}`}
+        : `<p class="muted">${esc(t('noSchedule'))}</p>
+           <form method="post" action="/t/${tour.id}/schedule"><div class="actions">
+             <button ${teams.length < 2 ? 'disabled' : ''}>${esc(t('drawSchedule'))}</button></div></form>
+           ${teams.length < 2 ? `<p class="hint">${esc(t('needTwoPairs'))}</p>` : ''}
+           ${courts.length ? '' : `<p class="note">${esc(t('addCourtsFirst'))}</p>`}`}
     </div>
 
-    <div class="card"><h3>Standings</h3>
-      ${wrapTable(`<thead><tr><th>#</th><th>Team</th><th class="num">Played</th>
-        <th class="num">Won</th><th class="num">Points</th><th class="num">Against</th></tr></thead>
+    <div class="card"><h3>${esc(t('standings'))}</h3>
+      ${wrapTable(`<thead><tr><th>#</th><th>${esc(t('team'))}</th><th class="num">${esc(t('played'))}</th>
+        <th class="num">${esc(t('won'))}</th><th class="num">${esc(t('points'))}</th>
+        <th class="num">${esc(t('against'))}</th></tr></thead>
       <tbody>${table.map((r, i) => `<tr><td class="pos">${i + 1}</td>
         <td class="lead">${esc(r.team)}</td>
-        <td class="num" data-l="Played">${r.played}</td>
-        <td class="num" data-l="Won">${r.won}</td>
-        <td class="num" data-l="Points"><strong>${r.points}</strong></td>
-        <td class="num muted" data-l="Against">${r.against}</td></tr>`).join('')
-        || '<tr><td class="muted" colspan="6">No results yet</td></tr>'}</tbody>`, 'stack')}
-    </div>`, { nav: navFor('/tournaments') })
+        <td class="num" data-l="${esc(t('played'))}">${r.played}</td>
+        <td class="num" data-l="${esc(t('won'))}">${r.won}</td>
+        <td class="num" data-l="${esc(t('points'))}"><strong>${r.points}</strong></td>
+        <td class="num muted" data-l="${esc(t('against'))}">${r.against}</td></tr>`).join('')
+        || `<tr><td class="muted" colspan="6">${esc(t('noResults'))}</td></tr>`}</tbody>`, 'stack')}
+    </div>`, { nav: navFor('/tournaments', t), t, here: '/tournaments' })
 }
 
 /** Full-screen, high-contrast, self-refreshing — this one is read from ten metres. */
-export function tvPage({ t, club, matches, table }) {
+export function tvPage({ tournament: tour, club, matches, table, t }) {
   const rounds = [...new Set(matches.map((m) => m.round))]
   const live = rounds.length ? rounds[0] : null
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8">
+  return `<!doctype html><html lang="${t.lang}"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="refresh" content="20">
-<title>${esc(club.name)} — live</title><style>${CSS}
+<title>${esc(club.name)} — ${esc(t('live'))}</title><style>${CSS}
 body{padding:2vh 3vw}
 h1{font-size:clamp(24px,4vw,56px);margin:0;overflow-wrap:anywhere}
 .sub{font-size:clamp(13px,1.6vw,24px);color:var(--muted);margin-bottom:2vh}
@@ -371,46 +419,43 @@ h1{font-size:clamp(24px,4vw,56px);margin:0;overflow-wrap:anywhere}
 /* A phone held up in the clubhouse gets the same board, one panel under the other. */
 @media (max-width:760px){.tv{grid-template-columns:1fr;gap:12px}body{padding:14px}}
 </style></head><body>
-<h1>${esc(club.name)} — ${esc(levelShort(t.level))}</h1>
-<div class="sub">${esc(humanWhen(t, { tbc: '' }))} · ${t.round_min} min rounds${
-  live ? ` · Round ${live}` : ''}</div>
+<h1>${esc(club.name)} — ${esc(levelShort(tour.level, t))}</h1>
+<div class="sub">${esc(humanWhen(tour, { lang: t.lang, tbc: '' }))} · ${
+  esc(t('minRounds', { n: tour.round_min }))}${live ? ` · ${esc(t('roundN', { n: live }))}` : ''}</div>
 <div class="tv">
-  <div><h2>Now on court</h2><div class="tablewrap"><table>
+  <div><h2>${esc(t('nowOnCourt'))}</h2><div class="tablewrap"><table>
     ${matches.filter((m) => m.round === live).map((m) => `<tr>
       <td class="court">${esc(m.court)}</td><td>${esc(m.team_a)}</td>
       <td class="muted">v</td><td>${esc(m.team_b)}</td></tr>`).join('')
-      || '<tr><td class="muted">Schedule not drawn yet</td></tr>'}
+      || `<tr><td class="muted">${esc(t('notDrawn'))}</td></tr>`}
   </table></div></div>
-  <div><h2>Standings</h2><div class="tablewrap"><table>
+  <div><h2>${esc(t('standings'))}</h2><div class="tablewrap"><table>
     ${table.slice(0, 10).map((r, i) => `<tr><td class="pos">${i + 1}</td><td>${esc(r.team)}</td>
       <td class="num"><strong>${r.points}</strong></td></tr>`).join('')
-      || '<tr><td class="muted">No results yet</td></tr>'}
+      || `<tr><td class="muted">${esc(t('noResults'))}</td></tr>`}
   </table></div></div>
 </div></body></html>`
 }
 
-export function whatsappPage({ live, outbox, log }) {
-  return page('WhatsApp', `
-    <h1>WhatsApp</h1>
-    <p><span class="pill ${live ? 'on' : ''}">${live ? 'live' : 'draft mode'}</span></p>
-    ${live ? '' : `<p class="note">Draft mode: the bot does the parsing, the state and the
-      formatting, and leaves the last hop to a human. WhatsApp has no official group API —
-      posting into a group means pairing a number as a linked device, which is against their
-      terms and gets numbers banned. Nobody has authorised that, so nothing is connected.</p>`}
-    <div class="card"><h3>Try a command</h3>
+export function whatsappPage({ live, outbox, log, t }) {
+  return page(t('navWhatsapp'), `
+    <h1>${esc(t('navWhatsapp'))}</h1>
+    <p><span class="pill ${live ? 'on' : ''}">${esc(live ? t('live') : t('draftMode'))}</span></p>
+    ${live ? '' : `<p class="note">${esc(t('draftNote'))}</p>`}
+    <div class="card"><h3>${esc(t('tryCommand'))}</h3>
       <form method="post" action="/whatsapp/simulate">
-        <label for="watext">Message</label>
+        <label for="watext">${esc(t('message'))}</label>
         <input id="watext" name="text" class="mono" placeholder="!in Mike M partner Sofia" required>
-        <label for="waid">From (optional)</label>
+        <label for="waid">${esc(t('fromOptional'))}</label>
         <input id="waid" name="wa_id" inputmode="tel" placeholder="+351…">
-        <div class="actions"><button>Send to the bot</button></div>
+        <div class="actions"><button>${esc(t('sendToBot'))}</button></div>
       </form>
-      ${log ? `<h3 style="margin-top:18px">Reply</h3><pre class="msg">${esc(log)}</pre>` : ''}
+      ${log ? `<h3 style="margin-top:18px">${esc(t('reply'))}</h3><pre class="msg">${esc(log)}</pre>` : ''}
     </div>
-    <div class="card"><h3>Outbox — paste these into the group</h3>
+    <div class="card"><h3>${esc(t('outboxTitle'))}</h3>
       ${outbox.length ? outbox.map((m) => `<pre class="msg" style="margin-bottom:12px">${esc(m.text)}</pre>`).join('')
-        : '<p class="muted">Nothing waiting.</p>'}
-    </div>`, { nav: navFor('/whatsapp') })
+        : `<p class="muted">${esc(t('nothingWaiting'))}</p>`}
+    </div>`, { nav: navFor('/whatsapp', t), t, here: '/whatsapp' })
 }
 
-export const _internal = { esc, parseLevel }
+export const _internal = { esc, parseLevel, statusLabel }

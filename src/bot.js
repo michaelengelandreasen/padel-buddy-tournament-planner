@@ -1,10 +1,11 @@
 import {
-  addSignup, createTournament, currentTournament,
+  addSignup, clubLanguage, clubRules, createTournament, currentTournament,
   getClub, listSignups, removeSignup,
 } from './db.js'
-import { buildTeams } from './formats/nonstop.js'
-import { humanWhen, parseWhen, validateWhen } from './dates.js'
-import { isMixedLevel, levelHelp, levelShort, parseLevel } from './levels.js'
+import { buildTeams, slots } from './formats/nonstop.js'
+import { dayName, humanWhen, parseWhen, shortDate, timeRange, validateWhen } from './dates.js'
+import { levelHelp, levelTight, parseLevel } from './levels.js'
+import { translator } from './i18n.js'
 
 /**
  * The WhatsApp command language.
@@ -26,7 +27,8 @@ const KEYS = ['level', 'date', 'courts', 'duration', 'round']
  * night nobody could self-select into and left the console with a value its
  * picker could not show; the date used to stay the word "Friday" forever.
  */
-function parseTournament(rest, { now = new Date() } = {}) {
+function parseTournament(rest, { now = new Date(), lang } = {}) {
+  const t = translator(lang)
   const clean = rest.replace(/[<>]/g, ' ')
   const out = { format: 'non-stop' }
   // Each key takes the words up to the next key, so a date can contain spaces.
@@ -40,14 +42,14 @@ function parseTournament(rest, { now = new Date() } = {}) {
   const head = (hits[0] ? clean.slice(0, hits[0].index) : clean).trim()
   if (/americano/i.test(head)) out.format = 'americano'
 
-  const level = parseLevel(out.level)
-  if (!level.ok) return { ok: false, error: `${level.error}\n\n${levelHelp()}` }
+  const level = parseLevel(out.level, { lang })
+  if (!level.ok) return { ok: false, error: `${level.error}\n\n${levelHelp(t)}` }
 
   // The date stays optional from the group — a host who knows the level but not
   // the evening can still open the board — but if one is given it has to be real.
-  const when = parseWhen(out.date, { now })
+  const when = parseWhen(out.date, { now, lang })
   if (!when.ok) return { ok: false, error: when.error }
-  const valid = validateWhen(when, { now })
+  const valid = validateWhen(when, { now, lang })
   if (!valid.ok) return { ok: false, error: valid.error }
 
   return {
@@ -100,127 +102,136 @@ function split(text) {
  * Handle one incoming message. Returns the reply text, or null to stay quiet —
  * a bot that answers everything in a group chat gets muted by lunchtime.
  */
-export function handle(text, { waId = '', isHost = true } = {}) {
+export function handle(text, { waId = '', isHost = true, lang = clubLanguage() } = {}) {
   const parsed = split(text)
   if (!parsed) return null
   const { cmd, rest } = parsed
+  const s = translator(lang)
+  const OPEN_CMD = '`!tournament non-stop level MX-4 date 2026-09-05 11:00 courts 3 duration 120`'
+  const IN_CMD = '`!in Mike M partner Sofia`'
 
   if (cmd === 'tournament') {
-    if (!isHost) return '🔒 Only the host can open a tournament.'
-    const parsedT = parseTournament(rest)
+    if (!isHost) return s('onlyHostOpens')
+    const parsedT = parseTournament(rest, { lang })
     if (!parsedT.ok) return `⚠️ ${parsedT.error}`
-    return openedMessage(createTournament(parsedT.value))
+    return boardMessage(createTournament(parsedT.value), '', lang)
   }
 
   if (cmd === 'in') {
     const t = currentTournament()
-    if (!t) return '🎾 No tournament is open yet. The host starts one with:\n`!tournament non-stop level MX-4 date Friday courts 3 duration 90`'
+    if (!t) return s('noTournamentOpen', { cmd: OPEN_CMD })
     const p = parseSignup(rest)
-    if (!p.name) return '🤔 I need a name — try `!in Mike M partner Sofia`.'
+    if (!p.name) return s('needAName', { cmd: IN_CMD })
     addSignup(t.id, { ...p, wa_id: waId })
-    return signupMessage(t)
+    return boardMessage(t, '', lang)
   }
 
   if (cmd === 'out') {
     const t = currentTournament()
     if (!t) return null
     const name = parseSignup(rest).name
-    if (!name) return '🤔 Who is dropping out? Try `!out Mike`.'
+    if (!name) return s('whoIsDropping', { cmd: '`!out Mike`' })
     const gone = removeSignup(t.id, name)
-    if (!gone) return `🤷 I don't have ${name} on the list.`
-    return signupMessage(t, `👋 ${gone.name} is out.`)
+    if (!gone) return s('notOnTheList', { name })
+    return boardMessage(t, s('isOut', { name: gone.name }), lang)
   }
 
   if (cmd === 'list' || cmd === 'players') {
     const t = currentTournament()
-    return t ? signupMessage(t) : '🎾 No tournament is open yet.'
+    return t ? boardMessage(t, '', lang) : s('noTournamentOpenShort')
   }
 
-  if (cmd === 'levels') return levelHelp()
-  if (cmd === 'help') return helpMessage()
+  if (cmd === 'levels') return levelHelp(s)
+  if (cmd === 'help') return helpMessage(lang)
   return null
 }
 
 const b = (s) => `*${s}*`
 
-export function openedMessage(t) {
-  const club = getClub()
-  const where = club.maps_url ? `\n📍 ${club.address || club.name} — ${club.maps_url}` : ''
-  return [
-    `🎾 ${b('Non-stop smash')} — ${club.name}`,
-    `🏆 Level: ${t.level || 'open'} — ${levelShort(t.level).toLowerCase()}`,
-    `📅 ${humanWhen(t)}`,
-    `🕒 ${t.duration_min} min · ${t.round_min} min rounds`,
-    `🏟️ ${t.courts} court${t.courts === 1 ? '' : 's'}${where}`,
-    '',
-    `Sign up with ${b('!in')} — name, M/F, and your partner:`,
-    '`!in Mike M partner Sofia`',
-    isMixedLevel(t.level) ? '🔀 Mixed level — one of each per pair.' : '',
-    `Dropping out? ${b('!out')} and your name.`,
-  ].filter((l) => l !== '').join('\n')
-}
+/** The slot emoji the group already uses. Category decides which ones appear. */
+const SLOT = { F: '👩🏻', M: '👦🏼' }
 
 /**
  * The sign-up board, re-posted on every change.
  *
- * Pairs first because pairs are what plays; half-teams below with the partner
- * they are waiting on, so the group can see who still needs someone. The count
- * against the courts is the number the host actually cares about.
+ * This is the club's own WhatsApp format, generated instead of retyped: the
+ * weekday and the date come from the tournament's date, the time range is its
+ * start plus its duration, the level and the court count are its settings, and
+ * the slot list is `courts × 4` long — so changing a tournament from three
+ * courts to four adds four blanks rather than needing a new message written by
+ * hand. The empty slots are the point of the format: they are what makes
+ * somebody reply.
  */
-export function signupMessage(t, prefix = '') {
-  const signups = listSignups(t.id)
-  const { teams, waiting } = buildTeams(signups)
-  const lines = []
+export function boardMessage(t, prefix = '', lang = clubLanguage()) {
+  const s = translator(lang)
+  const club = getClub()
+  const { teams, waiting } = buildTeams(listSignups(t.id))
+  const level = parseLevel(t.level)
+  const category = level.ok ? level.category : 'MX'
+  const { board, reserves, size, taken } = slots(teams, waiting, { courts: t.courts, category })
 
+  const lines = []
   if (prefix) lines.push(prefix, '')
-  lines.push(`🎾 ${b(`Non-stop smash — ${t.level || 'open'}`)}`)
-  lines.push(`📅 ${humanWhen(t)} · 🏟️ ${t.courts} court${t.courts === 1 ? '' : 's'}`)
+
+  if (t.play_date) {
+    lines.push(`📆 ${dayName(t.play_date, { lang })}`)
+    lines.push(shortDate(t.play_date))
+  } else {
+    lines.push(`📆 ${s('dateTBC')}`)
+  }
+  const range = timeRange(t.play_time, t.duration_min, { lang })
+  if (range) lines.push(`🕒 ${range}`)
+  lines.push(`📈 ${s('boardFormat')} ${levelTight(t.level) || '—'}`)
+  lines.push('')
+  lines.push(`📍 ${club.name}`)
+  if (club.maps_url) lines.push(club.maps_url)
+  lines.push('')
+  lines.push(`${t.courts} ${s('courtsWord')}`)
   lines.push('')
 
-  if (!teams.length && !waiting.length) {
-    lines.push('_Nobody signed up yet._', '', 'First in: `!in YourName M partner TheirName`')
-    return lines.join('\n')
+  for (const slot of board) {
+    const mark = SLOT[slot.want] || SLOT.M
+    lines.push(slot.player ? `${mark} ${slot.player.name}` : mark)
   }
 
-  if (teams.length) {
-    lines.push(b(`✅ Teams (${teams.length})`))
-    teams.forEach((team, i) => {
-      const marks = team.players.map((p) => genderMark(p.gender)).join('')
-      lines.push(`${medal(i)} ${team.name} ${marks}${team.mixed ? ' 🔀' : ''}`)
-    })
-  }
-  if (waiting.length) {
-    lines.push('', b(`⏳ Waiting for a partner (${waiting.length})`))
-    waiting.forEach((p) => {
-      const wants = p.partner ? ` — waiting on ${p.partner}` : ' — no partner named'
-      lines.push(`• ${p.name} ${genderMark(p.gender)}${wants}`)
-    })
+  if (reserves.length) {
+    lines.push('', b(`${s('reserves')} (${reserves.length})`))
+    reserves.forEach((p) => lines.push(`• ${p.name}`))
   }
 
-  const need = t.courts * 2
-  lines.push('', teams.length >= need
-    ? `🔥 ${teams.length} teams — enough for all ${t.courts} courts.`
-    : `📣 ${teams.length}/${need} teams for ${t.courts} courts — room for ${need - teams.length} more.`)
+  lines.push('')
+  // Blanks say "there is room" on their own; a full board can't, so it says so.
+  lines.push(taken >= size
+    ? (reserves.length ? s('boardFull', { n: reserves.length }) : s('boardFullClean'))
+    : s('whosIn'))
+  lines.push(s('signupHint', { cmd: '`!in Mike M partner Sofia`' }))
+  lines.push(s('dropoutHint', { cmd: '`!out Mike`' }))
+
+  const rules = clubRules(lang)
+  if (rules) lines.push('', b(s('important')), rules)
+
   return lines.join('\n')
 }
 
-const genderMark = (g) => (g === 'F' ? '🙋‍♀️' : g === 'M' ? '🙋‍♂️' : '🙋')
-const medal = (i) => (i === 0 ? '1️⃣' : i === 1 ? '2️⃣' : i === 2 ? '3️⃣' : '▫️')
+/** Kept as names because the console and the API both ask for them. */
+export const signupMessage = (t, prefix = '', lang) => boardMessage(t, prefix, lang)
+export const openedMessage = (t, lang) => boardMessage(t, '', lang)
 
-export function helpMessage() {
+export function helpMessage(lang = clubLanguage()) {
+  const s = translator(lang)
   return [
-    `🎾 ${b('Padel Tournament Planner')}`,
+    `🎾 ${b(s('appName'))}`,
     '',
-    b('Host'),
-    '`!tournament non-stop level MX-4 date 2026-09-05 19:00 courts 3 duration 90`',
+    b(s('helpHost')),
+    '`!tournament non-stop level MX-4 date 2026-09-05 11:00 courts 3 duration 120`',
     '',
-    b('Players'),
-    '`!in Mike M partner Sofia` — sign up as a pair',
-    '`!out Mike` — cancel',
-    '`!list` — who is in',
-    '`!levels` — what MX-4 means',
+    b(s('helpPlayers')),
+    `\`!in Mike M partner Sofia\` — ${s('helpSignUpAsPair')}`,
+    `\`!out Mike\` — ${s('helpCancel')}`,
+    `\`!list\` — ${s('helpWhoIsIn')}`,
+    `\`!levels\` — ${s('helpWhatLevel')}`,
     '',
-    '_Dates: `2026-09-05`, `5 Sep`, `sexta 19:00` or `Friday` all work._',
+    `_${s('helpDates', { examples: '`2026-09-05`, `5 Sep`, `sexta 19:00`, `Friday`' })}_`,
   ].join('\n')
 }
 

@@ -22,6 +22,7 @@ services:
       # projects volume, and ./ resolves through a symlink it doesn't accept.
       - ${PROJECTS_DIR}/padel-tournament-planner/src:/app/src
       - ${PROJECTS_DIR}/padel-tournament-planner/scripts:/app/scripts
+      - ${PROJECTS_DIR}/padel-tournament-planner/test:/app/test
       - ${PROJECTS_DIR}/padel-tournament-planner/data:/app/data
     labels:
       - traefik.enable=true

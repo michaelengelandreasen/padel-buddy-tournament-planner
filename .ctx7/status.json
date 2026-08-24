@@ -16,18 +16,30 @@
     {
       "title": "Padel Tribe (Porto) sample data",
       "state": "done"
+    },
+    {
+      "title": "Club WhatsApp board format",
+      "state": "done"
+    },
+    {
+      "title": "Portuguese / English language choice",
+      "state": "done"
     }
   ],
   "activity": [
+    {
+      "at": "2026-08-24T14:22:19.253Z",
+      "text": "Board message rebuilt as a courts x 4 slot list driven by tournament settings; full EN/PT layer (src/i18n.js) across console, bot and errors; drop-out policy editable in both languages. 17/17 tests pass."
+    },
     {
       "at": "2026-08-24T12:50:51.880Z",
       "text": "Added src/levels.js and src/dates.js, migrated tournaments to ISO date + time, rebuilt the console mobile-first, seeded Padel Tribe. 10/10 parser tests pass."
     }
   ],
   "status": "active",
-  "headline": "Padel Tribe, Porto — date picker, validated skill levels, phone-first console",
-  "summary": "Console at padel-tournament-planner.mike.users.ctx7.dev now stores the date as ISO + time behind a real date picker (min=today, past and >2y refused) and the skill level as a validated MX/M/F + grade 1-7 code, enforced identically on the web form and the !tournament command. Mobile rebuilt: no page ",
-  "next": "Confirm the level ladder matches how the club actually advertises its nights, and the real court names",
+  "headline": "Club WhatsApp board format, generated — and EN/PT throughout",
+  "summary": "The bot now posts the club's own board format (weekday, DD/MM/YYYY, time range, Nonstop MX4, location, N courts, courts x 4 slot list, drop-out policy) generated from each tournament's settings instead of retyped. A mixed level alternates woman/man down the slots so the board shape enforces one-of-e",
+  "next": "Confirm the level ladder and the Portuguese wording of the drop-out policy with the club",
   "url": "https://padel-tournament-planner.mike.users.ctx7.dev",
-  "updated": "2026-08-24T12:50:51.943Z"
+  "updated": "2026-08-24T14:22:19.256Z"
 }

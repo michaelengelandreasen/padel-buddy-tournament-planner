@@ -49,6 +49,58 @@ export function buildTeams(signups) {
 }
 
 /**
+ * How many players the night has room for: four to a court, all courts busy at
+ * once. Six pairs on three courts is three simultaneous matches — the same
+ * number the sign-up board draws slots for.
+ */
+export const capacity = (courts) => Math.max(0, Number(courts) || 0) * 4
+
+/**
+ * The sign-up board as a list of slots, which is how the group reads it.
+ *
+ * A padel club posts a fixed list of blanks and fills them in — the empty lines
+ * are the message, because they are what makes someone reply. A mixed level
+ * alternates woman/man down the list, so a pair occupies two adjacent slots and
+ * the shape of the board itself enforces "one of each".
+ *
+ * Complete pairs are seated first, in sign-up order, each taking the next free
+ * adjacent pair of slots. Players still waiting on a partner then drop into the
+ * first free slot their gender fits — they are in the tournament, just not yet
+ * in a pair, and hiding them until their partner messages is how a club ends up
+ * double-booking a court. Anyone past capacity comes back as `reserves`.
+ */
+export function slots(teams, waiting, { courts, category = 'MX' }) {
+  const size = capacity(courts)
+  const wants = (i) => (category === 'MX' ? (i % 2 === 0 ? 'F' : 'M') : category)
+  const board = Array.from({ length: size }, (_, i) => ({ want: wants(i), player: null }))
+  const reserves = []
+
+  // A mixed pair is written woman first, to line up with the slot it lands in.
+  const ordered = (team) => (category === 'MX'
+    ? [...team.players].sort((a, b) => (a.gender === 'F' ? -1 : b.gender === 'F' ? 1 : 0))
+    : team.players)
+
+  let at = 0
+  for (const team of teams) {
+    while (at + 1 < size && (board[at].player || board[at + 1].player)) at += 2
+    if (at + 1 >= size) { reserves.push(...ordered(team)); continue }
+    const [first, second] = ordered(team)
+    board[at].player = first
+    board[at + 1].player = second
+    at += 2
+  }
+
+  for (const p of waiting) {
+    const free = board.findIndex((s) => !s.player && (!p.gender || s.want === p.gender))
+    const any = free >= 0 ? free : board.findIndex((s) => !s.player)
+    if (any >= 0) board[any].player = p
+    else reserves.push(p)
+  }
+
+  return { board, reserves, size, taken: board.filter((s) => s.player).length }
+}
+
+/**
  * Round-robin over pairs, laid onto the courts available.
  *
  * The classic circle method: fix one team, rotate the rest. With an odd number

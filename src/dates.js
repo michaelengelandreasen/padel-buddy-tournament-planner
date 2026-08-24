@@ -12,6 +12,8 @@
  * "is this date in the past" is a question about the club's evening, not UTC's.
  */
 
+import { translator } from './i18n.js'
+
 const MONTHS = ['january', 'february', 'march', 'april', 'may', 'june', 'july',
   'august', 'september', 'october', 'november', 'december']
 const DAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
@@ -19,6 +21,12 @@ const DAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 
 // in Portuguese. Matched by prefix, which is why "sabado" and "sábado" both land.
 const DAYS_PT = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado']
 const MONTHS_PT = ['janeiro', 'fevereiro', 'marco', 'abril', 'maio', 'junho', 'julho',
+  'agosto', 'setembro', 'outubro', 'novembro', 'dezembro']
+// Written out for display; the matcher above works off accent-stripped prefixes,
+// but the board and the console print the real spelling.
+const DAYS_PT_LONG = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira',
+  'quinta-feira', 'sexta-feira', 'sábado']
+const MONTHS_PT_LONG = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho',
   'agosto', 'setembro', 'outubro', 'novembro', 'dezembro']
 
 const pad = (n) => String(n).padStart(2, '0')
@@ -51,7 +59,7 @@ const shift = (dt, days) => new Date(dt.getFullYear(), dt.getMonth(), dt.getDate
  * or a date with no year resolves *forward*: "Friday" in December is January's
  * Friday, never one that has already happened.
  */
-export function parseWhen(input, { now = new Date() } = {}) {
+export function parseWhen(input, { now = new Date(), lang } = {}) {
   const raw = String(input ?? '').trim()
   if (!raw) return { ok: true, date: '', time: '' }
 
@@ -92,7 +100,7 @@ export function parseWhen(input, { now = new Date() } = {}) {
   if (iso) {
     const v = `${iso[1]}-${pad(Number(iso[2]))}-${pad(Number(iso[3]))}`
     return isISODate(v) ? { ok: true, date: v, time }
-      : { ok: false, error: `${raw} isn't a real date.` }
+      : { ok: false, error: translator(lang)('dateNotReal', { raw }) }
   }
 
   // A bare weekday: the next one, today included — a Friday night tournament
@@ -119,7 +127,7 @@ export function parseWhen(input, { now = new Date() } = {}) {
   if (slash) {
     const [d, mo] = [Number(slash[1]), Number(slash[2])]
     const year = slash[3] ? Number(slash[3].length === 2 ? `20${slash[3]}` : slash[3]) : null
-    return resolve(d, mo, year, today, time, raw)
+    return resolve(d, mo, year, today, time, raw, lang)
   }
 
   // 5 sep / sep 5 / 5 september 2026
@@ -129,18 +137,17 @@ export function parseWhen(input, { now = new Date() } = {}) {
     const mo = MONTHS.findIndex((m, i) =>
       m.startsWith(stem) || MONTHS_PT[i].startsWith(stem))
     const d = Number(words[1] || words[3])
-    if (mo >= 0 && d) return resolve(d, mo + 1, words[4] ? Number(words[4]) : null, today, time, raw)
+    if (mo >= 0 && d) {
+      return resolve(d, mo + 1, words[4] ? Number(words[4]) : null, today, time, raw, lang)
+    }
   }
 
-  return {
-    ok: false,
-    error: `I couldn't read "${raw}" as a date. Try 2026-09-05, 5 Sep, or Friday.`,
-  }
+  return { ok: false, error: translator(lang)('dateUnreadable', { raw }) }
 }
 
 /** Fill in a missing year with the one that puts the date ahead of us, not behind. */
-function resolve(d, mo, year, today, time, raw) {
-  const bad = { ok: false, error: `${raw} isn't a real date.` }
+function resolve(d, mo, year, today, time, raw, lang) {
+  const bad = { ok: false, error: translator(lang)('dateNotReal', { raw }) }
   if (mo < 1 || mo > 12 || d < 1 || d > 31) return bad
   if (year) {
     const v = `${year}-${pad(mo)}-${pad(d)}`
@@ -160,31 +167,71 @@ function resolve(d, mo, year, today, time, raw) {
  * out. The last one is a typo guard — `2062-09-05` is a slipped finger, and it
  * would otherwise sit at the top of the list until someone noticed.
  */
-export function validateWhen({ date, time }, { now = new Date() } = {}) {
-  if (date && !isISODate(date)) return { ok: false, error: `${date} isn't a real date.` }
-  if (time && !isTime(time)) return { ok: false, error: `${time} isn't a time — use 19:00.` }
+export function validateWhen({ date, time }, { now = new Date(), lang } = {}) {
+  const t = translator(lang)
+  if (date && !isISODate(date)) return { ok: false, error: t('dateNotReal', { raw: date }) }
+  if (time && !isTime(time)) return { ok: false, error: t('timeNotReal', { raw: time }) }
   if (date) {
     const dt = toDate(date)
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    if (dt < today) return { ok: false, error: `${humanDate(date)} has already been played — pick a date from today on.` }
-    if (dt > shift(today, 730)) return { ok: false, error: `${humanDate(date)} is more than two years out — is that the year you meant?` }
+    const when = humanDate(date, { now, lang })
+    if (dt < today) return { ok: false, error: t('datePast', { when }) }
+    if (dt > shift(today, 730)) return { ok: false, error: t('dateTooFar', { when }) }
   }
   return { ok: true }
 }
 
-/** `2026-09-05` → `Friday 5 September`, with the year only when it isn't this one. */
-export function humanDate(date, { now = new Date() } = {}) {
+/** `2026-09-05` → `Friday 5 September` / `Sábado, 5 de setembro`. */
+export function humanDate(date, { now = new Date(), lang } = {}) {
   const dt = toDate(date)
   if (!dt) return String(date || '')
   const year = dt.getFullYear() === now.getFullYear() ? '' : ` ${dt.getFullYear()}`
-  const day = DAYS[dt.getDay()], month = MONTHS[dt.getMonth()]
-  return `${cap(day)} ${dt.getDate()} ${cap(month)}${year}`
+  if (lang === 'pt') {
+    const ptYear = year ? ` de ${dt.getFullYear()}` : ''
+    return `${cap(DAYS_PT_LONG[dt.getDay()])}, ${dt.getDate()} de ${MONTHS_PT_LONG[dt.getMonth()]}${ptYear}`
+  }
+  return `${cap(DAYS[dt.getDay()])} ${dt.getDate()} ${cap(MONTHS[dt.getMonth()])}${year}`
+}
+
+/** Just the weekday — the board prints it on a line of its own. */
+export function dayName(date, { lang } = {}) {
+  const dt = toDate(date)
+  if (!dt) return ''
+  return cap(lang === 'pt' ? DAYS_PT_LONG[dt.getDay()] : DAYS[dt.getDay()])
+}
+
+/** `2026-09-05` → `05/09/2026`, day first, the way the group writes it. */
+export function shortDate(date) {
+  const dt = toDate(date)
+  if (!dt) return ''
+  return `${pad(dt.getDate())}/${pad(dt.getMonth() + 1)}/${dt.getFullYear()}`
+}
+
+/**
+ * `11:00` + 120 min → `11AM-1PM` in English, `11h-13h` in Portuguese.
+ *
+ * The end is the start plus the duration, so the range moves whenever the
+ * tournament's own settings do — that is the whole point of generating it
+ * rather than typing it into the group by hand. Portugal reads a 24-hour clock,
+ * so the two languages genuinely differ here, not just in their words.
+ */
+export function timeRange(time, durationMin, { lang } = {}) {
+  if (!isTime(time)) return ''
+  const [h, m] = time.split(':').map(Number)
+  const endMins = (h * 60 + m + (Number(durationMin) || 0)) % (24 * 60)
+  const end = { h: Math.floor(endMins / 60), m: endMins % 60 }
+  const fmt = lang === 'pt'
+    ? (hh, mm) => `${hh}h${mm ? pad(mm) : ''}`
+    : (hh, mm) => `${((hh + 11) % 12) + 1}${mm ? `:${pad(mm)}` : ''}${hh < 12 ? 'AM' : 'PM'}`
+  const from = fmt(h, m)
+  const to = fmt(end.h, end.m)
+  return durationMin ? `${from}-${to}` : from
 }
 
 /** The one-line form the board, the console and the TV all print. */
-export function humanWhen({ play_date, play_time }, { now = new Date(), tbc = 'Date TBC' } = {}) {
-  if (!play_date) return tbc
-  const d = humanDate(play_date, { now })
+export function humanWhen({ play_date, play_time }, { now = new Date(), lang, tbc } = {}) {
+  if (!play_date) return tbc ?? translator(lang)('dateTBC')
+  const d = humanDate(play_date, { now, lang })
   return play_time ? `${d}, ${play_time}` : d
 }
 
