@@ -28,6 +28,10 @@
   ],
   "activity": [
     {
+      "at": "2026-08-24T15:43:42.888Z",
+      "text": "Score entry rebuilt: each match is a form with one line per team and that team's score box on it; Save spans both. Old table column strings removed."
+    },
+    {
       "at": "2026-08-24T14:22:19.253Z",
       "text": "Board message rebuilt as a courts x 4 slot list driven by tournament settings; full EN/PT layer (src/i18n.js) across console, bot and errors; drop-out policy editable in both languages. 17/17 tests pass."
     },
@@ -41,5 +45,5 @@
   "summary": "The bot now posts the club's own board format (weekday, DD/MM/YYYY, time range, Nonstop MX4, location, N courts, courts x 4 slot list, drop-out policy) generated from each tournament's settings instead of retyped. A mixed level alternates woman/man down the slots so the board shape enforces one-of-e",
   "next": "Confirm the level ladder and the Portuguese wording of the drop-out policy with the club",
   "url": "https://padel-tournament-planner.mike.users.ctx7.dev",
-  "updated": "2026-08-24T14:22:19.256Z"
+  "updated": "2026-08-24T15:43:42.916Z"
 }

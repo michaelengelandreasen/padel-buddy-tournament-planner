@@ -1,2 +1,5 @@
 data/
 .env
+android/app/build/
+android/.gradle/
+android/.kotlin/
