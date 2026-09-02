@@ -16,6 +16,17 @@ android {
         versionName = "0.1.0"
     }
 
+    // Debug key lives in-tree so every builder (ctx7-builder, a docker run, a laptop)
+    // signs identically. A different key = INSTALL_FAILED_UPDATE_INCOMPATIBLE on the
+    // phone, and the only way past that is an uninstall that wipes app data.
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
     buildTypes { release { isMinifyEnabled = false } }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
