@@ -26,12 +26,12 @@ services:
       - ${PROJECTS_DIR}/padel-tournament-planner/data:/app/data
     labels:
       - traefik.enable=true
-      - 'traefik.http.routers.padel-tournament-planner.rule=Host(`padel-tournament-planner.mike.users.ctx7.dev`)'
+      - 'traefik.http.routers.padel-tournament-planner.rule=Host(`padel-tournament-planner.mikehome.users.ctx7.dev`)'
       - traefik.http.routers.padel-tournament-planner.entrypoints=websecure
       - traefik.http.routers.padel-tournament-planner.tls=true
       - traefik.http.routers.padel-tournament-planner.tls.certresolver=cloudflare
-      - 'traefik.http.routers.padel-tournament-planner.tls.domains[0].main=mike.users.ctx7.dev'
-      - 'traefik.http.routers.padel-tournament-planner.tls.domains[0].sans=*.mike.users.ctx7.dev'
+      - 'traefik.http.routers.padel-tournament-planner.tls.domains[0].main=mikehome.users.ctx7.dev'
+      - 'traefik.http.routers.padel-tournament-planner.tls.domains[0].sans=*.mikehome.users.ctx7.dev'
       - traefik.http.services.padel-tournament-planner.loadbalancer.server.port=8080
 
 networks:
