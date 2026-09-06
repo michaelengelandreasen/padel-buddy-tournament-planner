@@ -2,7 +2,7 @@
 
 A WhatsApp-driven tournament organiser for a padel club. Non-stop smash only, for now.
 
-Live: https://padel-tournament-planner.mike.users.ctx7.dev
+Live: https://padel-tournament-planner.mikehome.users.ctx7.dev
 
 Seeded with **Padel Tribe**, R. Gonçalves Zarco 1813, Matosinhos (Porto) —
 [map](https://maps.app.goo.gl/PC4yvKz3BES4Xuh66): four courts, a Saturday
@@ -167,7 +167,14 @@ Partners can be written `partner X`, `with X`, `+ X` or `& X`.
 
 ## Running
 
+The bind mounts are absolute, because the container broker refuses a `./` path
+that resolves through a symlink. They read `PROJECTS_DIR` from a gitignored
+`.env`, so a fresh clone (or a new host) needs it written first — without it
+Docker mounts empty directories over `/app/src` and the app crash-loops on
+`Cannot find module '/app/src/server.js'`:
+
 ```
+echo PROJECTS_DIR=$(dirname "$PWD") > .env
 docker compose up -d --build
 docker compose exec app node scripts/seed.js --reset   # Padel Tribe sample data
 ```

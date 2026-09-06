@@ -44,6 +44,6 @@
   "headline": "Club WhatsApp board format, generated — and EN/PT throughout",
   "summary": "The bot now posts the club's own board format (weekday, DD/MM/YYYY, time range, Nonstop MX4, location, N courts, courts x 4 slot list, drop-out policy) generated from each tournament's settings instead of retyped. A mixed level alternates woman/man down the slots so the board shape enforces one-of-e",
   "next": "Confirm the level ladder and the Portuguese wording of the drop-out policy with the club",
-  "url": "https://padel-tournament-planner.mike.users.ctx7.dev",
+  "url": "https://padel-tournament-planner.mikehome.users.ctx7.dev",
   "updated": "2026-08-24T15:43:42.916Z"
 }

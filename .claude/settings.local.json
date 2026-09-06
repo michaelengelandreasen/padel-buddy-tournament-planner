@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker compose *)",
+      "Bash(curl -s https://padel-tournament-planner.mikehome.users.ctx7.dev/api/club)",
+      "Bash(curl -s https://padel-tournament-planner.mikehome.users.ctx7.dev/api/tournaments)",
+      "Bash(browser open *)",
+      "Bash(browser url *)",
+      "Bash(browser text *)",
+      "Bash(browser eval *)"
+    ]
+  }
+}
