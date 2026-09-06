@@ -20,6 +20,74 @@ import { LANGUAGES, translator } from './i18n.js'
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
 
+/**
+ * The icon set: one stroke, one weight, one grid, drawn once per page as a
+ * sprite and referenced by name. Every icon means one thing across the whole
+ * console — a court is always this court, "post" is always the megaphone — so
+ * a captain who has learned a screen has learned all of them.
+ */
+const ICONS = {
+  home: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M10 21v-6h4v6"/>',
+  trophy: '<path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/>'
+    + '<path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/>'
+    + '<path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/>'
+    + '<path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/>',
+  sliders: '<path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3"/>'
+    + '<path d="M14 2v4M8 10v4M16 18v4"/>',
+  chats: '<path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4c0-1.1.9-2 2-2h8a2 2 0 0 1 2 2v5Z"/>'
+    + '<path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1"/>',
+  chat: '<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>',
+  court: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M12 5v14"/>'
+    + '<path d="M2 12h4M18 12h4"/>',
+  users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>'
+    + '<path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+  hourglass: '<path d="M5 22h14M5 2h14"/>'
+    + '<path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"/>'
+    + '<path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"/>',
+  calendar: '<rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+  repeat: '<path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/>'
+    + '<path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>',
+  send: '<path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>',
+  megaphone: '<path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>',
+  inbox: '<path d="M22 12h-6l-2 3h-4l-2-3H2"/>'
+    + '<path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  shuffle: '<path d="M2 18h1.4c1.3 0 2.5-.6 3.3-1.7l6.1-8.6c.7-1.1 2-1.7 3.3-1.7H22"/>'
+    + '<path d="m18 2 4 4-4 4"/><path d="M2 6h1.9c1.5 0 2.9.9 3.6 2.2"/>'
+    + '<path d="M22 18h-5.9c-1.3 0-2.6-.7-3.3-1.8l-.5-.8"/><path d="m18 14 4 4-4 4"/>',
+  plus: '<path d="M5 12h14M12 5v14"/>',
+  trash: '<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>'
+    + '<path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>',
+  tv: '<rect width="20" height="15" x="2" y="7" rx="2"/><path d="m17 2-5 5-5-5"/>',
+  pin: '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
+  globe: '<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/>'
+    + '<path d="M2 12h20"/>',
+  doc: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/>'
+    + '<path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8M16 13H8M16 17H8"/>',
+  flag: '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4 22v-7"/>',
+  terminal: '<path d="m4 17 6-6-6-6"/><path d="M12 19h8"/>',
+  coffee: '<path d="M10 2v2M14 2v2M6 2v2"/>'
+    + '<path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"/>',
+  list: '<path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/>',
+  board: '<rect width="8" height="4" x="8" y="2" rx="1"/>'
+    + '<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>'
+    + '<path d="M12 11h4M12 16h4M8 11h.01M8 16h.01"/>',
+  compass: '<path d="M3 11 22 2l-9 19-2-8-8-2Z"/>',
+  arrow: '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
+  alert: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>'
+    + '<path d="M12 9v4M12 17h.01"/>',
+  level: '<path d="M3 20h18"/><path d="M6 16v-4M12 16V8M18 16V4"/>',
+  timer: '<path d="M10 2h4"/><path d="M12 14v-4"/><circle cx="12" cy="14" r="8"/>',
+}
+// `hidden` alone is not enough: the UA stylesheet hides hidden HTML elements, and an
+// <svg> is not one, so without the inline style the sprite paints as a blank box.
+const SPRITE = `<svg hidden aria-hidden="true" style="display:none">${Object.entries(ICONS).map(([k, d]) =>
+  `<symbol id="i-${k}" viewBox="0 0 24 24">${d}</symbol>`).join('')}</svg>`
+
+/** An icon next to a word. Decorative: the word carries the meaning, the icon speeds it up. */
+const ic = (name, cls = '') => `<svg class="i${cls ? ` ${cls}` : ''}" aria-hidden="true"><use href="#i-${name}"/></svg>`
+
 const CSS = `
 :root {
   --bg:#0B1220; --surface:#141C2B; --surface-2:#1B2536; --line:#2A3549;
@@ -48,14 +116,23 @@ header.top .dot{width:32px;height:32px;flex:0 0 32px;border-radius:9px;backgroun
 nav{margin-left:auto;display:flex;gap:2px;max-width:100%;overflow-x:auto;
   scrollbar-width:none;-ms-overflow-style:none}
 nav::-webkit-scrollbar{display:none}
-nav a{display:inline-flex;align-items:center;min-height:44px;padding:0 12px;border-radius:999px;
-  text-decoration:none;color:var(--muted);font-weight:600;white-space:nowrap}
+nav a{display:inline-flex;align-items:center;gap:7px;min-height:44px;padding:0 12px;
+  border-radius:999px;text-decoration:none;color:var(--muted);font-weight:600;white-space:nowrap}
+nav a:hover{color:var(--ink)}
 nav a.on{color:var(--ink);background:var(--surface-2)}
+nav a.on .i{color:var(--brand)}
 form.lang{display:flex;gap:2px;flex:0 0 auto;margin-left:8px}
 form.lang button{background:transparent;color:var(--muted);border:1px solid transparent;
   min-height:44px;padding:0 10px;font-size:.82rem;font-weight:800;letter-spacing:.03em}
 form.lang button.on{color:var(--brand-ink);background:var(--brand)}
 
+.i{width:1.1em;height:1.1em;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:2;
+  stroke-linecap:round;stroke-linejoin:round;vertical-align:-.18em}
+h3 .i,h2 .i{width:20px;height:20px;color:var(--muted);margin-right:.4em;vertical-align:-.22em}
+button .i,.btn .i,nav a .i{width:18px;height:18px}
+.meta{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;color:var(--muted);margin:0 0 .5rem}
+.meta>span,.meta>a{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.meta .i{width:16px;height:16px}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
   padding:20px;margin:16px 0;min-width:0}
 label{display:block;font-size:.82rem;color:var(--muted);margin:12px 0 4px;font-weight:600}
@@ -132,8 +209,9 @@ pre.msg{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--surface-2);
 .match{display:grid;grid-template-columns:1fr auto;gap:8px 14px;align-items:center;
   background:var(--surface-2);border:1px solid var(--line);border-radius:12px;
   padding:12px 14px;margin:10px 0}
-.match .court{grid-column:1/-1;font-weight:800;color:var(--accent);font-size:.74rem;
-  text-transform:uppercase;letter-spacing:.05em}
+.match .court{grid-column:1/-1;display:flex;align-items:center;gap:6px;font-weight:800;
+  color:var(--accent);font-size:.74rem;text-transform:uppercase;letter-spacing:.05em}
+.match .court .i{width:16px;height:16px}
 .match .sides{min-width:0}
 .match .side{display:flex;align-items:center;gap:12px;padding:7px 0}
 .match .side+.side{border-top:1px solid var(--line)}
@@ -168,11 +246,23 @@ pre.msg{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--surface-2);
 .roundhead button{white-space:nowrap}
 .head{display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:space-between}
 
+/*
+ * On a phone the nav becomes a tab bar under the thumb. Four labelled items no
+ * longer fit across the top of a 390px screen once they carry icons, and a
+ * scrolling top strip hides whichever tab you are not on; a bottom bar shows all
+ * four, always, and puts them where a hand already is.
+ */
 @media (max-width:720px){
-  .wrap{padding:16px 14px 56px}
+  .wrap{padding:16px 14px calc(72px + env(safe-area-inset-bottom))}
   header.top{padding:8px 12px}
-  nav{margin-left:0;width:100%;order:3;padding-bottom:2px}
-  nav a{padding:0 10px}
+  nav{position:fixed;left:0;right:0;bottom:0;z-index:6;margin:0;width:auto;gap:0;
+    display:grid;grid-template-columns:repeat(4,1fr);overflow:visible;
+    background:var(--surface);border-top:1px solid var(--line);
+    padding:6px 6px calc(6px + env(safe-area-inset-bottom))}
+  nav a{flex-direction:column;justify-content:center;gap:3px;min-height:52px;padding:4px 2px;
+    border-radius:10px;font-size:.68rem;font-weight:700;letter-spacing:.01em}
+  nav a .i{width:22px;height:22px}
+  nav a.on{background:transparent;color:var(--brand)}
   .card{padding:16px}
 }
 
@@ -236,12 +326,14 @@ export function page(title, body, { nav = '', script = '', t = translator(), her
 <header class="top"><a class="brand" href="/"><span class="dot">P</span>
 <strong>${esc(t('appName'))}</strong></a>
 <nav>${nav}</nav>${langToggle(t.lang, here)}</header>
+${SPRITE}
 <div class="wrap">${body}</div>${script ? `<script>${script}</script>` : ''}</body></html>`
 }
 
-const navFor = (here, t) => [['/', 'navOverview'], ['/tournaments', 'navTournaments'],
-  ['/settings', 'navSettings'], ['/groups', 'navGroups']]
-  .map(([h, key]) => `<a class="${here === h ? 'on' : ''}" href="${h}">${esc(t(key))}</a>`).join('')
+const navFor = (here, t) => [['/', 'navOverview', 'home'], ['/tournaments', 'navTournaments', 'trophy'],
+  ['/settings', 'navSettings', 'sliders'], ['/groups', 'navGroups', 'chats']]
+  .map(([h, key, icon]) => `<a class="${here === h ? 'on' : ''}" href="${h}"${
+    here === h ? ' aria-current="page"' : ''}>${ic(icon)}<span>${esc(t(key))}</span></a>`).join('')
 
 /** Status values are stored in English; only their display is translated. */
 const statusLabel = (status, t) => t({
@@ -258,7 +350,7 @@ const wrapTable = (inner, cls = '') =>
  * the team rather than "Score", and tapping a name focuses its box.
  */
 const matchForm = (m, t) => `<form class="match" method="post" action="/matches/${m.id}/score">
-  <div class="court">${esc(m.court)}</div>
+  <div class="court">${ic('court')} ${esc(m.court)}</div>
   <div class="sides">
     ${[['a', m.team_a, m.score_a], ['b', m.team_b, m.score_b]].map(([side, team, score]) => `
     <div class="side">
@@ -267,7 +359,7 @@ const matchForm = (m, t) => `<form class="match" method="post" action="/matches/
         inputmode="numeric" placeholder="–" value="${score ?? ''}">
     </div>`).join('')}
   </div>
-  <button class="btn ghost">${esc(t('save'))}</button>
+  <button class="btn ghost">${ic('check')}${esc(t('save'))}</button>
 </form>`
 
 const levelCell = (code, t) => code
@@ -277,18 +369,18 @@ const levelCell = (code, t) => code
 export function overview({ club, tournaments, courts, live, t }) {
   return page(t('navOverview'), `
     <h1>${esc(club.name)}</h1>
-    <p class="muted">${esc(club.address) || esc(t('noAddress'))}${
-      club.maps_url ? ` · <a href="${esc(club.maps_url)}">${esc(t('openInMaps'))}</a>` : ''}</p>
+    <p class="meta"><span>${ic('pin')}${esc(club.address) || esc(t('noAddress'))}</span>${
+      club.maps_url ? `<a href="${esc(club.maps_url)}">${esc(t('openInMaps'))}${ic('arrow')}</a>` : ''}</p>
     <div class="grid">
-      <div class="card"><h3>${esc(t('courts'))}</h3>
+      <div class="card"><h3>${ic('court')}${esc(t('courts'))}</h3>
         <p class="muted">${courts.length ? courts.map((c) => esc(c.label)).join(' · ') : esc(t('noneYet'))}</p>
-        <div class="actions"><a class="btn ghost" href="/settings">${esc(t('manageCourts'))}</a></div></div>
-      <div class="card"><h3>${esc(t('navGroups'))}</h3>
+        <div class="actions"><a class="btn ghost" href="/settings">${ic('sliders')}${esc(t('manageCourts'))}</a></div></div>
+      <div class="card"><h3>${ic('chats')}${esc(t('navGroups'))}</h3>
         <p><span class="pill ${live ? 'on' : ''}">${esc(live ? t('live') : t('draftMode'))}</span></p>
         <p class="muted">${esc(live ? t('postingToGroup') : t('draftExplain'))}</p>
-        <div class="actions"><a class="btn ghost" href="/groups">${esc(t('open'))}</a></div></div>
+        <div class="actions"><a class="btn ghost" href="/groups">${esc(t('open'))}${ic('arrow')}</a></div></div>
     </div>
-    <div class="card"><h3>${esc(t('tournaments'))}</h3>
+    <div class="card"><h3>${ic('trophy')}${esc(t('tournaments'))}</h3>
       ${tournaments.length ? wrapTable(`<thead><tr><th>${esc(t('when'))}</th><th>${esc(t('level'))}</th>
         <th class="num">${esc(t('courts'))}</th><th>${esc(t('status'))}</th><th></th></tr></thead><tbody>
       ${tournaments.map((x) => `<tr>
@@ -296,9 +388,9 @@ export function overview({ club, tournaments, courts, live, t }) {
         <td data-l="${esc(t('level'))}">${levelCell(x.level, t)}</td>
         <td class="num" data-l="${esc(t('courts'))}">${x.courts}</td>
         <td data-l="${esc(t('status'))}"><span class="pill">${esc(statusLabel(x.status, t))}</span></td>
-        <td class="full"><a class="tap" href="/t/${x.id}">${esc(t('open'))}</a></td></tr>`).join('')}</tbody>`, 'stack')
+        <td class="full"><a class="tap" href="/t/${x.id}">${esc(t('open'))} ${ic('arrow')}</a></td></tr>`).join('')}</tbody>`, 'stack')
         : `<p class="muted">${esc(t('noTournaments'))}</p>`}
-      <div class="actions"><a class="btn" href="/tournaments">${esc(t('newTournament'))}</a></div>
+      <div class="actions"><a class="btn" href="/tournaments">${ic('plus')}${esc(t('newTournament'))}</a></div>
     </div>`, { nav: navFor('/', t), t, here: '/' })
 }
 
@@ -306,7 +398,7 @@ export function settings({ club, courts, t }) {
   return page(t('settings'), `
     <h1>${esc(t('settings'))}</h1>
     <form class="card" method="post" action="/settings">
-      <h3>${esc(t('club'))}</h3>
+      <h3>${ic('flag')}${esc(t('club'))}</h3>
       <label for="cname">${esc(t('clubName'))}</label>
       <input id="cname" name="name" value="${esc(club.name)}" required>
       <label for="caddr">${esc(t('address'))}</label>
@@ -315,11 +407,11 @@ export function settings({ club, courts, t }) {
       <label for="cmaps">${esc(t('mapsLink'))}</label>
       <input id="cmaps" name="maps_url" type="url" value="${esc(club.maps_url)}"
         placeholder="https://maps.app.goo.gl/…">
-      <div class="actions"><button>${esc(t('saveClub'))}</button></div>
+      <div class="actions"><button>${ic('check')}${esc(t('saveClub'))}</button></div>
     </form>
 
     <form class="card" method="post" action="/settings">
-      <h3>${esc(t('language'))}</h3>
+      <h3>${ic('globe')}${esc(t('language'))}</h3>
       <p class="muted">${esc(t('languageHelp'))}</p>
       <label for="lang">${esc(t('language'))}</label>
       <select id="lang" name="language">${LANGUAGES.map((l) => `<option value="${l.code}"
@@ -328,7 +420,7 @@ export function settings({ club, courts, t }) {
     </form>
 
     <form class="card" method="post" action="/settings">
-      <h3>${esc(t('dropoutPolicy'))}</h3>
+      <h3>${ic('doc')}${esc(t('dropoutPolicy'))}</h3>
       <p class="muted">${esc(t('dropoutPolicyHelp'))}</p>
       <label for="rules_en">${esc(t('inEnglish'))}</label>
       <textarea id="rules_en" name="rules_en" style="min-height:96px">${esc(club.rules_en)}</textarea>
@@ -338,17 +430,17 @@ export function settings({ club, courts, t }) {
     </form>
 
     <div class="card">
-      <h3>${esc(t('courts'))}</h3>
+      <h3>${ic('court')}${esc(t('courts'))}</h3>
       <p class="muted">${esc(t('courtsHelp'))}</p>
       ${wrapTable(`<tbody>${courts.map((c) => `<tr><td>${esc(c.label)}</td>
         <td style="text-align:right;width:1%">
         <form method="post" action="/courts/${c.id}/delete">
-          <button class="btn danger">${esc(t('remove'))}</button></form>
+          <button class="btn danger">${ic('trash')}${esc(t('remove'))}</button></form>
       </td></tr>`).join('') || `<tr><td class="muted">${esc(t('noCourtsYet'))}</td></tr>`}</tbody>`)}
       <form class="row" method="post" action="/courts" style="margin-top:14px">
         <div><label for="courtlabel">${esc(t('addCourt'))}</label>
           <input id="courtlabel" name="label" placeholder="Court 1 / Center" required></div>
-        <div style="flex:0 0 auto"><button>${esc(t('add'))}</button></div>
+        <div style="flex:0 0 auto"><button>${ic('plus')}${esc(t('add'))}</button></div>
       </form>
     </div>`, { nav: navFor('/settings', t), t, here: '/settings' })
 }
@@ -375,7 +467,7 @@ export function tournamentsPage({ tournaments, form = {}, error = '', t }) {
   return page(t('newTournament'), `
     <h1>${esc(t('newTournament'))}</h1>
     <form class="card" method="post" action="/tournaments">
-      ${error ? `<p class="err">⚠️ ${esc(error)}</p>` : ''}
+      ${error ? `<p class="err">${ic('alert')} ${esc(error)}</p>` : ''}
       <div class="row">
         <div><label for="level_category">${esc(t('category'))}</label>
           <select id="level_category" name="level_category">${catOpts}</select></div>
@@ -402,7 +494,7 @@ export function tournamentsPage({ tournaments, form = {}, error = '', t }) {
           <input id="round_min" name="round_min" type="number" min="5" max="120"
             value="${esc(form.round_min || 12)}"></div>
       </div>
-      <div class="actions"><button>${esc(t('create'))}</button></div>
+      <div class="actions"><button>${ic('plus')}${esc(t('create'))}</button></div>
       <p class="note" style="margin-top:16px">${
         esc(t('botDoesTheSame', { cmd: '\u0000' })).replace('\u0000',
           `<span class="mono">${esc(cmd)}</span>`)}</p>
@@ -412,7 +504,7 @@ export function tournamentsPage({ tournaments, form = {}, error = '', t }) {
         <span class="muted"> · ${esc(levelShort(x.level, t))}</span><br>
         <span class="muted">${esc(humanWhen(x, { lang: t.lang }))} · ${
           esc(t('courtsN', { n: x.courts }))}</span></div>
-      <a class="btn ghost" href="/t/${x.id}">${esc(t('open'))}</a></div></div>`).join('')}
+      <a class="btn ghost" href="/t/${x.id}">${esc(t('open'))}${ic('arrow')}</a></div></div>`).join('')}
   `, { nav: navFor('/tournaments', t), script: LEVEL_JS, t, here: '/tournaments' })
 }
 
@@ -449,13 +541,15 @@ export function tournamentPage({
   return page(`${tour.level || ''} ${humanWhen(tour, { lang: t.lang })}`.trim(), `
     <h1>${esc(tour.level) || esc(t('statusOpen'))} · ${esc(humanWhen(tour, { lang: t.lang }))}</h1>
     <p class="muted">${esc(levelLabel(tour.level, t))}</p>
-    <p class="muted">${esc(t('courtsN', { n: tour.courts }))} · ${
-      esc(t('minutes', { n: tour.duration_min }))} · ${esc(t('minRounds', { n: tour.round_min }))}
-      · <span class="pill">${esc(statusLabel(tour.status, t))}</span>
-      · <a href="/t/${tour.id}/tv">${esc(t('tvView'))}</a></p>
+    <p class="meta">
+      <span>${ic('court')}${esc(t('courtsN', { n: tour.courts }))}</span>
+      <span>${ic('clock')}${esc(t('minutes', { n: tour.duration_min }))}</span>
+      <span>${ic('repeat')}${esc(t('minRounds', { n: tour.round_min }))}</span>
+      <span class="pill">${esc(statusLabel(tour.status, t))}</span>
+      <a href="/t/${tour.id}/tv">${ic('tv')}${esc(t('tvView'))}</a></p>
 
     <div class="grid">
-      <div class="card"><h3>${esc(t('teams'))} (${teams.length})</h3>
+      <div class="card"><h3>${ic('users')}${esc(t('teams'))} (${teams.length})</h3>
         ${offLevel.length ? `<p class="err">${esc(t('mixedWarning', {
           bad: offLevel.length, total: teams.length,
           verb: t(offLevel.length === 1 ? 'isNotAre' : 'areNotIs'),
@@ -465,23 +559,23 @@ export function tournamentPage({
           <td class="lead">${esc(x.name)}</td>
           <td>${x.mixed ? `<span class="pill on">${esc(t('mixed'))}</span>` : ''}</td></tr>`).join('')
           || `<tr><td class="muted">${esc(t('nobodyYet'))}</td></tr>`}</tbody>`, 'stack')}
-        ${waiting.length ? `<h3 style="margin-top:16px">${esc(t('waiting'))} (${waiting.length})</h3>
+        ${waiting.length ? `<h3 style="margin-top:16px">${ic('hourglass')}${esc(t('waiting'))} (${waiting.length})</h3>
           ${wrapTable(`<tbody>${waiting.map((p) => `<tr><td class="lead">${esc(p.name)}</td>
             <td class="muted full">${esc(p.partner ? t('waitingOn', { name: p.partner })
               : t('noPartner'))}</td></tr>`).join('')}</tbody>`, 'stack')}` : ''}
       </div>
-      <div class="card"><h3>${esc(t('signupBoard'))}</h3>
+      <div class="card"><h3>${ic('board')}${esc(t('signupBoard'))}</h3>
         ${flashFor('board')}
         <pre class="msg">${esc(message)}</pre>
         <div class="actions">
           <form method="post" action="/t/${tour.id}/post">
-            <button>${esc(t('postToGroups'))}</button></form>
-          <a class="btn ghost" href="/groups">${esc(t('outbox'))}</a>
+            <button>${ic('megaphone')}${esc(t('postToGroups'))}</button></form>
+          <a class="btn ghost" href="/groups">${ic('inbox')}${esc(t('outbox'))}</a>
         </div>
       </div>
     </div>
 
-    ${roundText ? `<div class="card"><h3>${esc(t('roundTitle'))} <span class="pill on">${
+    ${roundText ? `<div class="card"><h3>${ic('compass')}${esc(t('roundTitle'))} <span class="pill on">${
       esc(t('roundN', { n: now }))}</span></h3>
       <p class="muted">${esc(t('roundHelp'))}</p>
       ${flashFor(`round-${now}`)}
@@ -489,11 +583,11 @@ export function tournamentPage({
       <div class="actions">
         <form method="post" action="/t/${tour.id}/post">
           <input type="hidden" name="round" value="${now}">
-          <button>${esc(t('postToGroups'))}</button></form>
+          <button>${ic('megaphone')}${esc(t('postToGroups'))}</button></form>
       </div>
     </div>` : ''}
 
-    <div class="card"><h3>${esc(t('schedule'))}</h3>
+    <div class="card"><h3>${ic('list')}${esc(t('schedule'))}</h3>
       ${matches.length ? rounds.map((r) => `<div class="roundhead">
         <h4>${esc(t('roundN', { n: r }))}${r === now ? ` <span class="pill on">${esc(t('nowShort'))}</span>` : ''}</h4>
         <form method="post" action="/t/${tour.id}/post">
@@ -503,12 +597,12 @@ export function tournamentPage({
         matches.filter((m) => m.round === r).map((m) => matchForm(m, t)).join('')}`).join('')
         : `<p class="muted">${esc(t('noSchedule'))}</p>
            <form method="post" action="/t/${tour.id}/schedule"><div class="actions">
-             <button ${teams.length < 2 ? 'disabled' : ''}>${esc(t('drawSchedule'))}</button></div></form>
+             <button ${teams.length < 2 ? 'disabled' : ''}>${ic('shuffle')}${esc(t('drawSchedule'))}</button></div></form>
            ${teams.length < 2 ? `<p class="hint">${esc(t('needTwoPairs'))}</p>` : ''}
            ${courts.length ? '' : `<p class="note">${esc(t('addCourtsFirst'))}</p>`}`}
     </div>
 
-    <div class="card"><h3>${esc(t('standings'))}</h3>
+    <div class="card"><h3>${ic('trophy')}${esc(t('standings'))}</h3>
       ${wrapTable(`<thead><tr><th>#</th><th>${esc(t('team'))}</th><th class="num">${esc(t('played'))}</th>
         <th class="num">${esc(t('won'))}</th><th class="num">${esc(t('points'))}</th>
         <th class="num">${esc(t('against'))}</th></tr></thead>
@@ -549,13 +643,17 @@ export function tvPage({ tournament: tour, club, teams, matches, table, t }) {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="refresh" content="20">
 <title>${esc(club.name)} — ${esc(t('live'))}</title><style>${CSS}
+.court .i{width:1em;height:1em;margin-right:.3em;vertical-align:-.12em}
+.rest .i,.final .i{width:1.1em;height:1.1em;margin-right:.35em}
+.tv h2 .i{width:1em;height:1em}
 body{padding:2.5vh 3vw;min-height:100vh}
 .tvhead{display:flex;flex-wrap:wrap;align-items:baseline;gap:.4em 1.2em;margin-bottom:2vh}
 h1{font-size:clamp(22px,3.2vw,44px);margin:0;overflow-wrap:anywhere}
 .sub{font-size:clamp(13px,1.4vw,22px);color:var(--muted)}
 .tv{display:grid;grid-template-columns:1.25fr 1fr;gap:2.5vw;align-items:start}
-.tv h2{display:flex;flex-wrap:wrap;align-items:baseline;gap:.3em .8em;
+.tv h2{display:flex;flex-wrap:wrap;align-items:center;gap:.3em .6em;
   font-size:clamp(16px,1.8vw,28px);margin:0 0 .5em}
+.tv h2 .i{margin:0}
 .tv h2 .when{color:var(--muted);font-weight:600;font-size:.72em;font-variant-numeric:tabular-nums}
 .tv table{font-size:clamp(14px,1.7vw,26px);margin:0}
 .tv td{padding:.45em .6em;border-bottom:1px solid var(--line)}
@@ -570,6 +668,7 @@ h1{font-size:clamp(22px,3.2vw,44px);margin:0;overflow-wrap:anywhere}
 /* A phone held up in the clubhouse gets the same board, one panel under the other. */
 @media (max-width:760px){.tv{grid-template-columns:1fr;gap:18px}body{padding:14px}}
 </style></head><body>
+${SPRITE}
 <div class="tvhead"><h1>${esc(club.name)} — ${esc(levelShort(tour.level, t))}</h1>
 <span class="sub">${esc(humanWhen(tour, { lang: t.lang, tbc: '' }))} · ${
   esc(t('minRounds', { n: tour.round_min }))}</span></div>
@@ -579,21 +678,21 @@ h1{font-size:clamp(22px,3.2vw,44px);margin:0;overflow-wrap:anywhere}
       from && to ? `<span class="when">${esc(from)} → ${esc(to)}</span>` : ''}</h2>
     <div class="tablewrap"><table>
     ${plan ? plan.games.map((m) => `<tr>
-      <td class="court">${esc(m.court)}</td><td>${esc(m.team_a)}</td>
+      <td class="court">${ic('court')}${esc(m.court)}</td><td>${esc(m.team_a)}</td>
       <td class="vs">${esc(t('vsShort'))}</td><td>${esc(m.team_b)}</td></tr>`).join('')
       : `<tr><td class="muted">${esc(t('notDrawn'))}</td></tr>`}
     </table></div>
     ${plan && plan.resting.length
-      ? `<p class="rest">${esc(t('sittingOut'))}: ${esc(plan.resting.join(', '))}</p>` : ''}
+      ? `<p class="rest">${ic('coffee')}${esc(t('sittingOut'))}: ${esc(plan.resting.join(', '))}</p>` : ''}
     ${goes.length ? `<div class="next">
-      <h2>${esc(t('nextRoundAt', { n: round + 1, at: to || '—' }))}</h2>
+      <h2>${ic('compass')}${esc(t('nextRoundAt', { n: round + 1, at: to || '—' }))}</h2>
       <div class="tablewrap"><table>
       ${goes.map((g) => `<tr class="${g.court ? '' : 'off'}">
-        <td class="court">${esc(g.court || t('sittingOut'))}</td><td>${esc(g.name)}</td></tr>`).join('')}
+        <td class="court">${g.court ? ic('court') : ic('coffee')}${esc(g.court || t('sittingOut'))}</td><td>${esc(g.name)}</td></tr>`).join('')}
       </table></div></div>` : ''}
-    ${plan && last ? `<p class="final">${esc(t('lastRoundNote'))}</p>` : ''}
+    ${plan && last ? `<p class="final">${ic('trophy')}${esc(t('lastRoundNote'))}</p>` : ''}
   </div>
-  <div><h2>${esc(t('standings'))}</h2><div class="tablewrap"><table>
+  <div><h2>${ic('trophy')}${esc(t('standings'))}</h2><div class="tablewrap"><table>
     ${table.slice(0, 12).map((r, i) => `<tr><td class="pos">${i + 1}</td><td>${esc(r.team)}</td>
       <td class="num"><strong>${r.points}</strong></td></tr>`).join('')
       || `<tr><td class="muted">${esc(t('noResults'))}</td></tr>`}
@@ -617,28 +716,28 @@ export function groupsPage({ groups, chat, log, t }) {
     <h1>${esc(t('groups'))}</h1>
 
     <div class="grid">
-      <div class="card"><h3>${esc(t('telegramGroup'))}
+      <div class="card"><h3>${ic('send')}${esc(t('telegramGroup'))}
         <span class="pill ${tg && chat ? 'on' : ''}">${esc(tgPill)}</span></h3>
         <p class="muted">${esc(tgState)}</p>
         <p class="note">${esc(t('telegramHelp'))}</p>
       </div>
-      <div class="card"><h3>${esc(t('whatsappGroup'))}
+      <div class="card"><h3>${ic('chat')}${esc(t('whatsappGroup'))}
         <span class="pill">${esc(t('draftMode'))}</span></h3>
         <p class="note">${esc(t('draftNote'))}</p>
       </div>
     </div>
 
-    <div class="card"><h3>${esc(t('tryCommand'))}</h3>
+    <div class="card"><h3>${ic('terminal')}${esc(t('tryCommand'))}</h3>
       <form method="post" action="/groups/simulate">
         <label for="watext">${esc(t('message'))}</label>
         <input id="watext" name="text" class="mono" placeholder="!where Mike" required>
         <label for="waid">${esc(t('fromOptional'))}</label>
         <input id="waid" name="wa_id" inputmode="tel" placeholder="+351…">
-        <div class="actions"><button>${esc(t('sendToBot'))}</button></div>
+        <div class="actions"><button>${ic('send')}${esc(t('sendToBot'))}</button></div>
       </form>
       ${log ? `<h3 style="margin-top:18px">${esc(t('reply'))}</h3><pre class="msg">${esc(log)}</pre>` : ''}
     </div>
-    <div class="card"><h3>${esc(t('outboxTitle'))}</h3>
+    <div class="card"><h3>${ic('inbox')}${esc(t('outboxTitle'))}</h3>
       ${groups.outbox().length
         ? groups.outbox().map((m) => `<pre class="msg" style="margin-bottom:12px">${esc(m.text)}</pre>`).join('')
         : `<p class="muted">${esc(t('nothingWaiting'))}</p>`}
