@@ -189,6 +189,58 @@ const EN = {
   datePast: '{when} has already been played — pick a date from today on.',
   dateTooFar: '{when} is more than two years out — is that the year you meant?',
   datePick: 'Pick the date the tournament is played.',
+
+  // On the night: where to go, and where to go next. These are the strings that
+  // replace a printed sheet on a wall, so they say the court out loud.
+  roundOfN: 'Round {n} of {total}',
+  sittingOut: 'Sitting out',
+  nextRoundAt: 'Next round · {at}',
+  lastRoundNote: 'Last round — the table is final once these scores are in.',
+  thatWasTheLast: 'That was the last round.',
+  noSuchRound: "There is no round {n} — tonight runs to {max}.",
+  noScheduleYet: "🎾 The schedule isn't drawn yet.",
+  restingThisRound: 'Resting this round',
+  nextGoTo: 'Next: {court}, from {at}',
+  nextYouRest: 'Next: you rest, from {at}',
+  notOnAnyPair: "🤷 I don't have {name} on any pair tonight.",
+  whichPair: 'Which pair? {names}',
+  whoAreYou: '🤔 Whose court? Try {cmd}.',
+  pointsWonShort: '{points} pts · {won} won',
+  helpOnTheNight: 'On the night',
+  helpWhere: 'where you play now, and next',
+  helpRound: 'the round being played',
+  helpNext: 'where everyone goes next',
+  helpTable: 'the standings',
+
+  // Groups.
+  navGroups: 'Groups',
+  groups: 'Groups',
+  whatsappGroup: 'WhatsApp',
+  telegramGroup: 'Telegram',
+  telegramOff: 'Not connected. Set TELEGRAM_BOT_TOKEN and restart.',
+  telegramWaiting: 'Connected. Add the bot to the group and send /help there — '
+    + 'the first command tells it which group it lives in.',
+  telegramOn: 'Posting to group {chat}.',
+  telegramHelp: 'Telegram has a real group API, so the bot posts by itself: the sign-up board '
+    + 'is one pinned message it keeps up to date, and each round is posted fresh so it lands on '
+    + 'everyone\'s phone. Commands work with a slash too — /where mike.',
+  postBoard: 'Post the sign-up board',
+  signupBoard: 'Sign-up board',
+  postToGroups: 'Post to the groups',
+  nowShort: 'Now',
+  vsShort: 'vs',
+  offline: 'not connected',
+  waitingForGroup: 'waiting for a group',
+  sentTelegram: 'Posted to Telegram.',
+  sentTelegramEdited: 'Updated the pinned Telegram board.',
+  sendFailed: 'Telegram refused it: {error}',
+  sentDraft: 'In the WhatsApp outbox to paste.',
+  postRound: 'Post round {n}',
+  postedTo: 'Sent: {what}',
+  sentNowhere: 'Nothing is connected — the message is in the outbox to paste.',
+  roundTitle: 'Round message',
+  roundHelp: 'What the group sees between rounds. Posted automatically when the round before it '
+    + 'is fully scored.',
 }
 
 const PT = {
@@ -356,6 +408,56 @@ const PT = {
   datePast: '{when} — essa data já passou. Escolhe uma de hoje em diante.',
   dateTooFar: '{when} — isso é daqui a mais de dois anos. O ano é mesmo esse?',
   datePick: 'Escolhe a data em que o torneio se joga.',
+
+  roundOfN: 'Ronda {n} de {total}',
+  sittingOut: 'A descansar',
+  nextRoundAt: 'Próxima ronda · {at}',
+  lastRoundNote: 'Última ronda — a tabela fica fechada com estes resultados.',
+  thatWasTheLast: 'Foi a última ronda.',
+  noSuchRound: 'Não há ronda {n} — hoje vai até à {max}.',
+  noScheduleYet: '🎾 O calendário ainda não foi sorteado.',
+  restingThisRound: 'Descansa nesta ronda',
+  nextGoTo: 'A seguir: {court}, a partir das {at}',
+  nextYouRest: 'A seguir: descansas, a partir das {at}',
+  notOnAnyPair: '🤷 Não tenho {name} em nenhuma dupla hoje.',
+  whichPair: 'Qual dupla? {names}',
+  whoAreYou: '🤔 Campo de quem? Experimenta {cmd}.',
+  pointsWonShort: '{points} pts · {won} ganhos',
+  helpOnTheNight: 'Durante o torneio',
+  helpWhere: 'onde jogas agora, e a seguir',
+  helpRound: 'a ronda que se está a jogar',
+  helpNext: 'para onde vai cada dupla a seguir',
+  helpTable: 'a classificação',
+
+  navGroups: 'Grupos',
+  groups: 'Grupos',
+  whatsappGroup: 'WhatsApp',
+  telegramGroup: 'Telegram',
+  telegramOff: 'Não ligado. Define TELEGRAM_BOT_TOKEN e reinicia.',
+  telegramWaiting: 'Ligado. Adiciona o bot ao grupo e envia /help lá — o primeiro comando '
+    + 'diz-lhe em que grupo vive.',
+  telegramOn: 'A publicar no grupo {chat}.',
+  telegramHelp: 'O Telegram tem API oficial para grupos, por isso o bot publica sozinho: a '
+    + 'mensagem de inscrições é uma só mensagem afixada que ele vai actualizando, e cada ronda é '
+    + 'publicada de novo para chegar ao telemóvel de toda a gente. Os comandos também funcionam '
+    + 'com barra — /onde mike.',
+  postBoard: 'Publicar as inscrições',
+  signupBoard: 'Inscrições',
+  postToGroups: 'Publicar nos grupos',
+  nowShort: 'Agora',
+  vsShort: 'vs',
+  offline: 'não ligado',
+  waitingForGroup: 'à espera de um grupo',
+  sentTelegram: 'Publicado no Telegram.',
+  sentTelegramEdited: 'Mensagem afixada do Telegram actualizada.',
+  sendFailed: 'O Telegram recusou: {error}',
+  sentDraft: 'Na caixa de saída do WhatsApp, para colar.',
+  postRound: 'Publicar a ronda {n}',
+  postedTo: 'Enviado: {what}',
+  sentNowhere: 'Não há nada ligado — a mensagem ficou na caixa de saída para colar.',
+  roundTitle: 'Mensagem da ronda',
+  roundHelp: 'O que o grupo vê entre rondas. Publicada automaticamente assim que a ronda '
+    + 'anterior tem todos os resultados.',
 }
 
 const STRINGS = { en: EN, pt: PT }

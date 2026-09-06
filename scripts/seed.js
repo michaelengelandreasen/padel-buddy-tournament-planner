@@ -37,13 +37,19 @@ function next(weekday, weeksAhead = 0) {
 }
 const SATURDAY = 6, FRIDAY = 5
 
-// The club's real Saturday group: three mixed pairs in, and Mike still looking
+// The club's real Saturday group: five mixed pairs in, and Mike still looking
 // for a partner — which is exactly the state an empty slot next to his name says.
+//
+// Five pairs on three courts is the shape worth sampling: two courts busy, one
+// pair resting, and one slot on the board still open. A three-pair night draws a
+// single match and makes the round message look like it has nothing to say.
 const MIXED = [
   ['Mike', 'M', ''],
   ['Paula Quevedo', 'F', 'Luís Miranda'], ['Luís Miranda', 'M', 'Paula Quevedo'],
   ['Adriana Osório', 'F', 'Manuel Lima'], ['Manuel Lima', 'M', 'Adriana Osório'],
   ['Maria Aries', 'F', 'Filipe Herculano'], ['Filipe Herculano', 'M', 'Maria Aries'],
+  ['Rita Bessa', 'F', 'André Pinto'], ['André Pinto', 'M', 'Rita Bessa'],
+  ['Sofia Marques', 'F', 'Tiago Ferreira'], ['Tiago Ferreira', 'M', 'Sofia Marques'],
 ]
 
 const MENS = [

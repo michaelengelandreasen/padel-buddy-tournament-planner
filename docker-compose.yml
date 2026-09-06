@@ -13,9 +13,16 @@ services:
       # The club's own clock. "Is this date in the past" and "which Friday is
       # next" are questions about an evening in Matosinhos, not about UTC.
       TZ: Europe/Lisbon
-      # Which WhatsApp transport to use. "draft" formats messages for a human to
-      # paste and never touches WhatsApp; see src/whatsapp/transport.js.
-      WHATSAPP_TRANSPORT: draft
+      # Which group chats the bot posts to. Left unset it works this out on its
+      # own: the WhatsApp draft outbox always, plus Telegram if a bot token
+      # exists. See src/messaging/transport.js.
+      # MESSAGING_CHANNELS: draft telegram
+      #
+      # From @BotFather. With it set, the bot joins the club's Telegram group,
+      # answers commands there and posts the rounds by itself; without it the
+      # club stays on the paste-it-yourself outbox. Which group is learned from
+      # the first command the bot sees, so there is nothing else to configure.
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
     networks: [web]
     volumes:
       # Absolute host paths: the broker only permits binds under the real

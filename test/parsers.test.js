@@ -203,3 +203,67 @@ test('board: a level mismatch is shown, not smoothed over', () => {
   assert.equal(sofia.want, 'M')
   assert.equal(sofia.player.gender, 'F')
 })
+
+// ---- the night: where do I go next ----
+import {
+  courtsByTeam, currentRound, roundComplete, roundPlan, roundWindow, teamsNamed,
+} from '../src/rounds.js'
+import { normalizeCommand, toHtml } from '../src/messaging/markup.js'
+
+const NIGHT = { play_time: '11:00', round_min: 12 }
+const TEAMS = ['Ana & Rui', 'Bea & Zé', 'Cátia & Tó'].map((name) => ({ name }))
+const MATCHES = [
+  { round: 1, court: 'Court 2', team_a: 'Ana & Rui', team_b: 'Bea & Zé', score_a: 11, score_b: 7 },
+  { round: 2, court: 'Court 1', team_a: 'Cátia & Tó', team_b: 'Ana & Rui', score_a: null, score_b: null },
+  { round: 3, court: 'Court 1', team_a: 'Bea & Zé', team_b: 'Cátia & Tó', score_a: null, score_b: null },
+]
+
+test('rounds: the current round is the first one still missing a score', () => {
+  assert.equal(currentRound(MATCHES), 2)
+  assert.equal(currentRound(MATCHES.map((m) => ({ ...m, score_a: 1, score_b: 0 }))), 3)
+  assert.equal(currentRound([]), 0)
+  assert.equal(roundComplete(MATCHES, 1), true)
+  assert.equal(roundComplete(MATCHES, 2), false)
+  assert.equal(roundComplete(MATCHES, 9), false)
+})
+
+test('rounds: a round runs from start plus (n-1) lengths, and wraps midnight', () => {
+  assert.deepEqual(roundWindow(NIGHT, 1), { start: '11:00', end: '11:12' })
+  assert.deepEqual(roundWindow(NIGHT, 3), { start: '11:24', end: '11:36' })
+  assert.deepEqual(roundWindow({ play_time: '23:50', round_min: 15 }, 1), { start: '23:50', end: '00:05' })
+  assert.deepEqual(roundWindow({ play_time: '', round_min: 12 }, 1), { start: '', end: '' })
+})
+
+test('rounds: a plan names who is resting, not just who is playing', () => {
+  const plan = roundPlan({ tournament: NIGHT, matches: MATCHES, teams: TEAMS, round: 2 })
+  assert.deepEqual(plan.games.map((g) => g.court), ['Court 1'])
+  assert.deepEqual(plan.resting, ['Bea & Zé'])
+  assert.deepEqual(plan.rounds, [1, 2, 3])
+  const next = courtsByTeam(MATCHES, 3)
+  assert.equal(next.get('Bea & Zé'), 'Court 1')
+  assert.equal(next.get('Ana & Rui'), undefined)
+})
+
+test('rounds: a first name finds its pair, accents and case aside; two pairs stay two', () => {
+  assert.deepEqual(teamsNamed(TEAMS, 'catia').map((x) => x.name), ['Cátia & Tó'])
+  assert.deepEqual(teamsNamed(TEAMS, 'ZÉ').map((x) => x.name), ['Bea & Zé'])
+  assert.deepEqual(teamsNamed(TEAMS, 'nobody'), [])
+  const twoAnas = [...TEAMS, { name: 'Ana Rita & Vasco' }]
+  assert.equal(teamsNamed(twoAnas, 'ana').length, 2)
+  assert.equal(teamsNamed(twoAnas, 'rita').length, 1)
+})
+
+test('telegram: chat markup becomes HTML that a name cannot break', () => {
+  assert.equal(toHtml('*Court 1*\nAna_Rita & Rui <3'), '<b>Court 1</b>\nAna_Rita &amp; Rui &lt;3')
+  assert.equal(toHtml('Sign up: `!in Mike M partner Sofia`'), 'Sign up: <code>!in Mike M partner Sofia</code>')
+  assert.equal(toHtml('_note_ and a * on its own'), '<i>note</i> and a * on its own')
+})
+
+test('telegram: slash commands, with or without the bot name, are the club syntax', () => {
+  assert.equal(normalizeCommand('/where mike', 'padelbot'), '!where mike')
+  assert.equal(normalizeCommand('/list@padelbot', 'padelbot'), '!list')
+  assert.equal(normalizeCommand('/list@otherbot', 'padelbot'), '')
+  assert.equal(normalizeCommand('/start', 'padelbot'), '!help')
+  assert.equal(normalizeCommand('!in Ana F', 'padelbot'), '!in Ana F')
+  assert.equal(normalizeCommand('hello', 'padelbot'), 'hello')
+})

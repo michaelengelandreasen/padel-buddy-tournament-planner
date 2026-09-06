@@ -24,9 +24,37 @@
     {
       "title": "Portuguese / English language choice",
       "state": "done"
+    },
+    {
+      "title": "Merge weekday and date onto the board's first line",
+      "state": "done"
+    },
+    {
+      "title": "Round messages: where everyone goes now and next, auto-posted on the last score",
+      "state": "done"
+    },
+    {
+      "title": "!where / !round / !next / !table commands (EN + PT aliases)",
+      "state": "done"
+    },
+    {
+      "title": "Telegram channel: live group bot, pinned board edited in place, admin-only opens",
+      "state": "done"
+    },
+    {
+      "title": "TV view follows the round being played, with a next-round court list",
+      "state": "done"
+    },
+    {
+      "title": "Impeccable pass on the console: post feedback, honest status pills, craft floor",
+      "state": "done"
     }
   ],
   "activity": [
+    {
+      "at": "2026-09-06T04:06:42.825576Z",
+      "text": "Round messages and Telegram. One message per round (court by court, who rests, one line per pair for where to go next) is posted to every group when the previous round's last score lands. src/messaging/ is a bus over a live Telegram channel and the WhatsApp draft outbox. TV view now shows the round actually being played. 24/24 tests."
+    },
     {
       "at": "2026-08-24T15:43:42.888Z",
       "text": "Score entry rebuilt: each match is a form with one line per team and that team's score box on it; Save spans both. Old table column strings removed."
@@ -41,9 +69,9 @@
     }
   ],
   "status": "active",
-  "headline": "Club WhatsApp board format, generated — and EN/PT throughout",
-  "summary": "The bot now posts the club's own board format (weekday, DD/MM/YYYY, time range, Nonstop MX4, location, N courts, courts x 4 slot list, drop-out policy) generated from each tournament's settings instead of retyped. A mixed level alternates woman/man down the slots so the board shape enforces one-of-e",
-  "next": "Confirm the level ladder and the Portuguese wording of the drop-out policy with the club",
+  "headline": "Where do I go next — round messages in the groups, Telegram live",
+  "summary": "The club's nights ran on a printed sheet and a PDF. Now the group gets one message per round saying who is on which court and where every pair goes next, posted automatically when the round before it is scored; !where Mike answers one person. Telegram posts by itself (bot token is the whole setup, the group is learned from the first command); WhatsApp stays a paste-from-outbox draft because it has no group API.",
+  "next": "Create the Telegram bot with @BotFather, set TELEGRAM_BOT_TOKEN in .env, add it to the Padel Tribe group and send /help",
   "url": "https://padel-tournament-planner.mikehome.users.ctx7.dev",
-  "updated": "2026-08-24T15:43:42.916Z"
+  "updated": "2026-09-06T04:06:42.825576Z"
 }

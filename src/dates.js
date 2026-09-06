@@ -68,15 +68,15 @@ export function parseWhen(input, { now = new Date(), lang } = {}) {
   // Time first, so its digits can't be mistaken for a day of the month.
   let time = ''
   const ampm = s.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/)
-  const clock = s.match(/\b([01]?\d|2[0-3])\s*[:h.]\s*([0-5]\d)\b/)
+  const hhmm = s.match(/\b([01]?\d|2[0-3])\s*[:h.]\s*([0-5]\d)\b/)
   if (ampm) {
     let h = Number(ampm[1]) % 12
     if (ampm[3] === 'pm') h += 12
     time = `${pad(h)}:${ampm[2] || '00'}`
     s = (s.slice(0, ampm.index) + ' ' + s.slice(ampm.index + ampm[0].length)).trim()
-  } else if (clock) {
-    time = `${pad(Number(clock[1]))}:${clock[2]}`
-    s = (s.slice(0, clock.index) + ' ' + s.slice(clock.index + clock[0].length)).trim()
+  } else if (hhmm) {
+    time = `${pad(Number(hhmm[1]))}:${hhmm[2]}`
+    s = (s.slice(0, hhmm.index) + ' ' + s.slice(hhmm.index + hhmm[0].length)).trim()
   }
   s = s.replace(/\bat\b|\bàs\b|\bas\b/g, ' ').replace(/\s+/g, ' ').trim()
   // Accents off, so "terça" and "terca" are the same word to the matcher below.
@@ -208,24 +208,42 @@ export function shortDate(date) {
 }
 
 /**
+ * `11:00` + 24 min → `11:24`, wrapping past midnight rather than running off the
+ * end of the day — a 90-minute tournament starting at 23:30 is a real booking.
+ */
+export function addMinutes(time, mins) {
+  if (!isTime(time)) return ''
+  const [h, m] = time.split(':').map(Number)
+  const total = (((h * 60 + m + Math.round(Number(mins) || 0)) % 1440) + 1440) % 1440
+  return `${pad(Math.floor(total / 60))}:${pad(total % 60)}`
+}
+
+/**
+ * Portugal reads a 24-hour clock and the English-speaking half of the group
+ * doesn't, so the two languages genuinely differ here, not just in their words.
+ */
+const clockFmt = (lang) => (lang === 'pt'
+  ? (hh, mm) => `${hh}h${mm ? pad(mm) : ''}`
+  : (hh, mm) => `${((hh + 11) % 12) + 1}${mm ? `:${pad(mm)}` : ''}${hh < 12 ? 'AM' : 'PM'}`)
+
+/** One time, in the club's own convention: `11AM` / `11h`, `11:24AM` / `11h24`. */
+export function clock(time, { lang } = {}) {
+  if (!isTime(time)) return ''
+  const [h, m] = time.split(':').map(Number)
+  return clockFmt(lang)(h, m)
+}
+
+/**
  * `11:00` + 120 min → `11AM-1PM` in English, `11h-13h` in Portuguese.
  *
  * The end is the start plus the duration, so the range moves whenever the
  * tournament's own settings do — that is the whole point of generating it
- * rather than typing it into the group by hand. Portugal reads a 24-hour clock,
- * so the two languages genuinely differ here, not just in their words.
+ * rather than typing it into the group by hand.
  */
 export function timeRange(time, durationMin, { lang } = {}) {
   if (!isTime(time)) return ''
-  const [h, m] = time.split(':').map(Number)
-  const endMins = (h * 60 + m + (Number(durationMin) || 0)) % (24 * 60)
-  const end = { h: Math.floor(endMins / 60), m: endMins % 60 }
-  const fmt = lang === 'pt'
-    ? (hh, mm) => `${hh}h${mm ? pad(mm) : ''}`
-    : (hh, mm) => `${((hh + 11) % 12) + 1}${mm ? `:${pad(mm)}` : ''}${hh < 12 ? 'AM' : 'PM'}`
-  const from = fmt(h, m)
-  const to = fmt(end.h, end.m)
-  return durationMin ? `${from}-${to}` : from
+  const from = clock(time, { lang })
+  return durationMin ? `${from}-${clock(addMinutes(time, durationMin), { lang })}` : from
 }
 
 /** The one-line form the board, the console and the TV all print. */

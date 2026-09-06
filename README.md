@@ -1,13 +1,21 @@
 # Padel Tournament Planner
 
-A WhatsApp-driven tournament organiser for a padel club. Non-stop smash only, for now.
+A group-chat-driven tournament organiser for a padel club — WhatsApp and Telegram.
+Non-stop smash only, for now.
+
+The point of it: the club runs its nights off a printed sheet, a PDF and a
+WhatsApp group, and between rounds twenty people walk to a wall to find their
+own name. Here the group gets one message per round saying who is on which
+court and where every pair goes next, posted the moment the previous round's
+last score is typed in — and anyone can ask `!where Mike` and get their own
+answer. The TV view shows the same board on the clubhouse screen.
 
 Live: https://padel-tournament-planner.mikehome.users.ctx7.dev
 
 Seeded with **Padel Tribe**, R. Gonçalves Zarco 1813, Matosinhos (Porto) —
 [map](https://maps.app.goo.gl/PC4yvKz3BES4Xuh66): four courts, a Saturday
-mixed level 4 with three pairs in and one player still looking, and a men's
-level 3 with sign-ups open. Court names are placeholders; rename them in
+mixed level 4 with five pairs in and one player still looking (round 1 played),
+and a men's level 3 with sign-ups open. Court names are placeholders; rename them in
 Settings.
 
 ## The three pieces
@@ -36,10 +44,18 @@ cheap to reverse.
 - **WhatsApp.** WhatsApp has no official group API — the Cloud API is 1:1 only, and
   posting into a group means pairing a number as a linked device, which is against
   their terms and gets numbers banned. Nobody authorised burning a number, so the
-  default transport is `draft`: the bot parses, stores and formats exactly as the
-  live one would, and hands the finished message to a human to paste. To go live,
-  add `src/whatsapp/linked-device.js` with the same two methods and set
-  `WHATSAPP_TRANSPORT=linked-device`.
+  WhatsApp channel is `draft`: the bot parses, stores and formats exactly as a
+  live one would, and hands the finished message to a human to paste from the
+  outbox (`/groups`).
+- **Telegram.** Has a real group API, so it is the channel that actually posts.
+  One env var, `TELEGRAM_BOT_TOKEN` (from @BotFather), and the bot is live: add
+  it to the club's group and send `/help` there — the first command it sees is
+  how it learns which group it lives in. The sign-up board is one pinned message
+  it edits in place on every `!in`/`!out`; round messages are posted fresh so
+  they land on phones. Only group admins can open a tournament. Commands work
+  with a slash too (`/where mike`). Both channels run at once: every message goes
+  to Telegram and into the WhatsApp outbox. `src/messaging/` — `transport.js` is
+  the bus, `telegram.js` the live channel, `draft.js` the outbox.
 - **Google Sheets.** Not wired. The TV view does the job Sheets was wanted for —
   a big screen showing the plan and the results, refreshing itself, with no Google
   account, no OAuth and no token to expire. Sheets export can be added against the
@@ -51,8 +67,7 @@ The message the bot posts is the club's own WhatsApp format, generated rather
 than retyped:
 
 ```
-📆 Saturday                📆 Sábado
-29/08/2026                 29/08/2026
+📆 Saturday 29/08/2026     📆 Sábado 29/08/2026
 🕒 11AM-1PM                🕒 11h-13h
 📈 Nonstop MX4             📈 Nonstop MX4
 
@@ -150,6 +165,47 @@ Old rows are dragged through the same parsers on boot (`migrate()` in
 !help
 ```
 
+On the night (they read the tournament being *played*, which is not the newest
+one open — a club announces Friday while Saturday is still on court):
+
+```
+!where Mike      where you play now, and where you go next   (!onde)
+!round           the round being played, court by court      (!ronda)
+!next            where every pair goes for the next round    (!seguir)
+!table           the standings                               (!tabela)
+```
+
+A round message, generated from the stored matches:
+
+```
+🎾 *Round 2 of 5* · Nonstop MX4
+⏱ 11:12AM → 11:24AM
+
+*Court 1*
+Paula Quevedo & Luís Miranda
+🆚 Sofia Marques & Tiago Ferreira
+
+*Court 2*
+Adriana Osório & Manuel Lima
+🆚 Maria Aries & Filipe Herculano
+
+☕ Sitting out: Rita Bessa & André Pinto
+
+*⏭ Next round · 11:24AM*
+Court 1 — Paula Quevedo & Luís Miranda
+Court 1 — Rita Bessa & André Pinto
+Court 2 — Maria Aries & Filipe Herculano
+Court 2 — Sofia Marques & Tiago Ferreira
+☕ Adriana Osório & Manuel Lima
+```
+
+The next-round block is one line per pair rather than the fixtures, because a
+player reading it is not asking who they play — they are asking where to stand.
+Round 1 is posted when the schedule is drawn; every later round is posted when
+the last score of the round before it is saved, and the final standings after
+the last one. Any round or the board can also be posted by hand from the
+tournament page, which then says what each channel did with it.
+
 Angle brackets from the spec are accepted and ignored, so `level <MX-4>` works too.
 Partners can be written `partner X`, `with X`, `+ X` or `& X`.
 
@@ -157,7 +213,8 @@ Partners can be written `partner X`, `with X`, `+ X` or `& X`.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| POST | `/api/whatsapp/incoming` | `{text, from, chat}` → `{reply}`. The seam a live bridge posts to. |
+| POST | `/api/messages/incoming` | `{text, from, chat}` → `{reply}`. The seam a bridge posts to (`/api/whatsapp/incoming` still works). |
+| GET | `/api/tournaments/:id/round` | The current round message; `?n=3` for a specific one. |
 | GET | `/api/club` | Club settings and courts. |
 | GET | `/api/languages` | The club's language and the ones available. |
 | GET | `/api/tournaments` | All tournaments. |

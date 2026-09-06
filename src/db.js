@@ -1,7 +1,7 @@
 import { DatabaseSync } from 'node:sqlite'
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
-import { parseWhen } from './dates.js'
+import { parseWhen, toDate, todayISO } from './dates.js'
 import { parseLevel } from './levels.js'
 import { DEFAULT_LANGUAGE, isLanguage, translator } from './i18n.js'
 
@@ -33,7 +33,11 @@ db.exec(`
     -- The drop-out policy printed under every board, kept in both languages so
     -- switching the club over doesn't silently drop the club's own wording.
     rules_en  TEXT NOT NULL DEFAULT '',
-    rules_pt  TEXT NOT NULL DEFAULT ''
+    rules_pt  TEXT NOT NULL DEFAULT '',
+    -- Which Telegram group the bot lives in. Learned from the first command it
+    -- sees there rather than configured, because no club captain should have to
+    -- find out what a numeric chat id is.
+    telegram_chat_id TEXT NOT NULL DEFAULT ''
   );
   INSERT OR IGNORE INTO club (id, name) VALUES (1, 'Padel Club');
 
@@ -70,6 +74,16 @@ db.exec(`
     UNIQUE (tournament_id, name)
   );
 
+  -- Messages this bot has already posted, so it can edit them instead of
+  -- posting again. The sign-up board is one pinned message that keeps changing;
+  -- without this it would be twenty near-identical messages in a row.
+  CREATE TABLE IF NOT EXISTS posts (
+    key        TEXT PRIMARY KEY,
+    chat_id    TEXT NOT NULL,
+    message_id INTEGER NOT NULL,
+    at         TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
   CREATE TABLE IF NOT EXISTS matches (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     tournament_id INTEGER NOT NULL,
@@ -94,7 +108,8 @@ db.exec(`
  */
 function migrate() {
   const clubCols = db.prepare('PRAGMA table_info(club)').all().map((c) => c.name)
-  for (const [col, def] of [['language', "'en'"], ['rules_en', "''"], ['rules_pt', "''"]]) {
+  for (const [col, def] of [['language', "'en'"], ['rules_en', "''"], ['rules_pt', "''"],
+    ['telegram_chat_id', "''"]]) {
     if (!clubCols.includes(col)) {
       db.exec(`ALTER TABLE club ADD COLUMN ${col} TEXT NOT NULL DEFAULT ${def}`)
     }
@@ -141,7 +156,8 @@ export function clubLanguage() {
 
 /** Only the keys given are written, so the language form can't blank the address. */
 export function saveClub(patch) {
-  const allowed = ['name', 'address', 'maps_url', 'language', 'rules_en', 'rules_pt']
+  const allowed = ['name', 'address', 'maps_url', 'language', 'rules_en', 'rules_pt',
+    'telegram_chat_id']
   const keys = allowed.filter((k) => patch[k] !== undefined)
   if (!keys.length) return getClub()
   const clean = (k) => (k === 'language' && !isLanguage(patch[k])
@@ -156,6 +172,32 @@ export function clubRules(lang = clubLanguage()) {
   const club = getClub()
   return (lang === 'pt' ? club.rules_pt : club.rules_en).trim()
 }
+
+/**
+ * The Telegram group the bot posts into, or '' before it has ever been spoken to.
+ *
+ * `TELEGRAM_CHAT_ID` overrides it, for a club that wants the group pinned down
+ * in configuration rather than learned — but the learned value is the normal
+ * path, and it is what makes adding the bot to a group the whole setup.
+ */
+export const telegramChat = () =>
+  process.env.TELEGRAM_CHAT_ID || getClub()?.telegram_chat_id || ''
+
+/** Remember the group a command came from, the first time one arrives from it. */
+export function rememberTelegramChat(chatId) {
+  const id = String(chatId || '')
+  if (!id || id === getClub()?.telegram_chat_id) return
+  run('UPDATE club SET telegram_chat_id = ? WHERE id = 1', id)
+}
+
+/** A message the bot posted and may want to edit: the pinned board, mostly. */
+export const getPost = (key) => one('SELECT * FROM posts WHERE key = ?', key) || null
+export const savePost = (key, chatId, messageId) =>
+  run(`INSERT INTO posts (key, chat_id, message_id) VALUES (?, ?, ?)
+       ON CONFLICT (key) DO UPDATE SET
+         chat_id = excluded.chat_id, message_id = excluded.message_id, at = datetime('now')`,
+    key, String(chatId), Number(messageId))
+export const forgetPost = (key) => run('DELETE FROM posts WHERE key = ?', key)
 
 export const listCourts = () => all('SELECT * FROM courts ORDER BY sort, id')
 export const addCourt = (label, sort = 0) =>
@@ -173,8 +215,31 @@ export const getTournament = (id) =>
 export const currentTournament = () =>
   one("SELECT * FROM tournaments WHERE status != 'done' ORDER BY id DESC LIMIT 1")
 
+/**
+ * The tournament being *played*, which is not the same question as the newest
+ * one open.
+ *
+ * A club opens next Friday's night while Saturday morning's is still on court,
+ * so `currentTournament` — newest not yet done — is the right answer for `!in`
+ * and the wrong one for "where do I go next". This picks the night with a draw
+ * whose date is nearest to now: during a tournament that is today's, and between
+ * tournaments it is the one just played, which is what `!table` should show.
+ */
+export function playingTournament(today = todayISO()) {
+  const drawn = all(`SELECT * FROM tournaments t
+    WHERE EXISTS (SELECT 1 FROM matches m WHERE m.tournament_id = t.id)`)
+  if (!drawn.length) return null
+  const here = toDate(today)
+  const away = (t) => {
+    const d = toDate(t.play_date)
+    return d && here ? Math.abs(d - here) : Number.POSITIVE_INFINITY
+  }
+  return drawn.sort((a, b) => away(a) - away(b) || b.id - a.id)[0]
+}
+
 /** Wipe a tournament and everything hanging off it — used by the seed script. */
 export function deleteTournament(id) {
+  forgetPost(`board:${id}`)
   run('DELETE FROM matches WHERE tournament_id = ?', id)
   run('DELETE FROM signups WHERE tournament_id = ?', id)
   run('DELETE FROM tournaments WHERE id = ?', id)
@@ -209,6 +274,7 @@ export function removeSignup(tid, name) {
   return hit
 }
 
+export const getMatch = (id) => one('SELECT * FROM matches WHERE id = ?', id)
 export const listMatches = (tid) =>
   all('SELECT * FROM matches WHERE tournament_id = ? ORDER BY round, court', tid)
 

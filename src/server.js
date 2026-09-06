@@ -1,18 +1,30 @@
 import { createServer } from 'node:http'
 import {
-  addCourt, clubLanguage, createTournament, deleteCourt, getClub, getTournament, listCourts,
-  listMatches, listSignups, listTournaments, recordScore, replaceMatches, saveClub,
+  addCourt, clubLanguage, createTournament, deleteCourt, getClub, getMatch, getTournament,
+  listCourts, listMatches, listSignups, listTournaments, recordScore, rememberTelegramChat,
+  replaceMatches, saveClub, telegramChat,
 } from './db.js'
 import { buildTeams, schedule, standings } from './formats/nonstop.js'
-import { handle, signupMessage } from './bot.js'
+import { handle, roundMessage, signupMessage, standingsMessage } from './bot.js'
 import { parseWhen, validateWhen } from './dates.js'
+import { currentRound, roundComplete, roundsOf } from './rounds.js'
 import { parseLevel } from './levels.js'
 import { LANGUAGES, isLanguage, translator } from './i18n.js'
-import { transport } from './whatsapp/transport.js'
+import { bus, listen } from './messaging/transport.js'
+import { normalizeCommand } from './messaging/telegram.js'
 import * as V from './views.js'
 
-const wa = transport()
+const groups = bus()
 const PORT = Number(process.env.PORT || 8080)
+
+/**
+ * Post to every group the club runs, without making the caller wait.
+ *
+ * A host tapping "save score" on the side of a court should get their page back
+ * immediately; whether Telegram acknowledged in 40ms or 900ms is not their
+ * problem. Failures are logged by the bus itself and shown in the outbox.
+ */
+const post = (text, meta) => { groups.send(text, meta).catch((err) => console.error(err)) }
 
 const html = (res, body, code = 200) => {
   res.writeHead(code, { 'content-type': 'text/html; charset=utf-8' }); res.end(body)
@@ -50,7 +62,8 @@ function view(id) {
 
 const routes = [
   ['GET', /^\/$/, (_m, _r, t) => ({ html: V.overview({
-    club: getClub(), tournaments: listTournaments(), courts: listCourts(), live: wa.live, t }) })],
+    club: getClub(), tournaments: listTournaments(), courts: listCourts(),
+    live: groups.live, t }) })],
 
   ['GET', /^\/settings$/, (_m, _r, t) =>
     ({ html: V.settings({ club: getClub(), courts: listCourts(), t }) })],
@@ -107,11 +120,22 @@ const routes = [
     return { to: `/t/${created.id}` }
   }],
 
-  ['GET', /^\/t\/(\d+)$/, (m, _r, t) => {
+  ['GET', /^\/t\/(\d+)$/, (m, req, t) => {
     const v = view(Number(m[1]))
     if (!v) return { html: V.page('404', '<h1>404</h1>', { t }), code: 404 }
-    return { html: V.tournamentPage({ ...v, courts: listCourts(),
-      message: signupMessage(v.tournament, '', t.lang), t }) }
+    // What the last manual post did, carried in the redirect so a refresh
+    // doesn't re-post and the message survives exactly one page load.
+    const q = new URL(req.url, 'http://x').searchParams
+    const flash = q.get('posted') ? {
+      what: q.get('posted'), tg: q.get('tg') || '', err: (q.get('err') || '').slice(0, 120),
+    } : null
+    return { html: V.tournamentPage({ ...v, courts: listCourts(), flash,
+      message: signupMessage(v.tournament, '', t.lang),
+      // What the group would see right now, so a host can read it before
+      // deciding to send it.
+      roundText: v.matches.length
+        ? roundMessage(v.tournament, currentRound(v.matches), t.lang) : '',
+      t }) }
   }],
 
   ['GET', /^\/t\/(\d+)\/tv$/, (m, _r, t) => {
@@ -131,31 +155,77 @@ const routes = [
     const { matches } = schedule(v.teams, use,
       { durationMin: v.tournament.duration_min, roundMin: v.tournament.round_min })
     replaceMatches(id, matches)
+    // The draw is the moment the night starts existing for the players, so the
+    // first round goes to the groups without anyone having to remember to send it.
+    if (matches.length) post(roundMessage(getTournament(id), 1, t.lang), { reason: 'round 1' })
     return { to: `/t/${id}` }
   }],
 
-  ['POST', /^\/matches\/(\d+)\/score$/, async (m, req) => {
+  ['POST', /^\/matches\/(\d+)\/score$/, async (m, req, t) => {
     const f = await body(req)
-    const row = recordScore(Number(m[1]), Number(f.a) || 0, Number(f.b) || 0)
+    const before = getMatch(Number(m[1]))
+    if (!before) return { html: V.page('404', '<h1>404</h1>', { t }), code: 404 }
+    // Whether the round was already finished decides whether this save is news.
+    // Correcting a typo in a round everyone has left must not re-announce it.
+    const wasDone = roundComplete(listMatches(before.tournament_id), before.round)
+    const row = recordScore(before.id, Number(f.a) || 0, Number(f.b) || 0)
+
+    const after = listMatches(row.tournament_id)
+    if (!wasDone && roundComplete(after, row.round)) {
+      // The last score of a round is the only reliable "time has passed" signal
+      // this system gets — nobody presses a button while holding a racket. So it
+      // is what sends twenty people to their next court.
+      const tour = getTournament(row.tournament_id)
+      const next = row.round + 1
+      post(roundsOf(after).includes(next)
+        ? roundMessage(tour, next, t.lang)
+        : standingsMessage(tour, t.lang),
+      { reason: roundsOf(after).includes(next) ? `round ${next}` : 'final' })
+    }
     return { to: `/t/${row.tournament_id}` }
   }],
 
-  ['GET', /^\/whatsapp$/, (_m, _r, t) =>
-    ({ html: V.whatsappPage({ live: wa.live, outbox: wa.outbox(), t }) })],
-  ['POST', /^\/whatsapp\/simulate$/, async (_m, req, t) => {
+  // Post on demand, for a host who wants the board or a round in the group now.
+  ['POST', /^\/t\/(\d+)\/post$/, async (m, req, t) => {
+    const id = Number(m[1])
+    const tour = getTournament(id)
+    if (!tour) return { html: V.page('404', '<h1>404</h1>', { t }), code: 404 }
+    const f = await body(req)
+    const round = Number.parseInt(f.round, 10)
+    const isRound = Number.isFinite(round)
+    // A deliberate press waits for the answer — a second of latency is worth
+    // being told whether Telegram actually took it. Automatic posts don't wait.
+    const results = await groups.send(
+      isRound ? roundMessage(tour, round, t.lang) : signupMessage(tour, '', t.lang),
+      isRound ? { reason: `round ${round}` } : { key: `board:${id}`, pin: true, reason: 'board' })
+    const tg = results.find((r) => r.channel === 'telegram')
+    const code = !tg ? '' : tg.error ? 'err' : tg.edited ? 'edit' : tg.delivered ? 'ok' : 'wait'
+    const q = new URLSearchParams({ posted: isRound ? `round-${round}` : 'board' })
+    if (code) q.set('tg', code)
+    if (tg?.error) q.set('err', String(tg.error).slice(0, 120))
+    return { to: `/t/${id}?${q}` }
+  }],
+
+  ['GET', /^\/groups$/, (_m, _r, t) => ({ html: V.groupsPage({ groups, chat: telegramChat(), t }) })],
+  // The old name, from when WhatsApp was the only channel. Kept as a redirect
+  // because it is written on a phone home screen somewhere.
+  ['GET', /^\/whatsapp$/, () => ({ to: '/groups' })],
+  ['POST', /^\/groups\/simulate$/, async (_m, req, t) => {
     const f = await body(req)
     const reply = handle(f.text, { waId: f.wa_id || '', isHost: true, lang: t.lang })
-    if (reply) await wa.send(reply, { reason: 'reply' })
-    return { html: V.whatsappPage({ live: wa.live, outbox: wa.outbox(), t,
-      log: reply ?? t('botStayedQuiet') }) }
+    if (reply) await groups.send(reply.text, reply.meta)
+    return { html: V.groupsPage({ groups, chat: telegramChat(), t,
+      log: reply?.text ?? t('botStayedQuiet') }) }
   }],
 
   // ---- REST, for the Android console and any linked-device bridge ----
-  ['POST', /^\/api\/whatsapp\/incoming$/, async (_m, req) => {
+  ['POST', /^\/api\/(?:whatsapp|messages)\/incoming$/, async (_m, req) => {
     const f = await body(req)
     const reply = handle(f.text, { waId: f.from || '', isHost: f.isHost !== false })
-    if (reply) await wa.send(reply, { reason: 'reply', to: f.chat || '' })
-    return { json: { reply, transport: wa.name, live: wa.live } }
+    if (reply) await groups.send(reply.text, { ...reply.meta, to: f.chat || '' })
+    // `reply` stays a string: the Android console reads it straight into a
+    // text view, and it has no use for how the message wanted to be posted.
+    return { json: { reply: reply?.text ?? null, transport: groups.name, live: groups.live } }
   }],
   ['GET', /^\/api\/club$/, () => ({ json: { club: getClub(), courts: listCourts() } })],
   ['GET', /^\/api\/languages$/, () => ({ json: { current: clubLanguage(), available: LANGUAGES } })],
@@ -168,8 +238,19 @@ const routes = [
     const { tournament, ...rest } = v
     return { json: { t: tournament, ...rest, message: signupMessage(tournament) } }
   }],
-  ['GET', /^\/api\/outbox$/, () => ({ json: wa.outbox() })],
-  ['GET', /^\/healthz$/, () => ({ json: { ok: true, transport: wa.name } })],
+  ['GET', /^\/api\/outbox$/, () => ({ json: groups.outbox() })],
+  // What a player's phone would ask: where do I go, without a group chat at all.
+  ['GET', /^\/api\/tournaments\/(\d+)\/round$/, (m, req) => {
+    const v = view(Number(m[1]))
+    if (!v) return { json: { error: 'not found' }, code: 404 }
+    const url = new URL(req.url, 'http://x')
+    const asked = Number.parseInt(url.searchParams.get('n') ?? '', 10)
+    const round = Number.isFinite(asked) ? asked : currentRound(v.matches)
+    return { json: { round, rounds: roundsOf(v.matches),
+      message: roundMessage(v.tournament, round) } }
+  }],
+  ['GET', /^\/healthz$/, () => ({ json: {
+    ok: true, channels: groups.channels.map((c) => c.name), live: groups.live } })],
 ]
 
 createServer(async (req, res) => {
@@ -193,4 +274,38 @@ createServer(async (req, res) => {
     }
   }
   html(res, V.page('404', `<h1>404</h1><p><a href="/">${t('appName')}</a></p>`, { t }), 404)
-}).listen(PORT, () => console.log(`padel-tournament-planner on :${PORT} (whatsapp: ${wa.name})`))
+}).listen(PORT, () => {
+  console.log(`padel-tournament-planner on :${PORT} (groups: ${groups.name})`)
+  startTelegram()
+})
+
+/**
+ * Let the club talk to the bot from its Telegram group.
+ *
+ * The group is learned, not configured: the first command the bot sees tells it
+ * which chat it lives in, and that is remembered. Opening a tournament stays a
+ * host's job, and in a group Telegram can actually answer who that is — so the
+ * check is the group's own admin list rather than a trusting default.
+ */
+async function startTelegram() {
+  const tg = groups.telegram
+  if (!tg) return
+  let me
+  try {
+    me = await tg.whoami()
+    console.log(`telegram: @${me.username} listening`)
+  } catch (err) {
+    console.error(`telegram: ${err.message}`)
+    return
+  }
+  listen(tg, async (u) => {
+    const msg = u.message
+    if (!msg?.text) return
+    rememberTelegramChat(msg.chat.id)
+    const text = normalizeCommand(msg.text, me.username)
+    if (!text) return
+    const isHost = msg.chat.type === 'private' || await tg.isAdmin(msg.chat.id, msg.from?.id)
+    const reply = handle(text, { waId: String(msg.from?.id || ''), isHost, lang: clubLanguage() })
+    if (reply) await tg.send(reply.text, { ...reply.meta, chat: msg.chat.id })
+  })
+}
