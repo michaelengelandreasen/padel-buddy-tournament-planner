@@ -139,8 +139,22 @@ pre.msg{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--surface-2);
 .match .side+.side{border-top:1px solid var(--line)}
 .match .who{flex:1 1 auto;min-width:0;margin:0;font-size:1rem;font-weight:600;
   color:var(--ink);overflow-wrap:anywhere;cursor:pointer}
-.match input{flex:0 0 68px;width:68px;text-align:center;padding:8px 4px;
-  font-variant-numeric:tabular-nums}
+/*
+ * The score box has to read as a box from arm's length on a phone: it sits on
+ * the darkest ground the palette has, inside a border strong enough to be an
+ * edge rather than a hairline, and it is the tallest thing on its line. Empty
+ * shows a dash so a missing score looks missing; a typed number is big and bold.
+ */
+.match input{flex:0 0 76px;width:76px;min-height:50px;text-align:center;padding:6px 4px;
+  background:var(--bg);border:2px solid color-mix(in oklab,var(--muted) 45%,var(--line));
+  border-radius:12px;font-size:1.25rem;font-weight:800;font-variant-numeric:tabular-nums;
+  box-shadow:inset 0 1px 2px rgba(0,0,0,.45);transition:border-color .15s ease-out}
+.match input::placeholder{color:var(--muted);font-weight:600;opacity:1}
+.match input:hover{border-color:var(--muted)}
+.match input:focus{border-color:var(--brand);outline:none;
+  box-shadow:0 0 0 3px color-mix(in oklab,var(--brand) 30%,transparent),inset 0 1px 2px rgba(0,0,0,.45)}
+/* A box that already holds a score wears it plainly; the border no longer needs to shout. */
+.match input:not(:placeholder-shown){border-color:color-mix(in oklab,var(--brand) 55%,var(--line))}
 .match button{padding:8px 18px}
 @media (max-width:480px){
   .match{grid-template-columns:1fr}
