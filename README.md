@@ -247,13 +247,13 @@ so the stack's own `ctx7 expose` (Cloudflare orange-cloud to a routable origin)
 cannot make it public. The `public` service in compose is the way round that: a
 Caddy sidecar with its own Let's Encrypt certificate for `wp-bullet.asuscomm.com`
 (the router's DDNS name), proxying to the app over the compose network, listening
-on host **:8443** because Traefik owns :443. Core stack untouched.
+on host **:9443** because Traefik owns :443. Core stack untouched.
 
 On the ASUS router, once:
 
 1. Turn off *Web Access from WAN* (or move it off 443/80) — otherwise the
    router answers the public port itself, which is what Let's Encrypt saw first.
-2. Port forward **WAN TCP 443 → 192.168.40.230:8443**.
+2. Port forward **WAN TCP 443 → 192.168.40.230:9443**.
 
 Caddy retries issuance on its own; `docker compose restart public` forces it.
 Certificates persist in `data/caddy`. To go dark again: remove the `public`

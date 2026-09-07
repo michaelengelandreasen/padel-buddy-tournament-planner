@@ -47,7 +47,7 @@ services:
       - traefik.http.services.padel-tournament-planner.loadbalancer.server.port=8080
 
   # Public entry on the club's own domain — see deploy/Caddyfile for why this
-  # exists next to Traefik rather than inside it. Listens on host :8443 (Traefik
+  # exists next to Traefik rather than inside it. Listens on host :9443 (Traefik
   # owns :443); the home router forwards WAN 443 here. Certificates persist in
   # data/caddy so a recreate does not re-issue.
   public:
@@ -55,7 +55,7 @@ services:
     restart: unless-stopped
     depends_on: [app]
     ports:
-      - "8443:443"
+      - "9443:443"
     networks: [web]
     volumes:
       - ${PROJECTS_DIR}/padel-tournament-planner/deploy/Caddyfile:/etc/caddy/Caddyfile:ro

@@ -6,7 +6,7 @@
 # NAT, so the stack's own `expose` path (Cloudflare orange-cloud to a routable
 # origin) does not apply. Instead a second, project-scoped terminator: Caddy
 # gets its own Let's Encrypt certificate for the DDNS name and proxies to the
-# app over the compose network. The router forwards WAN 443 to this box's 8443.
+# app over the compose network. The router forwards WAN 443 to this box's 9443.
 #
 # Nothing in the core stack is touched, and removing this file and the service
 # puts the project back to VPN-only.
