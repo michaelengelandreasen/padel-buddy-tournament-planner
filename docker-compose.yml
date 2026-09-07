@@ -32,6 +32,11 @@ services:
       - ${PROJECTS_DIR}/padel-tournament-planner/test:/app/test
       - ${PROJECTS_DIR}/padel-tournament-planner/data:/app/data
     labels:
+      # The dashboard at mikehome.users.ctx7.dev lists containers carrying this
+      # label. The broker stamps it when the agent creates a container; a
+      # `docker compose up` run on the host does not, and the project silently
+      # disappears from the dashboard. Declared here so it survives recreation.
+      - aidevserver.project=true
       - traefik.enable=true
       - 'traefik.http.routers.padel-tournament-planner.rule=Host(`padel-tournament-planner.mikehome.users.ctx7.dev`)'
       - traefik.http.routers.padel-tournament-planner.entrypoints=websecure
