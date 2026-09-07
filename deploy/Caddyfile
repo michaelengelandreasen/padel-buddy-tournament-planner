@@ -1,0 +1,29 @@
+# The public face of the planner on the club's own domain.
+#
+# The ctx7 stack keeps every project dark by design: Traefik serves only the
+# *.mikehome.users.ctx7.dev wildcard, its cert comes from the ctx7 backend, and
+# nothing is reachable from the internet. This box is a home machine behind
+# NAT, so the stack's own `expose` path (Cloudflare orange-cloud to a routable
+# origin) does not apply. Instead a second, project-scoped terminator: Caddy
+# gets its own Let's Encrypt certificate for the DDNS name and proxies to the
+# app over the compose network. The router forwards WAN 443 to this box's 8443.
+#
+# Nothing in the core stack is touched, and removing this file and the service
+# puts the project back to VPN-only.
+{
+	admin off
+}
+
+wp-bullet.asuscomm.com {
+	encode zstd gzip
+	reverse_proxy app:8080
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		# Search engines have no business indexing a club's sign-up console.
+		X-Robots-Tag "noindex, nofollow, noarchive"
+		-Server
+	}
+}

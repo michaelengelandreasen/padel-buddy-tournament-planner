@@ -10,7 +10,8 @@ court and where every pair goes next, posted the moment the previous round's
 last score is typed in — and anyone can ask `!where Mike` and get their own
 answer. The TV view shows the same board on the clubhouse screen.
 
-Live: https://padel-tournament-planner.mikehome.users.ctx7.dev
+Live (VPN): https://padel-tournament-planner.mikehome.users.ctx7.dev
+Public: https://wp-bullet.asuscomm.com — see "Public domain" under Running.
 
 Seeded with **Padel Tribe**, R. Gonçalves Zarco 1813, Matosinhos (Porto) —
 [map](https://maps.app.goo.gl/PC4yvKz3BES4Xuh66): four courts, a Saturday
@@ -237,6 +238,30 @@ docker compose exec app node scripts/seed.js --reset   # Padel Tribe sample data
 ```
 
 Data lives in `data/planner.db` (gitignored, bind-mounted, survives recreation).
+
+### Public domain
+
+The ctx7 stack keeps projects VPN-only: Traefik serves the `*.mikehome.users.ctx7.dev`
+wildcard with a cert the ctx7 backend issues, and this is a home box behind NAT,
+so the stack's own `ctx7 expose` (Cloudflare orange-cloud to a routable origin)
+cannot make it public. The `public` service in compose is the way round that: a
+Caddy sidecar with its own Let's Encrypt certificate for `wp-bullet.asuscomm.com`
+(the router's DDNS name), proxying to the app over the compose network, listening
+on host **:8443** because Traefik owns :443. Core stack untouched.
+
+On the ASUS router, once:
+
+1. Turn off *Web Access from WAN* (or move it off 443/80) — otherwise the
+   router answers the public port itself, which is what Let's Encrypt saw first.
+2. Port forward **WAN TCP 443 → 192.168.40.230:8443**.
+
+Caddy retries issuance on its own; `docker compose restart public` forces it.
+Certificates persist in `data/caddy`. To go dark again: remove the `public`
+service (or `docker compose rm -sf public`) and the port forward.
+
+The dashboard at mikehome.users.ctx7.dev lists containers labelled
+`aidevserver.project=true`; compose declares it, because a `docker compose up`
+on the host (unlike the broker) does not stamp it and the project vanishes.
 `TZ=Europe/Lisbon` in compose, because "has this date already been played" is a
 question about an evening in Matosinhos, not about UTC.
 
