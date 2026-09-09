@@ -52,9 +52,17 @@
     {
       "title": "Public URL via Cloudflare Tunnel (padeladmin.webperfology.com)",
       "state": "done"
+    },
+    {
+      "title": "Tabbed tournament + settings pages, Save all scores, Padel Buddy branding",
+      "state": "done"
     }
   ],
   "activity": [
+    {
+      "at": "2026-09-09T10:19:13.019022Z",
+      "text": "Console restyled to Padel Buddy (palette + mark). Tournament page is four tabs (Board/Teams/Rounds/Table), Rounds is one form with Save all + per-match Save; empty boxes no longer coerce to 0-0. Settings tabbed too."
+    },
     {
       "at": "2026-09-06T04:06:42.825576Z",
       "text": "Round messages and Telegram. One message per round (court by court, who rests, one line per pair for where to go next) is posted to every group when the previous round's last score lands. src/messaging/ is a bus over a live Telegram channel and the WhatsApp draft outbox. TV view now shows the round actually being played. 24/24 tests."
@@ -77,5 +85,5 @@
   "summary": "The club's nights ran on a printed sheet and a PDF. Now the group gets one message per round saying who is on which court and where every pair goes next, posted automatically when the round before it is scored; !where Mike answers one person. Telegram posts by itself (bot token is the whole setup, the group is learned from the first command); WhatsApp stays a paste-from-outbox draft because it has no group API.",
   "next": "Decide how to gate the public console: a Cloudflare Access policy on the hostname, or a password in the app",
   "url": "https://padeladmin.webperfology.com",
-  "updated": "2026-09-09T09:24:17.547782Z"
+  "updated": "2026-09-09T10:19:13.019061Z"
 }

@@ -14,7 +14,7 @@
 
 import { categories, grades, isMixedLevel, levelLabel, levelShort, parseLevel } from './levels.js'
 import { clock, humanWhen, todayISO } from './dates.js'
-import { courtsByTeam, currentRound, roundPlan, roundsOf } from './rounds.js'
+import { courtsByTeam, currentRound, roundComplete, roundPlan, roundsOf } from './rounds.js'
 import { LANGUAGES, translator } from './i18n.js'
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => (
@@ -85,14 +85,86 @@ const ICONS = {
 const SPRITE = `<svg hidden aria-hidden="true" style="display:none">${Object.entries(ICONS).map(([k, d]) =>
   `<symbol id="i-${k}" viewBox="0 0 24 24">${d}</symbol>`).join('')}</svg>`
 
+/**
+ * Padel Buddy's mark, transcribed from the app's own ic_logo.xml on the same
+ * 108-unit grid: the emerald tile, the racket, the chat bubble, the sound waves.
+ */
+const LOGO = `<svg class="mark" viewBox="0 0 108 108" aria-hidden="true">
+<defs>
+  <linearGradient id="pb-tile" x1="0" y1="0" x2="108" y2="108" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="#34D399"/><stop offset=".55" stop-color="#10B981"/><stop offset="1" stop-color="#047857"/>
+  </linearGradient>
+  <linearGradient id="pb-face" x1="24" y1="24" x2="62" y2="72" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="#60A5FA"/><stop offset="1" stop-color="#1D4ED8"/>
+  </linearGradient>
+</defs>
+<rect width="108" height="108" rx="24" fill="url(#pb-tile)"/>
+<g transform="translate(54 55) scale(.86) translate(-54 -55)">
+  <path transform="translate(42 70) rotate(24)" d="M-5.5,2a5.5,5.5 0 0 1 11,0l0,16a5.5,5.5 0 0 1 -11,0z" fill="#1E293B"/>
+  <g transform="rotate(24 42 48)">
+    <path d="M20,48a22,26 0 1 0 44,0a22,26 0 1 0 -44,0z" fill="url(#pb-face)" stroke="#BFDBFE" stroke-opacity=".5" stroke-width="2.4"/>
+    <g fill="#0B1120" fill-opacity=".5">
+      <circle cx="38.4" cy="38" r="2.4"/><circle cx="46.4" cy="38" r="2.4"/>
+      <circle cx="34.4" cy="47" r="2.4"/><circle cx="42.4" cy="47" r="2.4"/><circle cx="50.4" cy="47" r="2.4"/>
+      <circle cx="38.4" cy="56" r="2.4"/><circle cx="46.4" cy="56" r="2.4"/>
+    </g>
+  </g>
+  <path d="M73.5,19L85.5,19A8,8 0 0 1 93.5,27L93.5,31A8,8 0 0 1 85.5,39L74,39A8,8 0 0 1 66,31L66,27A8,8 0 0 1 73.5,19Z" fill="#fff"/>
+  <path d="M72,37L69,47L79,39Z" fill="#fff"/>
+  <g fill="#047857"><circle cx="73.5" cy="29" r="2.3"/><circle cx="79.8" cy="29" r="2.3"/><circle cx="86.1" cy="29" r="2.3"/></g>
+  <g fill="none" stroke="#fff" stroke-linecap="round">
+    <path d="M65.5,60.7A13,13 0 0 1 65.5,83.3" stroke-width="3.4" stroke-opacity=".95"/>
+    <path d="M68.5,55.5A19,19 0 0 1 68.5,88.5" stroke-width="3.3" stroke-opacity=".62"/>
+    <path d="M71.5,50.3A25,25 0 0 1 71.5,93.7" stroke-width="3.2" stroke-opacity=".36"/>
+  </g>
+</g></svg>`
+
+/**
+ * The tab strip. Progressive enhancement: the server marks the default panel
+ * `on`, the URL hash overrides it (so a save that redirects to #rounds lands
+ * back on Rounds), arrows move between tabs, and with no script every panel is
+ * simply visible.
+ */
+const TABS_JS = `(function(){
+var tabs=[].slice.call(document.querySelectorAll('.tabs [role=tab]'));if(!tabs.length)return;
+function show(id,push){tabs.forEach(function(b){var on=b.dataset.tab===id;b.setAttribute('aria-selected',on?'true':'false');
+b.tabIndex=on?0:-1;var p=document.getElementById('tab-'+b.dataset.tab);if(p)p.classList.toggle('on',on)});
+if(push)history.replaceState(null,'','#'+id)}
+tabs.forEach(function(b){b.addEventListener('click',function(){show(b.dataset.tab,true)});
+b.addEventListener('keydown',function(e){if(e.key!=='ArrowRight'&&e.key!=='ArrowLeft')return;e.preventDefault();
+var i=tabs.indexOf(b),n=tabs[(i+(e.key==='ArrowRight'?1:tabs.length-1))%tabs.length];n.focus();show(n.dataset.tab,true)})});
+function fromHash(){var h=location.hash.slice(1);return tabs.some(function(b){return b.dataset.tab===h})?h:''}
+show(fromHash()||document.body.dataset.tab||tabs[0].dataset.tab,false);
+window.addEventListener('hashchange',function(){var h=fromHash();if(h)show(h,false)});
+})();`
+
+/** A tab strip + its panels. `tabs` is [{id, icon, label, count?, body}]. */
+function tabbed(tabs, active) {
+  const strip = `<div class="tabs" role="tablist">${tabs.map((x) => `<button type="button" role="tab"
+    id="tabbtn-${x.id}" data-tab="${x.id}" aria-controls="tab-${x.id}" aria-selected="${x.id === active}"
+    tabindex="${x.id === active ? 0 : -1}">${ic(x.icon)}<span>${esc(x.label)}</span>${
+      x.count != null ? `<span class="n">${x.count}</span>` : ''}</button>`).join('')}</div>`
+  const panels = tabs.map((x) => `<section class="panel${x.id === active ? ' on' : ''}" id="tab-${x.id}"
+    role="tabpanel" aria-labelledby="tabbtn-${x.id}">${x.body}</section>`).join('')
+  return strip + panels
+}
+
 /** An icon next to a word. Decorative: the word carries the meaning, the icon speeds it up. */
 const ic = (name, cls = '') => `<svg class="i${cls ? ` ${cls}` : ''}" aria-hidden="true"><use href="#i-${name}"/></svg>`
 
 const CSS = `
 :root {
-  --bg:#0B1220; --surface:#141C2B; --surface-2:#1B2536; --line:#2A3549;
-  --ink:#E8EEF7; --muted:#9FB0C6; --brand:#3DDC97; --brand-ink:#04231A;
-  --accent:#FFC857; --warn:#FF8A7A; --radius:14px;
+  /*
+   * Padel Buddy's palette, read out of its own theme: navy ground, emerald
+   * primary (the launcher tile), blue for anything that is a court (the
+   * racket), amber for "needs another look", coral for errors. The console
+   * is the same product as the phone app, and should look like it.
+   */
+  --bg:#0B1120; --surface:#121A2B; --surface-2:#1B2437; --line:#263247;
+  --ink:#E7EDF5; --muted:#9AA4B2;
+  --brand:#34D399; --brand-ink:#00281B; --brand-deep:#065F46; --brand-soft:#A7F3D0;
+  --court:#60A5FA; --court-ink:#04213F;
+  --accent:#FCD34D; --warn:#FFB4AB; --warn-bg:#5C1D18; --radius:14px;
   /* Native date and time pickers, the caret and the scrollbars all read this. */
   color-scheme: dark;
 }
@@ -111,8 +183,8 @@ header.top{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;
 header.top .brand{display:flex;align-items:center;gap:10px;min-width:0;flex:1 1 auto;
   min-height:44px;color:inherit;text-decoration:none}
 header.top .brand strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-header.top .dot{width:32px;height:32px;flex:0 0 32px;border-radius:9px;background:var(--brand);
-  color:var(--brand-ink);display:grid;place-items:center;font-weight:800}
+header.top .mark{width:34px;height:34px;flex:0 0 34px;display:block}
+header.top .brand small{color:var(--muted);font-weight:600;margin-left:6px;white-space:nowrap}
 nav{margin-left:auto;display:flex;gap:2px;max-width:100%;overflow-x:auto;
   scrollbar-width:none;-ms-overflow-style:none}
 nav::-webkit-scrollbar{display:none}
@@ -171,7 +243,7 @@ th{font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.
 td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 .pill{display:inline-block;padding:3px 10px;border-radius:999px;background:var(--surface-2);
   color:var(--muted);font-size:.78rem;font-weight:700;white-space:nowrap}
-.pill.on{background:#12352A;color:var(--brand)}
+.pill.on{background:var(--brand-deep);color:var(--brand-soft)}
 .muted{color:var(--muted)} .mono{font-family:ui-monospace,Menlo,monospace}
 .grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr))}
 .note{padding:10px 14px;background:color-mix(in oklab,var(--accent) 8%,var(--surface-2));
@@ -210,7 +282,7 @@ pre.msg{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--surface-2);
   background:var(--surface-2);border:1px solid var(--line);border-radius:12px;
   padding:12px 14px;margin:10px 0}
 .match .court{grid-column:1/-1;display:flex;align-items:center;gap:6px;font-weight:800;
-  color:var(--accent);font-size:.74rem;text-transform:uppercase;letter-spacing:.05em}
+  color:var(--court);font-size:.74rem;text-transform:uppercase;letter-spacing:.05em}
 .match .court .i{width:16px;height:16px}
 .match .sides{min-width:0}
 .match .side{display:flex;align-items:center;gap:12px;padding:7px 0}
@@ -245,6 +317,45 @@ pre.msg{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--surface-2);
 .roundhead form{flex:0 0 auto}
 .roundhead button{white-space:nowrap}
 .head{display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:space-between}
+/*
+ * Tabs, so a tournament is four short screens instead of one long scroll. The
+ * strip is the same shape as the nav so it reads as navigation, and the panels
+ * are plain sections: with scripting off every panel simply shows, in order.
+ */
+.tabs{display:flex;gap:2px;margin:18px 0 6px;border-bottom:1px solid var(--line);
+  overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tabs button{appearance:none;background:transparent;border:0;border-bottom:2px solid transparent;
+  border-radius:0;margin-bottom:-1px;padding:0 14px;min-height:46px;color:var(--muted);font-weight:700;
+  white-space:nowrap;display:inline-flex;align-items:center;gap:7px;transition:color .15s ease-out}
+.tabs button .i{width:18px;height:18px}
+.tabs button .n{font-size:.74rem;font-weight:800;color:var(--muted);background:var(--surface-2);
+  border-radius:999px;padding:1px 7px}
+.tabs button:hover{color:var(--ink);filter:none}
+.tabs button[aria-selected="true"]{color:var(--ink);border-color:var(--brand)}
+.tabs button[aria-selected="true"] .i{color:var(--brand)}
+.tabs button[aria-selected="true"] .n{background:var(--brand-deep);color:var(--brand-soft)}
+.js .panel:not(.on){display:none}
+.panel>.card:first-child{margin-top:10px}
+/* One bar for all the scores, kept in reach at the bottom of the rounds panel. */
+.savebar{position:sticky;bottom:12px;display:flex;justify-content:flex-end;gap:10px;margin-top:14px;
+  padding:10px;border-radius:12px;background:var(--surface);border:1px solid var(--line);
+  box-shadow:0 8px 24px -8px rgba(0,0,0,.6);z-index:2}
+@media (max-width:720px){.savebar{bottom:calc(72px + env(safe-area-inset-bottom))}
+  .savebar button{flex:1 1 auto}}
+/* Four tabs share a phone's width; nothing scrolls off the edge. */
+@media (max-width:480px){
+  .tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:0}
+  .tabs button{justify-content:center;padding:0 4px;gap:5px;font-size:.84rem}
+  .tabs button .i{width:17px;height:17px}
+  .tabs button .n{padding:0 6px;font-size:.7rem}
+}
+details.preview summary{cursor:pointer;color:var(--muted);font-weight:600;min-height:44px;
+  display:flex;align-items:center;gap:6px;list-style:none}
+details.preview summary::-webkit-details-marker{display:none}
+details.preview summary .i{transition:transform .15s ease-out}
+details.preview[open] summary .i{transform:rotate(90deg)}
+details.preview pre{margin-top:8px}
 
 /*
  * On a phone the nav becomes a tab bar under the thumb. Four labelled items no
@@ -318,16 +429,18 @@ const langToggle = (lang, here) => `<form class="lang" method="post" action="/la
     class="${l.code === lang ? 'on' : ''}" aria-label="${esc(l.label)}"
     ${l.code === lang ? 'aria-current="true"' : ''}>${l.short}</button>`).join('')}</form>`
 
-export function page(title, body, { nav = '', script = '', t = translator(), here = '' } = {}) {
+export function page(title, body, { nav = '', script = '', t = translator(), here = '', tab = '' } = {}) {
   return `<!doctype html><html lang="${t.lang}"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="dark">
-<title>${esc(title)}</title><style>${CSS}</style></head><body>
-<header class="top"><a class="brand" href="/"><span class="dot">P</span>
-<strong>${esc(t('appName'))}</strong></a>
+<title>${esc(title)}</title><style>${CSS}</style>
+<script>document.documentElement.classList.add('js')</script></head><body${
+  tab ? ` data-tab="${esc(tab)}"` : ''}>
+<header class="top"><a class="brand" href="/">${LOGO}
+<strong>Padel Buddy</strong><small>${esc(t('navTournaments'))}</small></a>
 <nav>${nav}</nav>${langToggle(t.lang, here)}</header>
 ${SPRITE}
-<div class="wrap">${body}</div>${script ? `<script>${script}</script>` : ''}</body></html>`
+<div class="wrap">${body}</div><script>${TABS_JS}</script>${script ? `<script>${script}</script>` : ''}</body></html>`
 }
 
 const navFor = (here, t) => [['/', 'navOverview', 'home'], ['/tournaments', 'navTournaments', 'trophy'],
@@ -345,22 +458,24 @@ const wrapTable = (inner, cls = '') =>
   `<div class="tablewrap"><table class="${cls}">${inner}</table></div>`
 
 /**
- * One match as a form: the court, then a line per team with that team's box on
- * it, then Save. Each name is the input's own <label>, so the accessible name is
- * the team rather than "Score", and tapping a name focuses its box.
+ * One match: the court, then a line per team with that team's box on it, and a
+ * per-match Save for the host who types one result at a time from courtside.
+ * It is a block inside the panel's single scores form, not a form of its own —
+ * so every box on the page can also be saved at once from the bar underneath.
+ * Each name is the input's own <label>, so the accessible name is the team.
  */
-const matchForm = (m, t) => `<form class="match" method="post" action="/matches/${m.id}/score">
+const matchBlock = (m, t) => `<div class="match">
   <div class="court">${ic('court')} ${esc(m.court)}</div>
   <div class="sides">
     ${[['a', m.team_a, m.score_a], ['b', m.team_b, m.score_b]].map(([side, team, score]) => `
     <div class="side">
       <label class="who" for="m${m.id}${side}">${esc(team)}</label>
-      <input id="m${m.id}${side}" name="${side}" type="number" min="0" max="99"
+      <input id="m${m.id}${side}" name="${side}${m.id}" type="number" min="0" max="99"
         inputmode="numeric" placeholder="–" value="${score ?? ''}">
     </div>`).join('')}
   </div>
-  <button class="btn ghost">${ic('check')}${esc(t('save'))}</button>
-</form>`
+  <button class="btn ghost" name="only" value="${m.id}">${ic('check')}${esc(t('save'))}</button>
+</div>`
 
 const levelCell = (code, t) => code
   ? `<span class="pill on">${esc(code)}</span> <span class="muted">${esc(levelShort(code, t))}</span>`
@@ -395,8 +510,7 @@ export function overview({ club, tournaments, courts, live, t }) {
 }
 
 export function settings({ club, courts, t }) {
-  return page(t('settings'), `
-    <h1>${esc(t('settings'))}</h1>
+  const clubForm = `
     <form class="card" method="post" action="/settings">
       <h3>${ic('flag')}${esc(t('club'))}</h3>
       <label for="cname">${esc(t('clubName'))}</label>
@@ -408,27 +522,8 @@ export function settings({ club, courts, t }) {
       <input id="cmaps" name="maps_url" type="url" value="${esc(club.maps_url)}"
         placeholder="https://maps.app.goo.gl/…">
       <div class="actions"><button>${ic('check')}${esc(t('saveClub'))}</button></div>
-    </form>
-
-    <form class="card" method="post" action="/settings">
-      <h3>${ic('globe')}${esc(t('language'))}</h3>
-      <p class="muted">${esc(t('languageHelp'))}</p>
-      <label for="lang">${esc(t('language'))}</label>
-      <select id="lang" name="language">${LANGUAGES.map((l) => `<option value="${l.code}"
-        ${l.code === t.lang ? 'selected' : ''}>${esc(l.label)}</option>`).join('')}</select>
-      <div class="actions"><button>${esc(t('save'))}</button></div>
-    </form>
-
-    <form class="card" method="post" action="/settings">
-      <h3>${ic('doc')}${esc(t('dropoutPolicy'))}</h3>
-      <p class="muted">${esc(t('dropoutPolicyHelp'))}</p>
-      <label for="rules_en">${esc(t('inEnglish'))}</label>
-      <textarea id="rules_en" name="rules_en" style="min-height:96px">${esc(club.rules_en)}</textarea>
-      <label for="rules_pt">${esc(t('inPortuguese'))}</label>
-      <textarea id="rules_pt" name="rules_pt" style="min-height:96px">${esc(club.rules_pt)}</textarea>
-      <div class="actions"><button>${esc(t('save'))}</button></div>
-    </form>
-
+    </form>`
+  const courtsPanel = `
     <div class="card">
       <h3>${ic('court')}${esc(t('courts'))}</h3>
       <p class="muted">${esc(t('courtsHelp'))}</p>
@@ -442,17 +537,37 @@ export function settings({ club, courts, t }) {
           <input id="courtlabel" name="label" placeholder="Court 1 / Center" required></div>
         <div style="flex:0 0 auto"><button>${ic('plus')}${esc(t('add'))}</button></div>
       </form>
-    </div>`, { nav: navFor('/settings', t), t, here: '/settings' })
+    </div>`
+  const langForm = `
+    <form class="card" method="post" action="/settings">
+      <h3>${ic('globe')}${esc(t('language'))}</h3>
+      <p class="muted">${esc(t('languageHelp'))}</p>
+      <label for="lang">${esc(t('language'))}</label>
+      <select id="lang" name="language">${LANGUAGES.map((l) => `<option value="${l.code}"
+        ${l.code === t.lang ? 'selected' : ''}>${esc(l.label)}</option>`).join('')}</select>
+      <div class="actions"><button>${ic('check')}${esc(t('save'))}</button></div>
+    </form>`
+  const policyForm = `
+    <form class="card" method="post" action="/settings">
+      <h3>${ic('doc')}${esc(t('dropoutPolicy'))}</h3>
+      <p class="muted">${esc(t('dropoutPolicyHelp'))}</p>
+      <label for="rules_en">${esc(t('inEnglish'))}</label>
+      <textarea id="rules_en" name="rules_en" style="min-height:96px">${esc(club.rules_en)}</textarea>
+      <label for="rules_pt">${esc(t('inPortuguese'))}</label>
+      <textarea id="rules_pt" name="rules_pt" style="min-height:96px">${esc(club.rules_pt)}</textarea>
+      <div class="actions"><button>${ic('check')}${esc(t('save'))}</button></div>
+    </form>`
+
+  return page(t('settings'), `
+    <h1>${esc(t('settings'))}</h1>
+    ${tabbed([
+      { id: 'club', icon: 'flag', label: t('club'), body: clubForm },
+      { id: 'courts', icon: 'court', label: t('courts'), count: courts.length, body: courtsPanel },
+      { id: 'language', icon: 'globe', label: t('language'), body: langForm },
+      { id: 'policy', icon: 'doc', label: t('tabPolicy'), body: policyForm },
+    ], 'club')}`, { nav: navFor('/settings', t), t, here: '/settings', tab: 'club' })
 }
 
-/**
- * The new-tournament form.
- *
- * The level is two pickers rather than a text box, so an invalid one cannot be
- * typed in the first place; the server re-checks anyway, because a form is not a
- * validator, it is a suggestion. The date is a real date input with `min` set to
- * today, and a time beside it — the pair is what the whole app stores now.
- */
 export function tournamentsPage({ tournaments, form = {}, error = '', t }) {
   const today = todayISO()
   const cat = form.level_category || 'MX'
@@ -522,6 +637,11 @@ export function flashLine(flash, t) {
   if (flash.tg === 'edit') bits.push(`<strong>${esc(t('sentTelegramEdited'))}</strong>`)
   if (flash.tg === 'err') bits.push(`<strong>${esc(t('sendFailed', { error: flash.err || '' }))}</strong>`)
   if (flash.tg === 'wait') bits.push(`<strong>${esc(t('telegramWaiting'))}</strong>`)
+  if (flash.what === 'scores') {
+    const n = Number(flash.n) || 0
+    return `<div class="flash" role="status"><strong>${
+      esc(n ? t('savedScores', { n }) : t('savedNothing'))}</strong></div>`
+  }
   bits.push(bits.length
     ? `<span>${esc(t('sentDraft'))}</span>`
     : `<strong>${esc(t('sentDraft'))}</strong><a href="/groups">${esc(t('outbox'))} →</a>`)
@@ -537,71 +657,74 @@ export function tournamentPage({
   // A mixed level asks every pair to be one of each. The host would otherwise
   // find out at the draw, which is too late to fix by messaging anyone.
   const offLevel = isMixedLevel(tour.level) ? teams.filter((x) => !x.mixed) : []
+  const allDone = rounds.length > 0 && rounds.every((r) => roundComplete(matches, r))
+  // Where the host is in the night decides which tab opens: sign-ups before the
+  // draw, the rounds during it, the table once every score is in.
+  const active = !matches.length ? 'board' : allDone ? 'table' : 'rounds'
 
-  return page(`${tour.level || ''} ${humanWhen(tour, { lang: t.lang })}`.trim(), `
-    <h1>${esc(tour.level) || esc(t('statusOpen'))} · ${esc(humanWhen(tour, { lang: t.lang }))}</h1>
-    <p class="muted">${esc(levelLabel(tour.level, t))}</p>
-    <p class="meta">
-      <span>${ic('court')}${esc(t('courtsN', { n: tour.courts }))}</span>
-      <span>${ic('clock')}${esc(t('minutes', { n: tour.duration_min }))}</span>
-      <span>${ic('repeat')}${esc(t('minRounds', { n: tour.round_min }))}</span>
-      <span class="pill">${esc(statusLabel(tour.status, t))}</span>
-      <a href="/t/${tour.id}/tv">${ic('tv')}${esc(t('tvView'))}</a></p>
-
-    <div class="grid">
-      <div class="card"><h3>${ic('users')}${esc(t('teams'))} (${teams.length})</h3>
-        ${offLevel.length ? `<p class="err">${esc(t('mixedWarning', {
-          bad: offLevel.length, total: teams.length,
-          verb: t(offLevel.length === 1 ? 'isNotAre' : 'areNotIs'),
-          names: offLevel.map((x) => x.name).join(', '),
-        }))}</p>` : ''}
-        ${wrapTable(`<tbody>${teams.map((x, i) => `<tr><td class="pos">${i + 1}</td>
-          <td class="lead">${esc(x.name)}</td>
-          <td>${x.mixed ? `<span class="pill on">${esc(t('mixed'))}</span>` : ''}</td></tr>`).join('')
-          || `<tr><td class="muted">${esc(t('nobodyYet'))}</td></tr>`}</tbody>`, 'stack')}
-        ${waiting.length ? `<h3 style="margin-top:16px">${ic('hourglass')}${esc(t('waiting'))} (${waiting.length})</h3>
-          ${wrapTable(`<tbody>${waiting.map((p) => `<tr><td class="lead">${esc(p.name)}</td>
-            <td class="muted full">${esc(p.partner ? t('waitingOn', { name: p.partner })
-              : t('noPartner'))}</td></tr>`).join('')}</tbody>`, 'stack')}` : ''}
+  const board = `
+    <div class="card"><h3>${ic('board')}${esc(t('signupBoard'))}</h3>
+      ${flashFor('board')}
+      <pre class="msg">${esc(message)}</pre>
+      <div class="actions">
+        <form method="post" action="/t/${tour.id}/post">
+          <button>${ic('megaphone')}${esc(t('postToGroups'))}</button></form>
+        <a class="btn ghost" href="/groups">${ic('inbox')}${esc(t('outbox'))}</a>
       </div>
-      <div class="card"><h3>${ic('board')}${esc(t('signupBoard'))}</h3>
-        ${flashFor('board')}
-        <pre class="msg">${esc(message)}</pre>
-        <div class="actions">
-          <form method="post" action="/t/${tour.id}/post">
-            <button>${ic('megaphone')}${esc(t('postToGroups'))}</button></form>
-          <a class="btn ghost" href="/groups">${ic('inbox')}${esc(t('outbox'))}</a>
-        </div>
-      </div>
-    </div>
+    </div>`
 
-    ${roundText ? `<div class="card"><h3>${ic('compass')}${esc(t('roundTitle'))} <span class="pill on">${
+  const teamsPanel = `
+    <div class="card"><h3>${ic('users')}${esc(t('teams'))} (${teams.length})</h3>
+      ${offLevel.length ? `<p class="err">${ic('alert')} ${esc(t('mixedWarning', {
+        bad: offLevel.length, total: teams.length,
+        verb: t(offLevel.length === 1 ? 'isNotAre' : 'areNotIs'),
+        names: offLevel.map((x) => x.name).join(', '),
+      }))}</p>` : ''}
+      ${wrapTable(`<tbody>${teams.map((x, i) => `<tr><td class="pos">${i + 1}</td>
+        <td class="lead">${esc(x.name)}</td>
+        <td>${x.mixed ? `<span class="pill on">${esc(t('mixed'))}</span>` : ''}</td></tr>`).join('')
+        || `<tr><td class="muted">${esc(t('nobodyYet'))}</td></tr>`}</tbody>`, 'stack')}
+      ${waiting.length ? `<h3 style="margin-top:16px">${ic('hourglass')}${esc(t('waiting'))} (${waiting.length})</h3>
+        ${wrapTable(`<tbody>${waiting.map((p) => `<tr><td class="lead">${esc(p.name)}</td>
+          <td class="muted full">${esc(p.partner ? t('waitingOn', { name: p.partner })
+            : t('noPartner'))}</td></tr>`).join('')}</tbody>`, 'stack')}` : ''}
+    </div>`
+
+  // Before the draw the rounds tab is the draw itself; after it, the scores
+  // are the primary task and the round message is one collapsed preview above
+  // them — it posts itself when a round completes, so it rarely needs opening.
+  const roundsPanel = !matches.length ? `
+    <div class="card"><h3>${ic('list')}${esc(t('schedule'))}</h3>
+      <p class="muted">${esc(t('noSchedule'))}</p>
+      <form method="post" action="/t/${tour.id}/schedule"><div class="actions">
+        <button ${teams.length < 2 ? 'disabled' : ''}>${ic('shuffle')}${esc(t('drawSchedule'))}</button></div></form>
+      ${teams.length < 2 ? `<p class="hint">${esc(t('needTwoPairs'))}</p>` : ''}
+      ${courts.length ? '' : `<p class="note">${esc(t('addCourtsFirst'))}</p>`}
+    </div>` : `
+    <div class="card"><h3>${ic('compass')}${esc(t('roundTitle'))} <span class="pill on">${
       esc(t('roundN', { n: now }))}</span></h3>
       <p class="muted">${esc(t('roundHelp'))}</p>
       ${flashFor(`round-${now}`)}
-      <pre class="msg">${esc(roundText)}</pre>
-      <div class="actions">
+      <div class="actions" style="margin-top:8px">
         <form method="post" action="/t/${tour.id}/post">
           <input type="hidden" name="round" value="${now}">
           <button>${ic('megaphone')}${esc(t('postToGroups'))}</button></form>
       </div>
-    </div>` : ''}
-
-    <div class="card"><h3>${ic('list')}${esc(t('schedule'))}</h3>
-      ${matches.length ? rounds.map((r) => `<div class="roundhead">
-        <h4>${esc(t('roundN', { n: r }))}${r === now ? ` <span class="pill on">${esc(t('nowShort'))}</span>` : ''}</h4>
-        <form method="post" action="/t/${tour.id}/post">
-          <input type="hidden" name="round" value="${r}">
-          <button class="link">${esc(t('postRound', { n: r }))}</button></form>
-      </div>${
-        matches.filter((m) => m.round === r).map((m) => matchForm(m, t)).join('')}`).join('')
-        : `<p class="muted">${esc(t('noSchedule'))}</p>
-           <form method="post" action="/t/${tour.id}/schedule"><div class="actions">
-             <button ${teams.length < 2 ? 'disabled' : ''}>${ic('shuffle')}${esc(t('drawSchedule'))}</button></div></form>
-           ${teams.length < 2 ? `<p class="hint">${esc(t('needTwoPairs'))}</p>` : ''}
-           ${courts.length ? '' : `<p class="note">${esc(t('addCourtsFirst'))}</p>`}`}
+      <details class="preview"><summary>${ic('arrow')}${esc(t('preview'))}</summary>
+        <pre class="msg">${esc(roundText)}</pre></details>
     </div>
+    <form class="card" method="post" action="/t/${tour.id}/scores">
+      <h3>${ic('list')}${esc(t('schedule'))}</h3>
+      ${flashFor('scores')}
+      ${rounds.map((r) => `<div class="roundhead">
+        <h4>${esc(t('roundN', { n: r }))}${r === now && !allDone ? ` <span class="pill on">${esc(t('nowShort'))}</span>` : ''}</h4>
+        <button type="submit" class="link" formaction="/t/${tour.id}/post" name="round" value="${r}"
+          formnovalidate>${esc(t('postRound', { n: r }))}</button>
+      </div>${matches.filter((m) => m.round === r).map((m) => matchBlock(m, t)).join('')}`).join('')}
+      <div class="savebar"><button>${ic('check')}${esc(t('saveAll'))}</button></div>
+    </form>`
 
+  const tablePanel = `
     <div class="card"><h3>${ic('trophy')}${esc(t('standings'))}</h3>
       ${wrapTable(`<thead><tr><th>#</th><th>${esc(t('team'))}</th><th class="num">${esc(t('played'))}</th>
         <th class="num">${esc(t('won'))}</th><th class="num">${esc(t('points'))}</th>
@@ -613,7 +736,23 @@ export function tournamentPage({
         <td class="num" data-l="${esc(t('points'))}"><strong>${r.points}</strong></td>
         <td class="num muted" data-l="${esc(t('against'))}">${r.against}</td></tr>`).join('')
         || `<tr><td class="muted" colspan="6">${esc(t('noResults'))}</td></tr>`}</tbody>`, 'stack')}
-    </div>`, { nav: navFor('/tournaments', t), t, here: '/tournaments' })
+    </div>`
+
+  return page(`${tour.level || ''} ${humanWhen(tour, { lang: t.lang })}`.trim(), `
+    <h1>${esc(tour.level) || esc(t('statusOpen'))} · ${esc(humanWhen(tour, { lang: t.lang }))}</h1>
+    <p class="muted">${esc(levelLabel(tour.level, t))}</p>
+    <p class="meta">
+      <span>${ic('court')}${esc(t('courtsN', { n: tour.courts }))}</span>
+      <span>${ic('clock')}${esc(t('minutes', { n: tour.duration_min }))}</span>
+      <span>${ic('repeat')}${esc(t('minRounds', { n: tour.round_min }))}</span>
+      <span class="pill">${esc(statusLabel(tour.status, t))}</span>
+      <a href="/t/${tour.id}/tv">${ic('tv')}${esc(t('tvView'))}</a></p>
+    ${tabbed([
+      { id: 'board', icon: 'board', label: t('tabBoard'), body: board },
+      { id: 'teams', icon: 'users', label: t('tabTeams'), count: teams.length, body: teamsPanel },
+      { id: 'rounds', icon: 'list', label: t('tabRounds'), count: rounds.length || null, body: roundsPanel },
+      { id: 'table', icon: 'trophy', label: t('tabTable'), body: tablePanel },
+    ], active)}`, { nav: navFor('/tournaments', t), t, here: '/tournaments', tab: active })
 }
 
 /** Full-screen, high-contrast, self-refreshing — this one is read from ten metres. */

@@ -1,6 +1,6 @@
 import { createServer } from 'node:http'
 import {
-  addCourt, clubLanguage, createTournament, deleteCourt, getClub, getMatch, getTournament,
+  addCourt, clubLanguage, createTournament, deleteCourt, getClub, getTournament,
   listCourts, listMatches, listSignups, listTournaments, recordScore, rememberTelegramChat,
   replaceMatches, saveClub, telegramChat,
 } from './db.js'
@@ -128,6 +128,7 @@ const routes = [
     const q = new URL(req.url, 'http://x').searchParams
     const flash = q.get('posted') ? {
       what: q.get('posted'), tg: q.get('tg') || '', err: (q.get('err') || '').slice(0, 120),
+      n: q.get('n') || '',
     } : null
     return { html: V.tournamentPage({ ...v, courts: listCourts(), flash,
       message: signupMessage(v.tournament, '', t.lang),
@@ -158,31 +159,56 @@ const routes = [
     // The draw is the moment the night starts existing for the players, so the
     // first round goes to the groups without anyone having to remember to send it.
     if (matches.length) post(roundMessage(getTournament(id), 1, t.lang), { reason: 'round 1' })
-    return { to: `/t/${id}` }
+    return { to: `/t/${id}#rounds` }
   }],
 
-  ['POST', /^\/matches\/(\d+)\/score$/, async (m, req, t) => {
+  /**
+   * Save scores — every box on the page at once, or one match when the host
+   * pressed that match's own Save (`only`).
+   *
+   * An empty pair of boxes means "no result yet", never 0–0: it used to be
+   * coerced to zero, which marked a match as played and could complete a round
+   * that nobody had finished. Half a score (one box filled) is left alone.
+   */
+  ['POST', /^\/t\/(\d+)\/scores$/, async (m, req, t) => {
+    const id = Number(m[1])
+    const tour = getTournament(id)
+    if (!tour) return { html: V.page('404', '<h1>404</h1>', { t }), code: 404 }
     const f = await body(req)
-    const before = getMatch(Number(m[1]))
-    if (!before) return { html: V.page('404', '<h1>404</h1>', { t }), code: 404 }
-    // Whether the round was already finished decides whether this save is news.
-    // Correcting a typo in a round everyone has left must not re-announce it.
-    const wasDone = roundComplete(listMatches(before.tournament_id), before.round)
-    const row = recordScore(before.id, Number(f.a) || 0, Number(f.b) || 0)
-
-    const after = listMatches(row.tournament_id)
-    if (!wasDone && roundComplete(after, row.round)) {
-      // The last score of a round is the only reliable "time has passed" signal
-      // this system gets — nobody presses a button while holding a racket. So it
-      // is what sends twenty people to their next court.
-      const tour = getTournament(row.tournament_id)
-      const next = row.round + 1
-      post(roundsOf(after).includes(next)
-        ? roundMessage(tour, next, t.lang)
-        : standingsMessage(tour, t.lang),
-      { reason: roundsOf(after).includes(next) ? `round ${next}` : 'final' })
+    const before = listMatches(id)
+    const only = f.only ? Number(f.only) : null
+    const num = (v) => {
+      if (v == null || String(v).trim() === '') return null
+      const n = Number.parseInt(v, 10)
+      return Number.isFinite(n) && n >= 0 && n <= 99 ? n : null
     }
-    return { to: `/t/${row.tournament_id}` }
+    let changed = 0
+    for (const mt of before) {
+      if (only && mt.id !== only) continue
+      if (!(`a${mt.id}` in f)) continue
+      const a = num(f[`a${mt.id}`]), b = num(f[`b${mt.id}`])
+      if (a == null && b == null) {
+        if (mt.score_a != null || mt.score_b != null) { recordScore(mt.id, null, null); changed++ }
+        continue
+      }
+      if (a == null || b == null) continue
+      if (a !== mt.score_a || b !== mt.score_b) { recordScore(mt.id, a, b); changed++ }
+    }
+
+    // A round that became complete in this save is the only reliable "time has
+    // passed" signal this system gets — nobody presses a button while holding a
+    // racket. It sends twenty people to their next court. When several rounds
+    // complete at once (scores typed in after the fact) only the last one is
+    // announced; re-posting a round everyone has left is noise.
+    const after = listMatches(id)
+    const newlyDone = roundsOf(after).filter((r) => !roundComplete(before, r) && roundComplete(after, r))
+    if (newlyDone.length) {
+      const next = Math.max(...newlyDone) + 1
+      const hasNext = roundsOf(after).includes(next)
+      post(hasNext ? roundMessage(tour, next, t.lang) : standingsMessage(tour, t.lang),
+        { reason: hasNext ? `round ${next}` : 'final' })
+    }
+    return { to: `/t/${id}?posted=scores&n=${changed}#rounds` }
   }],
 
   // Post on demand, for a host who wants the board or a round in the group now.
@@ -203,7 +229,7 @@ const routes = [
     const q = new URLSearchParams({ posted: isRound ? `round-${round}` : 'board' })
     if (code) q.set('tg', code)
     if (tg?.error) q.set('err', String(tg.error).slice(0, 120))
-    return { to: `/t/${id}?${q}` }
+    return { to: `/t/${id}?${q}#${isRound ? 'rounds' : 'board'}` }
   }],
 
   ['GET', /^\/groups$/, (_m, _r, t) => ({ html: V.groupsPage({ groups, chat: telegramChat(), t }) })],

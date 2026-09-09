@@ -237,6 +237,10 @@ docker compose up -d --build
 docker compose exec app node scripts/seed.js --reset   # Padel Tribe sample data
 ```
 
+The tournament page is four tabs — Board, Teams, Rounds, Table — and the
+Rounds tab is one form: every score box on the page saves from the bar at the
+bottom, or one match from its own Save. Empty boxes mean "not played", never 0–0.
+
 Data lives in `data/planner.db` (gitignored, bind-mounted, survives recreation).
 
 ### Public domain
