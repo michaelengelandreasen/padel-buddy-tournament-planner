@@ -48,6 +48,10 @@
     {
       "title": "Impeccable pass on the console: post feedback, honest status pills, craft floor",
       "state": "done"
+    },
+    {
+      "title": "Public URL via Cloudflare Tunnel (padeladmin.webperfology.com)",
+      "state": "done"
     }
   ],
   "activity": [
@@ -71,7 +75,7 @@
   "status": "active",
   "headline": "Where do I go next — round messages in the groups, Telegram live",
   "summary": "The club's nights ran on a printed sheet and a PDF. Now the group gets one message per round saying who is on which court and where every pair goes next, posted automatically when the round before it is scored; !where Mike answers one person. Telegram posts by itself (bot token is the whole setup, the group is learned from the first command); WhatsApp stays a paste-from-outbox draft because it has no group API.",
-  "next": "Create the Telegram bot with @BotFather, set TELEGRAM_BOT_TOKEN in .env, add it to the Padel Tribe group and send /help",
-  "url": "https://padel-tournament-planner.mikehome.users.ctx7.dev",
-  "updated": "2026-09-06T04:06:42.825576Z"
+  "next": "Decide how to gate the public console: a Cloudflare Access policy on the hostname, or a password in the app",
+  "url": "https://padeladmin.webperfology.com",
+  "updated": "2026-09-09T09:24:17.547782Z"
 }

@@ -23,7 +23,7 @@ services:
       # club stays on the paste-it-yourself outbox. Which group is learned from
       # the first command the bot sees, so there is nothing else to configure.
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
-    networks: [web]
+    networks: [web, internal]
     volumes:
       # Absolute host paths: the broker only permits binds under the real
       # projects volume, and ./ resolves through a symlink it doesn't accept.
@@ -70,7 +70,13 @@ services:
     command: tunnel --no-autoupdate run
     environment:
       TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
-    networks: [web]
+    # Only the private network. On the shared `web` network four other projects
+    # also have a service called `app`, and Docker's DNS round-robins between
+    # them — so `http://app:8080` from here would reach somebody else's
+    # container one request in five. Here `app` can only mean ours.
+    networks: [internal]
 
 networks:
   web: { external: true }
+  # Project-private, so service names resolve to this project alone.
+  internal: {}

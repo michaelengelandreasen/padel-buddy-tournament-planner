@@ -11,7 +11,7 @@ last score is typed in — and anyone can ask `!where Mike` and get their own
 answer. The TV view shows the same board on the clubhouse screen.
 
 Live (VPN): https://padel-tournament-planner.mikehome.users.ctx7.dev
-Public: through a Cloudflare Tunnel on the club's own domain — see "Public domain" under Running.
+Public: https://padeladmin.webperfology.com — a Cloudflare Tunnel; see "Public domain" under Running.
 
 Seeded with **Padel Tribe**, R. Gonçalves Zarco 1813, Matosinhos (Porto) —
 [map](https://maps.app.goo.gl/PC4yvKz3BES4Xuh66): four courts, a Saturday
