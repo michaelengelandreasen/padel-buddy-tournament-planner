@@ -3,6 +3,7 @@ package com.padelplanner.net
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.BufferedReader
+import android.util.Base64
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
@@ -130,6 +131,12 @@ object Api {
             requestMethod = method
             connectTimeout = 8000
             readTimeout = 12000
+            // The console sits behind one shared HTTP Basic login. Credentials
+            // written into the server URL (https://user:pass@host) win; the
+            // club's default is used otherwise, so a fresh install just works.
+            val creds = URL(base).userInfo ?: "padel:buddy"
+            setRequestProperty("Authorization",
+                "Basic " + Base64.encodeToString(creds.toByteArray(), Base64.NO_WRAP))
             // The server answers form posts with a 303 to the page it just
             // changed. Following it would download HTML we have no use for.
             instanceFollowRedirects = false

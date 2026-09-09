@@ -11,7 +11,8 @@ last score is typed in — and anyone can ask `!where Mike` and get their own
 answer. The TV view shows the same board on the clubhouse screen.
 
 Live (VPN): https://padel-tournament-planner.mikehome.users.ctx7.dev
-Public: https://padeladmin.webperfology.com — a Cloudflare Tunnel; see "Public domain" under Running.
+Public: https://padeladmin.webperfology.com — a Cloudflare Tunnel; login `padel` / `buddy`,
+see "Public domain" under Running.
 
 Seeded with **Padel Tribe**, R. Gonçalves Zarco 1813, Matosinhos (Porto) —
 [map](https://maps.app.goo.gl/PC4yvKz3BES4Xuh66): four courts, a Saturday
@@ -270,11 +271,17 @@ you manage there:
    then `docker compose up -d`. The tunnel shows *Healthy* in Zero Trust within
    seconds and the hostname serves the console.
 
-The console has no login. Before sharing the URL beyond the players, either
-add an **Access** policy on the hostname in Zero Trust (Access → Applications;
-one-time PIN by email is free for a club-sized group) or ask for a password on
-the app. To go dark again, remove `COMPOSE_PROFILES` from `.env` and
-`docker compose up -d --remove-orphans`.
+The console has one shared login, HTTP Basic — `padel` / `buddy` by default
+(`BASIC_AUTH=user:pass` in the environment; empty disables it). Share it inside
+the link and the browser remembers it:
+
+```
+https://padel:buddy@padeladmin.webperfology.com/            console
+https://padel:buddy@padeladmin.webperfology.com/t/13/tv     the TV board
+```
+
+`/healthz` stays open. To go dark again, remove `COMPOSE_PROFILES` from `.env`
+and `docker compose up -d --remove-orphans`.
 
 The dashboard at mikehome.users.ctx7.dev lists containers labelled
 `aidevserver.project=true`; compose declares it, because a `docker compose up`

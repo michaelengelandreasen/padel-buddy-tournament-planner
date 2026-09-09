@@ -1,4 +1,5 @@
 import { createServer } from 'node:http'
+import { timingSafeEqual } from 'node:crypto'
 import {
   addCourt, clubLanguage, createTournament, deleteCourt, getClub, getTournament,
   listCourts, listMatches, listSignups, listTournaments, recordScore, rememberTelegramChat,
@@ -16,6 +17,29 @@ import * as V from './views.js'
 
 const groups = bus()
 const PORT = Number(process.env.PORT || 8080)
+
+/**
+ * One shared login for the whole console, HTTP Basic.
+ *
+ * The public URL puts a club's sign-up sheet and score entry on the open
+ * internet, and the people who need it are a handful of hosts who will get the
+ * link from each other. A username and password that travel inside the link
+ * (`https://padel:buddy@host/`) is exactly the right amount of door: no
+ * accounts, no reset flow, and the browser remembers it. `BASIC_AUTH=user:pass`
+ * in the environment; empty disables it. `/healthz` stays open for monitoring.
+ */
+const AUTH = String(process.env.BASIC_AUTH || '')
+const authOk = (req) => {
+  if (!AUTH) return true
+  const h = String(req.headers.authorization || '')
+  if (!h.startsWith('Basic ')) return false
+  const given = Buffer.from(h.slice(6).trim(), 'base64')
+  const want = Buffer.from(AUTH)
+  // Compare in constant time, on equal-length buffers, so neither the length
+  // nor the position of the first wrong byte leaks through the clock.
+  return given.length === want.length && timingSafeEqual(given, want)
+}
+const OPEN_PATHS = new Set(['/healthz'])
 
 /**
  * Post to every group the club runs, without making the caller wait.
@@ -281,6 +305,14 @@ const routes = [
 
 createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x')
+  if (!OPEN_PATHS.has(url.pathname) && !authOk(req)) {
+    res.writeHead(401, {
+      'www-authenticate': 'Basic realm="Padel Buddy", charset="UTF-8"',
+      'content-type': 'text/plain; charset=utf-8',
+      'cache-control': 'no-store',
+    })
+    return res.end('Padel Buddy — sign in.')
+  }
   // One language per request, read once: every view and every parser gets the
   // same `t`, so a page can never render half in one language and half in another.
   const t = translator(clubLanguage())
