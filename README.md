@@ -11,7 +11,7 @@ last score is typed in — and anyone can ask `!where Mike` and get their own
 answer. The TV view shows the same board on the clubhouse screen.
 
 Live (VPN): https://padel-tournament-planner.mikehome.users.ctx7.dev
-Public: https://wp-bullet.asuscomm.com — see "Public domain" under Running.
+Public: through a Cloudflare Tunnel on the club's own domain — see "Public domain" under Running.
 
 Seeded with **Padel Tribe**, R. Gonçalves Zarco 1813, Matosinhos (Porto) —
 [map](https://maps.app.goo.gl/PC4yvKz3BES4Xuh66): four courts, a Saturday
@@ -241,23 +241,36 @@ Data lives in `data/planner.db` (gitignored, bind-mounted, survives recreation).
 
 ### Public domain
 
-The ctx7 stack keeps projects VPN-only: Traefik serves the `*.mikehome.users.ctx7.dev`
-wildcard with a cert the ctx7 backend issues, and this is a home box behind NAT,
-so the stack's own `ctx7 expose` (Cloudflare orange-cloud to a routable origin)
-cannot make it public. The `public` service in compose is the way round that: a
-Caddy sidecar with its own Let's Encrypt certificate for `wp-bullet.asuscomm.com`
-(the router's DDNS name), proxying to the app over the compose network, listening
-on host **:9443** because Traefik owns :443. Core stack untouched.
+The ctx7 stack keeps projects VPN-only, its Traefik can only serve the ctx7
+wildcard certificate, and this is a home box whose router already uses 443/80
+for its own nginx — so nothing here can answer the internet directly. The
+`tunnel` service is the way round that: **cloudflared dials out** to Cloudflare,
+which terminates TLS at its edge and passes requests down the tunnel to
+`http://app:8080` on the compose network. No port forward, no certificate, no
+router change; the stack is untouched.
 
-On the ASUS router, once:
+Once, in [Cloudflare Zero Trust](https://one.dash.cloudflare.com/) for a zone
+you manage there:
 
-1. Turn off *Web Access from WAN* (or move it off 443/80) — otherwise the
-   router answers the public port itself, which is what Let's Encrypt saw first.
-2. Port forward **WAN TCP 443 → 192.168.40.230:9443**.
+1. **Networks → Tunnels → Create a tunnel → Cloudflared**, name it (e.g.
+   `padel`), and copy the token from the install step (the long `eyJ…` string).
+2. **Public Hostname**: subdomain `padel`, your domain, type **HTTP**,
+   URL **`app:8080`**. Save — Cloudflare creates the DNS record itself.
+3. On this box, add to `.env`:
 
-Caddy retries issuance on its own; `docker compose restart public` forces it.
-Certificates persist in `data/caddy`. To go dark again: remove the `public`
-service (or `docker compose rm -sf public`) and the port forward.
+   ```
+   TUNNEL_TOKEN=eyJ…
+   COMPOSE_PROFILES=public
+   ```
+
+   then `docker compose up -d`. The tunnel shows *Healthy* in Zero Trust within
+   seconds and the hostname serves the console.
+
+The console has no login. Before sharing the URL beyond the players, either
+add an **Access** policy on the hostname in Zero Trust (Access → Applications;
+one-time PIN by email is free for a club-sized group) or ask for a password on
+the app. To go dark again, remove `COMPOSE_PROFILES` from `.env` and
+`docker compose up -d --remove-orphans`.
 
 The dashboard at mikehome.users.ctx7.dev lists containers labelled
 `aidevserver.project=true`; compose declares it, because a `docker compose up`

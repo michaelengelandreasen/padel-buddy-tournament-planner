@@ -46,20 +46,31 @@ services:
       - 'traefik.http.routers.padel-tournament-planner.tls.domains[0].sans=*.mikehome.users.ctx7.dev'
       - traefik.http.services.padel-tournament-planner.loadbalancer.server.port=8080
 
-  # Public entry on the club's own domain — see deploy/Caddyfile for why this
-  # exists next to Traefik rather than inside it. Listens on host :9443 (Traefik
-  # owns :443); the home router forwards WAN 443 here. Certificates persist in
-  # data/caddy so a recreate does not re-issue.
-  public:
-    image: caddy:2-alpine
+  # Public entry on the club's own domain, through a Cloudflare Tunnel.
+  #
+  # The stack keeps projects VPN-only, Traefik cannot issue a certificate for a
+  # name outside the ctx7 wildcard, and the home router's 443/80 already belong
+  # to its own nginx — so nothing here can answer the public internet directly.
+  # cloudflared dials out instead: Cloudflare terminates TLS at its edge and
+  # hands requests to this container over the outbound tunnel, which reaches the
+  # app on the compose network as http://app:8080. No port, no cert, no router
+  # change. The public hostname and its target are set in Cloudflare Zero Trust
+  # (Networks → Tunnels → Public Hostname); the token in .env is the whole
+  # configuration on this side.
+  #
+  # Behind the `public` profile so a bare `docker compose up` on a box without
+  # a token does not leave a crash-looping container. Enable it once in .env:
+  #   TUNNEL_TOKEN=eyJ…
+  #   COMPOSE_PROFILES=public
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    profiles: [public]
     restart: unless-stopped
     depends_on: [app]
-    ports:
-      - "9443:443"
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
     networks: [web]
-    volumes:
-      - ${PROJECTS_DIR}/padel-tournament-planner/deploy/Caddyfile:/etc/caddy/Caddyfile:ro
-      - ${PROJECTS_DIR}/padel-tournament-planner/data/caddy:/data
 
 networks:
   web: { external: true }
