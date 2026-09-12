@@ -136,6 +136,10 @@ night. Each tournament carries its own list — seeded from Settings → Courts
 add, remove. A rename follows through to that night's schedule only; a court
 already in the schedule can be renamed but not removed. The draw uses the
 night's list, and the sign-up board draws `courts × 4` slots from its length.
+The list is one form — every name saves from *Save all*, or one row from its
+own Save. Labels are what the club calls the court — `1`, `2`, `Center` — and
+the word is put back only on display and in messages when the label is a bare
+number ("Court 1"), so the box you rename it in holds just the number.
 
 ## Venues
 

@@ -127,7 +127,7 @@ function seedTournamentCourts(tid, count) {
   const defaults = db.prepare('SELECT label FROM courts ORDER BY sort, id').all().map((c) => c.label)
   const n = Math.max(1, Number(count) || defaults.length || 1)
   const ins = db.prepare('INSERT INTO tournament_courts (tournament_id, label, sort) VALUES (?, ?, ?)')
-  for (let i = 0; i < n; i++) ins.run(tid, defaults[i] || `Court ${i + 1}`, i)
+  for (let i = 0; i < n; i++) ins.run(tid, defaults[i] || String(i + 1), i)
 }
 
 /**
@@ -161,6 +161,17 @@ function migrate() {
   if (!cols.includes('venue')) {
     db.exec("ALTER TABLE tournaments ADD COLUMN venue TEXT NOT NULL DEFAULT ''")
   }
+  // Courts used to be stored as "Court 3"; the word is put back on display, so
+  // a stored label is just the number (or the name). Strip it wherever a label
+  // is written, but only when what is left is a number — "Court Center" stays.
+  for (const [table, col] of [['courts', 'label'], ['tournament_courts', 'label'], ['matches', 'court']]) {
+    for (const word of ['Court ', 'Campo ']) {
+      db.exec(`UPDATE ${table} SET ${col} = trim(substr(${col}, ${word.length + 1}))
+        WHERE ${col} LIKE '${word}%' AND trim(substr(${col}, ${word.length + 1})) GLOB '[0-9]*'
+        AND trim(substr(${col}, ${word.length + 1})) NOT GLOB '*[^0-9]*'`)
+    }
+  }
+
   // Tournaments from before courts were per night get theirs from the club's
   // list, the way a new one would.
   for (const t of db.prepare('SELECT id, courts FROM tournaments').all()) {
@@ -327,6 +338,28 @@ export function renameTournamentCourt(tid, id, label) {
   run('UPDATE tournament_courts SET label = ? WHERE id = ?', next, id)
   run('UPDATE matches SET court = ? WHERE tournament_id = ? AND court = ?', next, tid, court.label)
   return one('SELECT * FROM tournament_courts WHERE id = ?', id)
+}
+
+/** Rename several of this night's courts at once: `{id: label}`. Returns how many changed. */
+export function renameTournamentCourts(tid, labels) {
+  let n = 0
+  for (const c of listTournamentCourts(tid)) {
+    if (!(c.id in labels)) continue
+    const next = String(labels[c.id] ?? '').replace(/\s+/g, ' ').trim().slice(0, 40)
+    if (next && next !== c.label) { renameTournamentCourt(tid, c.id, next); n++ }
+  }
+  return n
+}
+
+/** Rename several of the club's default courts at once. */
+export function renameCourts(labels) {
+  let n = 0
+  for (const c of listCourts()) {
+    if (!(c.id in labels)) continue
+    const next = String(labels[c.id] ?? '').replace(/\s+/g, ' ').trim().slice(0, 40)
+    if (next && next !== c.label) { renameCourt(c.id, next); n++ }
+  }
+  return n
 }
 
 /** Remove a court from this night. Refused once a schedule names it. */

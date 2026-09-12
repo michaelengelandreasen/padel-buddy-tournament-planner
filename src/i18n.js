@@ -262,6 +262,7 @@ const EN = {
   savedPairs: 'Saved {n} pairs.',
   seatEmpty: 'empty seat',
   courtName: 'Court name',
+  courtN: 'Court {n}',
   courtsNight: 'Courts for this night',
   courtsNightHelp: 'Only this tournament — rename, add or remove courts here and nothing else changes. '
     + 'New nights start from the defaults in Settings.',
@@ -534,6 +535,7 @@ const PT = {
   savedPairs: 'Guardadas {n} duplas.',
   seatEmpty: 'lugar vazio',
   courtName: 'Nome do campo',
+  courtN: 'Campo {n}',
   courtsNight: 'Campos desta noite',
   courtsNightHelp: 'Só este torneio — muda o nome, adiciona ou remove campos aqui e nada mais se altera. '
     + 'As noites novas começam com os campos por defeito das Definições.',

@@ -26,7 +26,7 @@ const CLUB = {
   maps_url: 'https://maps.app.goo.gl/PC4yvKz3BES4Xuh66',
 }
 // The club has four; a given night books as many as it needs.
-const COURTS = ['Court 1', 'Court 2', 'Court 3', 'Court 4']
+const COURTS = ['1', '2', '3', '4']
 
 /** The next given weekday. Never today, so the sample is always still to come. */
 function next(weekday, weeksAhead = 0) {

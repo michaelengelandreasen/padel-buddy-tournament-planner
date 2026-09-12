@@ -119,3 +119,13 @@ export const roundComplete = (matches, round) => {
   const games = matches.filter((m) => m.round === round)
   return games.length > 0 && games.every((m) => m.score_a != null && m.score_b != null)
 }
+
+/**
+ * A court label as people read it. Courts are stored as what the club calls
+ * them — "1", "2", "Center" — and only a bare number gets the word put back:
+ * "Court 1" in a message, "1" in the box you rename it in.
+ */
+export const courtName = (label, t) => {
+  const l = String(label ?? '').trim()
+  return /^\d+$/.test(l) ? t('courtN', { n: l }) : l
+}

@@ -14,7 +14,7 @@
 
 import { categories, grades, isMixedLevel, levelLabel, levelShort, parseLevel } from './levels.js'
 import { clock, humanWhen, todayISO } from './dates.js'
-import { courtsByTeam, currentRound, roundComplete, roundPlan, roundsOf } from './rounds.js'
+import { courtName, courtsByTeam, currentRound, roundComplete, roundPlan, roundsOf } from './rounds.js'
 import { LANGUAGES, translator } from './i18n.js'
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => (
@@ -243,19 +243,19 @@ document.querySelectorAll('[data-copy]').forEach(function(b){
  * not removed, because a schedule already names it.
  */
 const courtList = (courts, base, t, { fixed = false } = {}) => `
-  <div class="courtlist">${courts.map((c) => `<div class="courtrow">
-    <form method="post" action="${base}/${c.id}" class="rename">
+  <form class="courtlist" method="post" action="${base}/save">
+    ${courts.map((c) => `<div class="courtrow">
       ${ic('court')}
-      <input name="label" value="${esc(c.label)}" maxlength="40" required aria-label="${esc(t('courtName'))}">
-      <button class="btn save">${ic('check')}${esc(t('save'))}</button>
-    </form>
-    ${c.locked ? '' : `<form method="post" action="${base}/${c.id}/delete">
-      <button class="btn danger" aria-label="${esc(t('remove'))} ${esc(c.label)}">${ic('trash')}<span>${esc(t('remove'))}</span></button>
-    </form>`}
-  </div>`).join('') || `<p class="muted">${esc(t('noCourtsYet'))}</p>`}</div>
+      <input name="label${c.id}" value="${esc(c.label)}" maxlength="40" required aria-label="${esc(t('courtName'))}">
+      <button class="btn save" name="only" value="${c.id}">${ic('check')}${esc(t('save'))}</button>
+      ${c.locked ? '' : `<button class="btn danger" formaction="${base}/${c.id}/delete" formnovalidate
+        aria-label="${esc(t('remove'))} ${esc(c.label)}">${ic('trash')}<span>${esc(t('remove'))}</span></button>`}
+    </div>`).join('') || `<p class="muted">${esc(t('noCourtsYet'))}</p>`}
+    ${courts.length > 1 ? `<div class="actions"><button>${ic('check')}${esc(t('saveAll'))}</button></div>` : ''}
+  </form>
   ${fixed ? '' : `<form class="row" method="post" action="${base}" style="margin-top:14px">
     <div><label for="courtlabel-${base.replace(/\W/g, '')}">${esc(t('addCourt'))}</label>
-      <input id="courtlabel-${base.replace(/\W/g, '')}" name="label" placeholder="Court 1 / Center" required></div>
+      <input id="courtlabel-${base.replace(/\W/g, '')}" name="label" placeholder="5 / Center" required></div>
     <div style="flex:0 0 auto"><button>${ic('plus')}${esc(t('add'))}</button></div>
   </form>`}`
 
@@ -494,9 +494,9 @@ details.preview pre{margin-top:8px}
 @media (max-width:480px){.readout .roster{columns:1}}
 /* A court is a name you can edit in place; the row is the field, its Save, its Remove. */
 .courtlist{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.courtlist .actions{margin-top:6px}
 .courtrow{display:flex;gap:8px;align-items:center}
-.courtrow .rename{display:flex;flex:1 1 auto;min-width:0;gap:8px;align-items:center}
-.courtrow .rename>.i{flex:0 0 auto;color:var(--court)}
+.courtrow>.i{flex:0 0 auto;color:var(--court)}
 .courtrow input{flex:1 1 auto;min-width:0}
 .courtrow .btn.danger span{display:none}
 .courtrow .btn.danger{padding:0 12px}
@@ -677,7 +677,7 @@ const wrapTable = (inner, cls = '') =>
  * Each name is the input's own <label>, so the accessible name is the team.
  */
 const matchBlock = (m, t) => `<div class="match">
-  <div class="court">${ic('court')} ${esc(m.court)}</div>
+  <div class="court">${ic('court')} ${esc(courtName(m.court, t))}</div>
   <div class="sides">
     ${[['a', m.team_a, m.score_a], ['b', m.team_b, m.score_b]].map(([side, team, score]) => `
     <div class="side">
@@ -700,7 +700,7 @@ export function overview({ club, tournaments, courts, live, t }) {
       club.maps_url ? `<a href="${esc(club.maps_url)}">${esc(t('openInMaps'))}${ic('arrow')}</a>` : ''}</p>
     <div class="grid">
       <div class="card"><h3>${ic('court')}${esc(t('courts'))}</h3>
-        <p class="muted">${courts.length ? courts.map((c) => esc(c.label)).join(' · ') : esc(t('noneYet'))}</p>
+        <p class="muted">${courts.length ? courts.map((c) => esc(courtName(c.label, t))).join(' · ') : esc(t('noneYet'))}</p>
         <div class="actions"><a class="btn ghost" href="/settings">${ic('sliders')}${esc(t('manageCourts'))}</a></div></div>
       <div class="card"><h3>${ic('chats')}${esc(t('navGroups'))}</h3>
         <p><span class="pill ${live ? 'on' : ''}">${esc(live ? t('live') : t('draftMode'))}</span></p>
@@ -1151,7 +1151,7 @@ ${SPRITE}
       from && to ? `<span class="when">${esc(from)} → ${esc(to)}</span>` : ''}</h2>
     <div class="tablewrap"><table>
     ${plan ? plan.games.map((m) => `<tr>
-      <td class="court">${ic('court')}${esc(m.court)}</td><td>${esc(m.team_a)}</td>
+      <td class="court">${ic('court')}${esc(courtName(m.court, t))}</td><td>${esc(m.team_a)}</td>
       <td class="vs">${esc(t('vsShort'))}</td><td>${esc(m.team_b)}</td></tr>`).join('')
       : `<tr><td class="muted">${esc(t('notDrawn'))}</td></tr>`}
     </table></div>
@@ -1161,7 +1161,7 @@ ${SPRITE}
       <h2>${ic('compass')}${esc(t('nextRoundAt', { n: round + 1, at: to || '—' }))}</h2>
       <div class="tablewrap"><table>
       ${goes.map((g) => `<tr class="${g.court ? '' : 'off'}">
-        <td class="court">${g.court ? ic('court') : ic('coffee')}${esc(g.court || t('sittingOut'))}</td><td>${esc(g.name)}</td></tr>`).join('')}
+        <td class="court">${g.court ? ic('court') : ic('coffee')}${esc(g.court ? courtName(g.court, t) : t('sittingOut'))}</td><td>${esc(g.name)}</td></tr>`).join('')}
       </table></div></div>` : ''}
     ${plan && last ? `<p class="final">${ic('trophy')}${esc(t('lastRoundNote'))}</p>` : ''}
   </div>

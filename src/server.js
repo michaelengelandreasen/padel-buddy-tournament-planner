@@ -2,7 +2,8 @@ import { createServer } from 'node:http'
 import { timingSafeEqual } from 'node:crypto'
 import {
   addCourt, addSignup, addTournamentCourt, addVenue, clubLanguage, createTournament, deleteCourt,
-  deleteTournamentCourt, deleteVenue, listTournamentCourts, renameTournamentCourt,
+  deleteTournamentCourt, deleteVenue, listTournamentCourts, renameCourts, renameTournamentCourt,
+  renameTournamentCourts,
   findVenue, getClub, getTournament, listVenues, updateVenue,
   listCourts, listMatches, listSignups, listTournaments, recordScore, rememberTelegramChat,
   renameCourt, replaceMatches, saveClub, setPartner, telegramChat,
@@ -53,6 +54,17 @@ const OPEN_PATHS = new Set(['/healthz'])
  * problem. Failures are logged by the bus itself and shown in the outbox.
  */
 const post = (text, meta) => { groups.send(text, meta).catch((err) => console.error(err)) }
+
+/** `label12=Center&label13=3` → {12: 'Center', 13: '3'}; with `only=12`, just that one. */
+function labelsFrom(f) {
+  const only = f.only ? Number(f.only) : null
+  const out = {}
+  for (const [k, v] of Object.entries(f)) {
+    const m = /^label(\d+)$/.exec(k)
+    if (m && (!only || Number(m[1]) === only)) out[Number(m[1])] = v
+  }
+  return out
+}
 
 const html = (res, body, code = 200) => {
   res.writeHead(code, { 'content-type': 'text/html; charset=utf-8' }); res.end(body)
@@ -119,6 +131,12 @@ const routes = [
   ['POST', /^\/courts$/, async (_m, req) => {
     const f = await body(req)
     if (f.label?.trim()) addCourt(f.label.trim(), listCourts().length)
+    return { to: '/settings#courts' }
+  }],
+  // One form for the whole list: every field, or one row when `only` is set.
+  ['POST', /^\/courts\/save$/, async (_m, req) => {
+    const f = await body(req)
+    renameCourts(labelsFrom(f))
     return { to: '/settings#courts' }
   }],
   ['POST', /^\/courts\/(\d+)$/, async (m, req) => {
@@ -290,6 +308,11 @@ const routes = [
   ['POST', /^\/t\/(\d+)\/courts$/, async (m, req) => {
     const f = await body(req)
     addTournamentCourt(Number(m[1]), f.label)
+    return { to: `/t/${m[1]}#rounds` }
+  }],
+  ['POST', /^\/t\/(\d+)\/courts\/save$/, async (m, req) => {
+    const f = await body(req)
+    renameTournamentCourts(Number(m[1]), labelsFrom(f))
     return { to: `/t/${m[1]}#rounds` }
   }],
   ['POST', /^\/t\/(\d+)\/courts\/(\d+)$/, async (m, req) => {

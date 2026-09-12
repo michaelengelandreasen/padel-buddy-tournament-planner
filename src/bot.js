@@ -5,7 +5,7 @@ import {
 import { buildTeams, slots, standings } from './formats/nonstop.js'
 import { clock, dayName, parseWhen, shortDate, timeRange, validateWhen } from './dates.js'
 import {
-  courtsByTeam, currentRound, findGame, opponentIn, roundPlan, roundsOf, teamsNamed,
+  courtName, courtsByTeam, currentRound, findGame, opponentIn, roundPlan, roundsOf, teamsNamed,
 } from './rounds.js'
 import { levelHelp, levelTight, parseLevel } from './levels.js'
 import { translator } from './i18n.js'
@@ -330,7 +330,7 @@ export function roundMessage(tour, round, lang = clubLanguage()) {
   for (const g of plan.games) {
     const scored = g.score_a != null && g.score_b != null
     const tail = (n) => (scored ? ` — ${n}` : '')
-    lines.push('', b(g.court))
+    lines.push('', b(courtName(g.court, s)))
     lines.push(`${g.team_a}${tail(g.score_a)}`)
     lines.push(`🆚 ${g.team_b}${tail(g.score_b)}`)
   }
@@ -352,7 +352,7 @@ export function roundMessage(tour, round, lang = clubLanguage()) {
         || String(a.court).localeCompare(String(x.court), undefined, { numeric: true })
         || a.name.localeCompare(x.name))
     for (const g of goes) {
-      lines.push(g.court ? `${g.court} — ${g.name}` : `☕ ${g.name}`)
+      lines.push(g.court ? `${courtName(g.court, s)} — ${g.name}` : `☕ ${g.name}`)
     }
   }
 
@@ -385,7 +385,7 @@ export function whereMessage(tour, query, lang = clubLanguage()) {
   const lines = [`📍 ${b(team)}`]
   const when = clockWindow(tour, plan, lang)
   lines.push(now
-    ? `🎾 ${s('nowShort')} · ${b(now.court)}${when ? ` (${when})` : ''}`
+    ? `🎾 ${s('nowShort')} · ${b(courtName(now.court, s))}${when ? ` (${when})` : ''}`
     : `☕ ${s('restingThisRound')}${when ? ` (${when})` : ''}`)
   if (now) lines.push(`🆚 ${opponentIn(now, team)}`)
 
@@ -395,7 +395,7 @@ export function whereMessage(tour, query, lang = clubLanguage()) {
     const nextCourt = courtsByTeam(matches, round + 1).get(team)
     const at = clock(plan.end, { lang })
     lines.push(nextCourt
-      ? `⏭ ${s('nextGoTo', { court: nextCourt, at: at || '—' })}`
+      ? `⏭ ${s('nextGoTo', { court: courtName(nextCourt, s), at: at || '—' })}`
       : `⏭ ${s('nextYouRest', { at: at || '—' })}`)
   }
   return lines.join('\n')
