@@ -3,7 +3,7 @@ import { timingSafeEqual } from 'node:crypto'
 import {
   addCourt, addSignup, clubLanguage, createTournament, deleteCourt, getClub, getTournament,
   listCourts, listMatches, listSignups, listTournaments, recordScore, rememberTelegramChat,
-  replaceMatches, saveClub, setPartner, telegramChat,
+  renameCourt, replaceMatches, saveClub, setPartner, telegramChat,
 } from './db.js'
 import { buildTeams, schedule, standings } from './formats/nonstop.js'
 import { handle, roundMessage, signupMessage, standingsMessage } from './bot.js'
@@ -93,7 +93,12 @@ const routes = [
 
   ['GET', /^\/settings$/, (_m, _r, t) =>
     ({ html: V.settings({ club: getClub(), courts: listCourts(), t }) })],
-  ['POST', /^\/settings$/, async (_m, req) => { saveClub(await body(req)); return { to: '/settings' } }],
+  // Every settings form says which tab it lives on, so a save lands back there.
+  ['POST', /^\/settings$/, async (_m, req) => {
+    const f = await body(req)
+    saveClub(f)
+    return { to: `/settings#${/^[a-z]+$/.test(f.tab || '') ? f.tab : 'club'}` }
+  }],
 
   // The header toggle. Same handler as the settings form, so there is one place
   // the language is written and one place it is validated.
@@ -108,9 +113,14 @@ const routes = [
   ['POST', /^\/courts$/, async (_m, req) => {
     const f = await body(req)
     if (f.label?.trim()) addCourt(f.label.trim(), listCourts().length)
-    return { to: '/settings' }
+    return { to: '/settings#courts' }
   }],
-  ['POST', /^\/courts\/(\d+)\/delete$/, (m) => { deleteCourt(Number(m[1])); return { to: '/settings' } }],
+  ['POST', /^\/courts\/(\d+)$/, async (m, req) => {
+    const f = await body(req)
+    renameCourt(Number(m[1]), f.label)
+    return { to: '/settings#courts' }
+  }],
+  ['POST', /^\/courts\/(\d+)\/delete$/, (m) => { deleteCourt(Number(m[1])); return { to: '/settings#courts' } }],
 
   ['GET', /^\/tournaments$/, (_m, _r, t) =>
     ({ html: V.tournamentsPage({ tournaments: listTournaments(), t }) })],

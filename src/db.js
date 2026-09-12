@@ -208,6 +208,20 @@ export const addCourt = (label, sort = 0) =>
   run('INSERT INTO courts (label, sort) VALUES (?, ?)', label, sort)
 export const deleteCourt = (id) => run('DELETE FROM courts WHERE id = ?', id)
 
+/**
+ * Rename a court everywhere it is written. Matches store the court's label as
+ * text — the schedule is a printed thing, not a join — so a rename that left
+ * old schedules saying "Court 3" while the wall says "Center" would be a lie.
+ */
+export function renameCourt(id, label) {
+  const court = one('SELECT * FROM courts WHERE id = ?', id)
+  const next = String(label ?? '').replace(/\s+/g, ' ').trim().slice(0, 40)
+  if (!court || !next || next === court.label) return court
+  run('UPDATE courts SET label = ? WHERE id = ?', next, id)
+  run('UPDATE matches SET court = ? WHERE court = ?', next, court.label)
+  return one('SELECT * FROM courts WHERE id = ?', id)
+}
+
 /** Soonest first, with undated ones last — a club reads its list as a calendar. */
 export const listTournaments = () =>
   all(`SELECT * FROM tournaments

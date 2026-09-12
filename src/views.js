@@ -443,6 +443,15 @@ details.preview pre{margin-top:8px}
 .readout .roster{flex:1 1 100%;columns:2;column-gap:24px;margin:4px 0 0;padding-left:1.4em;font-size:.95rem}
 .readout .roster li{break-inside:avoid;padding:2px 0}
 @media (max-width:480px){.readout .roster{columns:1}}
+/* A court is a name you can edit in place; the row is the field, its Save, its Remove. */
+.courtlist{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.courtrow{display:flex;gap:8px;align-items:center}
+.courtrow .rename{display:flex;flex:1 1 auto;min-width:0;gap:8px;align-items:center}
+.courtrow .rename>.i{flex:0 0 auto;color:var(--court)}
+.courtrow input{flex:1 1 auto;min-width:0}
+.courtrow .btn.danger span{display:none}
+.courtrow .btn.danger{padding:0 12px}
+@media (min-width:640px){.courtrow .btn.danger span{display:inline}.courtrow .btn.danger{padding:11px 16px}}
 /*
  * The pairs board. Seats are the shape a pair has — two slots side by side —
  * and the tray is everyone still unplaced. A player is a chip that moves by
@@ -478,7 +487,6 @@ details.preview pre{margin-top:8px}
 .tray .chip{width:auto;max-width:100%}
 .tray:empty::before{content:attr(data-empty);color:var(--muted);padding:8px 6px;font-size:.9rem}
 .pairsbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:14px}
-.pairsbar .spacer{flex:1 1 auto}
 /* On a phone the two seats stack, so a name is never squeezed to its first letters. */
 @media (max-width:480px){
   .pairsbar button{flex:1 1 100%}
@@ -654,17 +662,23 @@ export function settings({ club, courts, t }) {
       <label for="cmaps">${esc(t('mapsLink'))}</label>
       <input id="cmaps" name="maps_url" type="url" value="${esc(club.maps_url)}"
         placeholder="https://maps.app.goo.gl/…">
-      <div class="actions"><button>${ic('check')}${esc(t('saveClub'))}</button></div>
+      <input type="hidden" name="tab" value="club">
+      <div class="actions"><button>${ic('check')}${esc(t('save'))}</button></div>
     </form>`
   const courtsPanel = `
     <div class="card">
       <h3>${ic('court')}${esc(t('courts'))}</h3>
       <p class="muted">${esc(t('courtsHelp'))}</p>
-      ${wrapTable(`<tbody>${courts.map((c) => `<tr><td>${esc(c.label)}</td>
-        <td style="text-align:right;width:1%">
+      <div class="courtlist">${courts.map((c) => `<div class="courtrow">
+        <form method="post" action="/courts/${c.id}" class="rename">
+          ${ic('court')}
+          <input name="label" value="${esc(c.label)}" maxlength="40" required aria-label="${esc(t('courtName'))}">
+          <button class="btn ghost">${ic('check')}${esc(t('save'))}</button>
+        </form>
         <form method="post" action="/courts/${c.id}/delete">
-          <button class="btn danger">${ic('trash')}${esc(t('remove'))}</button></form>
-      </td></tr>`).join('') || `<tr><td class="muted">${esc(t('noCourtsYet'))}</td></tr>`}</tbody>`)}
+          <button class="btn danger" aria-label="${esc(t('remove'))} ${esc(c.label)}">${ic('trash')}<span>${esc(t('remove'))}</span></button>
+        </form>
+      </div>`).join('') || `<p class="muted">${esc(t('noCourtsYet'))}</p>`}</div>
       <form class="row" method="post" action="/courts" style="margin-top:14px">
         <div><label for="courtlabel">${esc(t('addCourt'))}</label>
           <input id="courtlabel" name="label" placeholder="Court 1 / Center" required></div>
@@ -678,6 +692,7 @@ export function settings({ club, courts, t }) {
       <label for="lang">${esc(t('language'))}</label>
       <select id="lang" name="language">${LANGUAGES.map((l) => `<option value="${l.code}"
         ${l.code === t.lang ? 'selected' : ''}>${esc(l.label)}</option>`).join('')}</select>
+      <input type="hidden" name="tab" value="language">
       <div class="actions"><button>${ic('check')}${esc(t('save'))}</button></div>
     </form>`
   const policyForm = `
@@ -688,6 +703,7 @@ export function settings({ club, courts, t }) {
       <textarea id="rules_en" name="rules_en" style="min-height:96px">${esc(club.rules_en)}</textarea>
       <label for="rules_pt">${esc(t('inPortuguese'))}</label>
       <textarea id="rules_pt" name="rules_pt" style="min-height:96px">${esc(club.rules_pt)}</textarea>
+      <input type="hidden" name="tab" value="policy">
       <div class="actions"><button>${ic('check')}${esc(t('save'))}</button></div>
     </form>`
 
@@ -869,10 +885,9 @@ export function tournamentPage({
       </div>
       <input type="hidden" name="seats" value="[]">
       <div class="pairsbar">
+        <button>${ic('check')}${esc(t('save'))}</button>
         <button type="button" class="btn ghost" data-act="rest">${ic('shuffle')}${esc(t('pairUpRest'))}</button>
         <button type="button" class="btn ghost" data-act="all">${ic('repeat')}${esc(t('reshuffleAll'))}</button>
-        <span class="spacer"></span>
-        <button>${ic('check')}${esc(t('savePairs'))}</button>
       </div>
     </form>`
 
