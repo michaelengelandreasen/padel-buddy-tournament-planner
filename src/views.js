@@ -247,7 +247,7 @@ const courtList = (courts, base, t, { fixed = false } = {}) => `
     <form method="post" action="${base}/${c.id}" class="rename">
       ${ic('court')}
       <input name="label" value="${esc(c.label)}" maxlength="40" required aria-label="${esc(t('courtName'))}">
-      <button class="btn ghost">${ic('check')}${esc(t('save'))}</button>
+      <button class="btn save">${ic('check')}${esc(t('save'))}</button>
     </form>
     ${c.locked ? '' : `<form method="post" action="${base}/${c.id}/delete">
       <button class="btn danger" aria-label="${esc(t('remove'))} ${esc(c.label)}">${ic('trash')}<span>${esc(t('remove'))}</span></button>
@@ -352,6 +352,9 @@ button:not(:disabled):hover,.btn:hover{filter:brightness(1.08)}
 button:not(:disabled):active,.btn:active{transform:translateY(1px)}
 .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
 .btn.ghost:hover{background:var(--surface-2);filter:none}
+/* A secondary Save is still a Save: the brand colour on its outline says so. */
+.btn.save{background:transparent;color:var(--brand);border:1.5px solid var(--brand)}
+.btn.save:hover{background:color-mix(in oklab,var(--brand) 12%,transparent);filter:none}
 /* A secondary action that lives next to a heading: reads as text, taps like a button. */
 button.link{background:transparent;color:var(--muted);border:0;padding:0 8px;font-weight:600;
   text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--line)}
@@ -421,16 +424,16 @@ pre.msg{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--surface-2);
  * edge rather than a hairline, and it is the tallest thing on its line. Empty
  * shows a dash so a missing score looks missing; a typed number is big and bold.
  */
-.match input{flex:0 0 76px;width:76px;min-height:50px;text-align:center;padding:6px 4px;
-  background:var(--bg);border:2px solid color-mix(in oklab,var(--muted) 45%,var(--line));
-  border-radius:12px;font-size:1.25rem;font-weight:800;font-variant-numeric:tabular-nums;
-  box-shadow:inset 0 1px 2px rgba(0,0,0,.45);transition:border-color .15s ease-out}
+.match input{flex:0 0 88px;width:88px;min-height:56px;text-align:center;padding:6px 4px;
+  background:var(--bg);border:2px solid color-mix(in oklab,var(--brand) 45%,var(--line));
+  border-radius:12px;font-size:1.5rem;font-weight:800;font-variant-numeric:tabular-nums;
+  box-shadow:inset 0 1px 2px rgba(0,0,0,.45),0 0 0 1px rgba(0,0,0,.35);transition:border-color .15s ease-out}
 .match input::placeholder{color:var(--muted);font-weight:600;opacity:1}
-.match input:hover{border-color:var(--muted)}
+.match input:hover{border-color:var(--brand)}
 .match input:focus{border-color:var(--brand);outline:none;
   box-shadow:0 0 0 3px color-mix(in oklab,var(--brand) 30%,transparent),inset 0 1px 2px rgba(0,0,0,.45)}
-/* A box that already holds a score wears it plainly; the border no longer needs to shout. */
-.match input:not(:placeholder-shown){border-color:color-mix(in oklab,var(--brand) 55%,var(--line))}
+/* A box that already holds a score wears it in the brand colour outright. */
+.match input:not(:placeholder-shown){border-color:var(--brand);color:var(--brand-soft)}
 .match button{padding:8px 18px}
 @media (max-width:480px){
   .match{grid-template-columns:1fr}
@@ -503,6 +506,13 @@ form.venue{padding:12px 14px;border:1px solid var(--line);border-radius:12px;bac
 form.venue .actions{margin-top:12px}
 form.venue.add{margin-top:16px;background:transparent;border-style:dashed}
 form.venue h4{margin:0}
+/* A card that folds: its heading is the summary, the arrow turns when open. */
+details.fold summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;min-height:44px;margin:-4px 0}
+details.fold summary::-webkit-details-marker{display:none}
+details.fold summary h3{margin:0;flex:1 1 auto}
+details.fold summary>.i{color:var(--muted);transition:transform .15s ease-out}
+details.fold[open] summary>.i{transform:rotate(90deg)}
+details.fold[open] summary{margin-bottom:8px}
 /* Standings: a real grid at every width. */
 table.standings td.pos{font-weight:800;color:var(--brand);width:2.4ch;font-variant-numeric:tabular-nums}
 table.standings td.team{font-weight:600;overflow-wrap:anywhere}
@@ -676,7 +686,7 @@ const matchBlock = (m, t) => `<div class="match">
         inputmode="numeric" placeholder="–" value="${score ?? ''}">
     </div>`).join('')}
   </div>
-  <button class="btn ghost" name="only" value="${m.id}">${ic('check')}${esc(t('save'))}</button>
+  <button class="btn save" name="only" value="${m.id}">${ic('check')}${esc(t('save'))}</button>
 </div>`
 
 const levelCell = (code, t) => code
@@ -989,10 +999,18 @@ export function tournamentPage({
   // renamed (its matches follow) but not removed from under the schedule.
   const inSchedule = new Set(matches.map((m) => m.court))
   const nightCourts = courts.map((c) => ({ ...c, locked: inSchedule.has(c.label) }))
-  const courtsCard = `
-    <div class="card"><h3>${ic('court')}${esc(t('courtsNight'))} <span class="pill">${courts.length}</span></h3>
+  // Before the draw the courts are part of setting the night up, so the card
+  // is open; after it they are a detail, folded above the scores so they can
+  // still be found and renamed without scrolling past every round.
+  const courtsBody = `
       <p class="muted">${esc(t('courtsNightHelp'))}${matches.length ? ` ${esc(t('courtsNightLocked'))}` : ''}</p>
-      ${courtList(nightCourts, `/t/${tour.id}/courts`, t, { fixed: matches.length > 0 })}
+      ${courtList(nightCourts, `/t/${tour.id}/courts`, t, { fixed: matches.length > 0 })}`
+  const courtsCard = matches.length ? `
+    <details class="card fold"><summary><h3>${ic('court')}${esc(t('courtsNight'))} <span class="pill">${courts.length}</span></h3>${ic('arrow')}</summary>
+      ${courtsBody}
+    </details>` : `
+    <div class="card"><h3>${ic('court')}${esc(t('courtsNight'))} <span class="pill">${courts.length}</span></h3>
+      ${courtsBody}
     </div>`
   const roundsPanel = !matches.length ? `
     <div class="card"><h3>${ic('list')}${esc(t('schedule'))}</h3>
@@ -1001,6 +1019,7 @@ export function tournamentPage({
         <button ${teams.length < 2 ? 'disabled' : ''}>${ic('shuffle')}${esc(t('drawSchedule'))}</button></div></form>
       ${teams.length < 2 ? `<p class="hint">${esc(t('needTwoPairs'))}</p>` : ''}
     </div>${courtsCard}` : `
+    ${courtsCard}
     <div class="card"><h3>${ic('compass')}${esc(t('roundTitle'))} <span class="pill on">${
       esc(t('roundN', { n: now }))}</span></h3>
       <p class="muted">${esc(t('roundHelp'))}</p>
@@ -1023,7 +1042,7 @@ export function tournamentPage({
           formnovalidate>${esc(t('postRound', { n: r }))}</button>
       </div>${matches.filter((m) => m.round === r).map((m) => matchBlock(m, t)).join('')}`).join('')}
       <div class="savebar"><button>${ic('check')}${esc(t('saveAll'))}</button></div>
-    </form>${courtsCard}`
+    </form>`
 
   // The table stays a table on a phone: a ranking is read down a column, and
   // four short numbers fit beside a name. Headings abbreviate below 480px.
