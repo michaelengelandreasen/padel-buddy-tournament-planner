@@ -424,10 +424,10 @@ pre.msg{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--surface-2);
  * edge rather than a hairline, and it is the tallest thing on its line. Empty
  * shows a dash so a missing score looks missing; a typed number is big and bold.
  */
-.match input{flex:0 0 88px;width:88px;min-height:56px;text-align:center;padding:6px 4px;
-  background:var(--bg);border:2px solid color-mix(in oklab,var(--brand) 45%,var(--line));
-  border-radius:12px;font-size:1.5rem;font-weight:800;font-variant-numeric:tabular-nums;
-  box-shadow:inset 0 1px 2px rgba(0,0,0,.45),0 0 0 1px rgba(0,0,0,.35);transition:border-color .15s ease-out}
+.match input{flex:0 0 76px;width:76px;min-height:50px;text-align:center;padding:6px 4px;
+  background:var(--bg);border:2px solid color-mix(in oklab,var(--brand) 55%,var(--line));
+  border-radius:12px;font-size:1.25rem;font-weight:800;font-variant-numeric:tabular-nums;
+  box-shadow:inset 0 1px 2px rgba(0,0,0,.45);transition:border-color .15s ease-out}
 .match input::placeholder{color:var(--muted);font-weight:600;opacity:1}
 .match input:hover{border-color:var(--brand)}
 .match input:focus{border-color:var(--brand);outline:none;
