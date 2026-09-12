@@ -1,7 +1,8 @@
 import { createServer } from 'node:http'
 import { timingSafeEqual } from 'node:crypto'
 import {
-  addCourt, addSignup, addVenue, clubLanguage, createTournament, deleteCourt, deleteVenue,
+  addCourt, addSignup, addTournamentCourt, addVenue, clubLanguage, createTournament, deleteCourt,
+  deleteTournamentCourt, deleteVenue, listTournamentCourts, renameTournamentCourt,
   findVenue, getClub, getTournament, listVenues, updateVenue,
   listCourts, listMatches, listSignups, listTournaments, recordScore, rememberTelegramChat,
   renameCourt, replaceMatches, saveClub, setPartner, telegramChat,
@@ -84,7 +85,8 @@ function view(id) {
   if (!tournament) return null
   const { teams, waiting } = buildTeams(listSignups(tournament.id))
   const matches = listMatches(tournament.id)
-  return { tournament, teams, waiting, matches, table: standings(teams, matches) }
+  return { tournament, teams, waiting, matches, table: standings(teams, matches),
+    courts: listTournamentCourts(tournament.id) }
 }
 
 const routes = [
@@ -205,7 +207,7 @@ const routes = [
       what: q.get('posted'), tg: q.get('tg') || '', err: (q.get('err') || '').slice(0, 120),
       n: q.get('n') || '',
     } : q.get('signed') ? { what: 'board', signed: q.get('signed') } : null
-    return { html: V.tournamentPage({ ...v, courts: listCourts(), flash,
+    return { html: V.tournamentPage({ ...v, flash,
       message: signupMessage(v.tournament, '', t.lang),
       // What the group would see right now, so a host can read it before
       // deciding to send it.
@@ -224,11 +226,8 @@ const routes = [
   ['POST', /^\/t\/(\d+)\/schedule$/, (m, _r, t) => {
     const id = Number(m[1])
     const v = view(id)
-    // Courts the club configured, capped by what this tournament booked. A club
-    // with six courts running a three-court night should not draw six.
-    const courts = listCourts().map((c) => c.label)
-    const use = (courts.length ? courts : Array.from({ length: v.tournament.courts },
-      (_, i) => `Court ${i + 1}`)).slice(0, v.tournament.courts)
+    // This night's own courts, as named on its Rounds tab.
+    const use = v.courts.map((c) => c.label)
     const { matches } = schedule(v.teams, use,
       { durationMin: v.tournament.duration_min, roundMin: v.tournament.round_min })
     replaceMatches(id, matches)
@@ -285,6 +284,22 @@ const routes = [
         { reason: hasNext ? `round ${next}` : 'final' })
     }
     return { to: `/t/${id}?posted=scores&n=${changed}#rounds` }
+  }],
+
+  // This night's courts: rename, add, remove — nothing outside the tournament moves.
+  ['POST', /^\/t\/(\d+)\/courts$/, async (m, req) => {
+    const f = await body(req)
+    addTournamentCourt(Number(m[1]), f.label)
+    return { to: `/t/${m[1]}#rounds` }
+  }],
+  ['POST', /^\/t\/(\d+)\/courts\/(\d+)$/, async (m, req) => {
+    const f = await body(req)
+    renameTournamentCourt(Number(m[1]), Number(m[2]), f.label)
+    return { to: `/t/${m[1]}#rounds` }
+  }],
+  ['POST', /^\/t\/(\d+)\/courts\/(\d+)\/delete$/, (m) => {
+    deleteTournamentCourt(Number(m[1]), Number(m[2]))
+    return { to: `/t/${m[1]}#rounds` }
   }],
 
   // The pairs board: seats → partners, written both ways. Only while the night

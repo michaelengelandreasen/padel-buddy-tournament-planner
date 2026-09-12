@@ -51,7 +51,7 @@ const EN = {
   clubName: 'Club name',
   address: 'Address',
   mapsLink: 'Google Maps link',
-  courtsHelp: 'Named, not numbered — the group message and the TV view both say these out loud. Rename one and every schedule follows.',
+  courtsHelp: 'Named, not numbered — the group message and the TV view both say these out loud.',
   addCourt: 'Add a court',
   add: 'Add',
   remove: 'Remove',
@@ -262,6 +262,12 @@ const EN = {
   savedPairs: 'Saved {n} pairs.',
   seatEmpty: 'empty seat',
   courtName: 'Court name',
+  courtsNight: 'Courts for this night',
+  courtsNightHelp: 'Only this tournament — rename, add or remove courts here and nothing else changes. '
+    + 'New nights start from the defaults in Settings.',
+  courtsNightLocked: 'A court in the schedule can be renamed but not removed.',
+  courtsDefaultsHelp: 'The courts a new night starts with. Each tournament then keeps its own list, '
+    + 'edited on its Rounds tab — changing these does not touch nights already created.',
   copy: 'Copy',
   copied: 'Copied',
   shareTable: 'Table for the group',
@@ -325,7 +331,7 @@ const PT = {
   clubName: 'Nome do clube',
   address: 'Morada',
   mapsLink: 'Link do Google Maps',
-  courtsHelp: 'Com nome, não com número — a mensagem do grupo e o ecrã da TV dizem-nos em voz alta. Muda um nome e todos os calendários acompanham.',
+  courtsHelp: 'Com nome, não com número — a mensagem do grupo e o ecrã da TV dizem-nos em voz alta.',
   addCourt: 'Adicionar campo',
   add: 'Adicionar',
   remove: 'Remover',
@@ -528,6 +534,12 @@ const PT = {
   savedPairs: 'Guardadas {n} duplas.',
   seatEmpty: 'lugar vazio',
   courtName: 'Nome do campo',
+  courtsNight: 'Campos desta noite',
+  courtsNightHelp: 'Só este torneio — muda o nome, adiciona ou remove campos aqui e nada mais se altera. '
+    + 'As noites novas começam com os campos por defeito das Definições.',
+  courtsNightLocked: 'Um campo que já está no calendário pode mudar de nome mas não ser removido.',
+  courtsDefaultsHelp: 'Os campos com que uma noite nova começa. Cada torneio guarda depois a sua lista, '
+    + 'editada no separador Rondas — mudar estes não altera noites já criadas.',
   copy: 'Copiar',
   copied: 'Copiado',
   shareTable: 'Tabela para o grupo',

@@ -96,6 +96,16 @@ db.exec(`
     at         TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
+  -- A night's own courts. Which courts a club has booked, and what they are
+  -- called that evening, changes from night to night — so each tournament
+  -- carries its list, seeded from the club's defaults when it is created.
+  CREATE TABLE IF NOT EXISTS tournament_courts (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    tournament_id INTEGER NOT NULL,
+    label         TEXT NOT NULL,
+    sort          INTEGER NOT NULL DEFAULT 0
+  );
+
   CREATE TABLE IF NOT EXISTS matches (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     tournament_id INTEGER NOT NULL,
@@ -108,6 +118,17 @@ db.exec(`
     UNIQUE (tournament_id, round, court)
   );
 `)
+
+/**
+ * A tournament's courts, to start with: the club's defaults in order, padded
+ * with "Court k" when the night booked more than the club has named.
+ */
+function seedTournamentCourts(tid, count) {
+  const defaults = db.prepare('SELECT label FROM courts ORDER BY sort, id').all().map((c) => c.label)
+  const n = Math.max(1, Number(count) || defaults.length || 1)
+  const ins = db.prepare('INSERT INTO tournament_courts (tournament_id, label, sort) VALUES (?, ?, ?)')
+  for (let i = 0; i < n; i++) ins.run(tid, defaults[i] || `Court ${i + 1}`, i)
+}
 
 /**
  * Migrations, run on every boot and safe to run twice.
@@ -140,6 +161,13 @@ function migrate() {
   if (!cols.includes('venue')) {
     db.exec("ALTER TABLE tournaments ADD COLUMN venue TEXT NOT NULL DEFAULT ''")
   }
+  // Tournaments from before courts were per night get theirs from the club's
+  // list, the way a new one would.
+  for (const t of db.prepare('SELECT id, courts FROM tournaments').all()) {
+    const n = db.prepare('SELECT COUNT(*) AS n FROM tournament_courts WHERE tournament_id = ?').get(t.id).n
+    if (!n) seedTournamentCourts(t.id, t.courts)
+  }
+
   const rows = db.prepare('SELECT id, level, play_date, play_time FROM tournaments').all()
   const fix = db.prepare('UPDATE tournaments SET level = ?, play_date = ?, play_time = ? WHERE id = ?')
   for (const r of rows) {
@@ -263,18 +291,53 @@ export const addCourt = (label, sort = 0) =>
   run('INSERT INTO courts (label, sort) VALUES (?, ?)', label, sort)
 export const deleteCourt = (id) => run('DELETE FROM courts WHERE id = ?', id)
 
-/**
- * Rename a court everywhere it is written. Matches store the court's label as
- * text — the schedule is a printed thing, not a join — so a rename that left
- * old schedules saying "Court 3" while the wall says "Center" would be a lie.
- */
+/** Rename one of the club's default courts. Nights already created keep their own. */
 export function renameCourt(id, label) {
-  const court = one('SELECT * FROM courts WHERE id = ?', id)
+  const next = String(label ?? '').replace(/\s+/g, ' ').trim().slice(0, 40)
+  if (next) run('UPDATE courts SET label = ? WHERE id = ?', next, id)
+  return one('SELECT * FROM courts WHERE id = ?', id)
+}
+
+// ---- a night's own courts ----
+export const listTournamentCourts = (tid) =>
+  all('SELECT * FROM tournament_courts WHERE tournament_id = ? ORDER BY sort, id', tid)
+
+/** Keep the tournament's court count — what the board draws slots from — equal to its list. */
+const syncCourtCount = (tid) => run('UPDATE tournaments SET courts = ? WHERE id = ?',
+  Math.max(1, listTournamentCourts(tid).length), tid)
+
+export function addTournamentCourt(tid, label) {
+  const next = String(label ?? '').replace(/\s+/g, ' ').trim().slice(0, 40)
+  if (!next) return null
+  run('INSERT INTO tournament_courts (tournament_id, label, sort) VALUES (?, ?, ?)',
+    tid, next, listTournamentCourts(tid).length)
+  syncCourtCount(tid)
+  return listTournamentCourts(tid)
+}
+
+/**
+ * Rename a court for this night only. Its matches store the label as text —
+ * the schedule is a printed thing, not a join — so they are renamed with it;
+ * other nights that happen to use the same name are not touched.
+ */
+export function renameTournamentCourt(tid, id, label) {
+  const court = one('SELECT * FROM tournament_courts WHERE id = ? AND tournament_id = ?', id, tid)
   const next = String(label ?? '').replace(/\s+/g, ' ').trim().slice(0, 40)
   if (!court || !next || next === court.label) return court
-  run('UPDATE courts SET label = ? WHERE id = ?', next, id)
-  run('UPDATE matches SET court = ? WHERE court = ?', next, court.label)
-  return one('SELECT * FROM courts WHERE id = ?', id)
+  run('UPDATE tournament_courts SET label = ? WHERE id = ?', next, id)
+  run('UPDATE matches SET court = ? WHERE tournament_id = ? AND court = ?', next, tid, court.label)
+  return one('SELECT * FROM tournament_courts WHERE id = ?', id)
+}
+
+/** Remove a court from this night. Refused once a schedule names it. */
+export function deleteTournamentCourt(tid, id) {
+  const court = one('SELECT * FROM tournament_courts WHERE id = ? AND tournament_id = ?', id, tid)
+  if (!court) return false
+  const used = one('SELECT COUNT(*) AS n FROM matches WHERE tournament_id = ? AND court = ?', tid, court.label).n
+  if (used) return false
+  run('DELETE FROM tournament_courts WHERE id = ?', id)
+  syncCourtCount(tid)
+  return true
 }
 
 /** Soonest first, with undated ones last — a club reads its list as a calendar. */
@@ -313,6 +376,7 @@ export function playingTournament(today = todayISO()) {
 /** Wipe a tournament and everything hanging off it — used by the seed script. */
 export function deleteTournament(id) {
   forgetPost(`board:${id}`)
+  run('DELETE FROM tournament_courts WHERE tournament_id = ?', id)
   run('DELETE FROM matches WHERE tournament_id = ?', id)
   run('DELETE FROM signups WHERE tournament_id = ?', id)
   run('DELETE FROM tournaments WHERE id = ?', id)
@@ -325,7 +389,9 @@ export function createTournament(t) {
     t.format ?? 'non-stop', t.level ?? '', t.play_date ?? '', t.play_time ?? '',
     t.courts ?? 2, t.duration_min ?? 90, t.round_min ?? 12, String(t.venue ?? '').trim().slice(0, 80),
   )
-  return getTournament(Number(r.lastInsertRowid))
+  const id = Number(r.lastInsertRowid)
+  seedTournamentCourts(id, t.courts ?? 2)
+  return getTournament(id)
 }
 
 export const listSignups = (tid) =>

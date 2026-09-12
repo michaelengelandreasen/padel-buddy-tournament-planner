@@ -128,6 +128,15 @@ not read is said per field and left for the host; *Create with 16 players*
 makes the tournament and signs everyone up in one go. `src/import.js`, tested
 against the real message in `test/fixtures/maia.txt`.
 
+## Courts belong to the night
+
+Which courts are booked, and what they are called, changes from night to
+night. Each tournament carries its own list — seeded from Settings → Courts
+(the defaults) when it is created — and edits it on its Rounds tab: rename,
+add, remove. A rename follows through to that night's schedule only; a court
+already in the schedule can be renamed but not removed. The draw uses the
+night's list, and the sign-up board draws `courts × 4` slots from its length.
+
 ## Venues
 
 Settings → Venues keeps the other places the club plays — name, address, map

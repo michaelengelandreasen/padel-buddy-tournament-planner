@@ -236,6 +236,29 @@ document.querySelectorAll('[data-copy]').forEach(function(b){
   })});
 })();`
 
+/**
+ * A list of courts you edit in place: each row is its field, its Save, its
+ * Remove; an add form underneath. `base` is where the rows post — the club's
+ * defaults or one night's own. A court with `locked` set can be renamed but
+ * not removed, because a schedule already names it.
+ */
+const courtList = (courts, base, t, { fixed = false } = {}) => `
+  <div class="courtlist">${courts.map((c) => `<div class="courtrow">
+    <form method="post" action="${base}/${c.id}" class="rename">
+      ${ic('court')}
+      <input name="label" value="${esc(c.label)}" maxlength="40" required aria-label="${esc(t('courtName'))}">
+      <button class="btn ghost">${ic('check')}${esc(t('save'))}</button>
+    </form>
+    ${c.locked ? '' : `<form method="post" action="${base}/${c.id}/delete">
+      <button class="btn danger" aria-label="${esc(t('remove'))} ${esc(c.label)}">${ic('trash')}<span>${esc(t('remove'))}</span></button>
+    </form>`}
+  </div>`).join('') || `<p class="muted">${esc(t('noCourtsYet'))}</p>`}</div>
+  ${fixed ? '' : `<form class="row" method="post" action="${base}" style="margin-top:14px">
+    <div><label for="courtlabel-${base.replace(/\W/g, '')}">${esc(t('addCourt'))}</label>
+      <input id="courtlabel-${base.replace(/\W/g, '')}" name="label" placeholder="Court 1 / Center" required></div>
+    <div style="flex:0 0 auto"><button>${ic('plus')}${esc(t('add'))}</button></div>
+  </form>`}`
+
 /** A Copy button for the message in `#id`. */
 const copyBtn = (id, t) => `<button type="button" class="btn ghost" data-copy="#${id}" data-done="${esc(t('copied'))}">${
   ic('board')}<span>${esc(t('copy'))}</span></button>`
@@ -706,22 +729,8 @@ export function settings({ club, courts, venues = [], t }) {
   const courtsPanel = `
     <div class="card">
       <h3>${ic('court')}${esc(t('courts'))}</h3>
-      <p class="muted">${esc(t('courtsHelp'))}</p>
-      <div class="courtlist">${courts.map((c) => `<div class="courtrow">
-        <form method="post" action="/courts/${c.id}" class="rename">
-          ${ic('court')}
-          <input name="label" value="${esc(c.label)}" maxlength="40" required aria-label="${esc(t('courtName'))}">
-          <button class="btn ghost">${ic('check')}${esc(t('save'))}</button>
-        </form>
-        <form method="post" action="/courts/${c.id}/delete">
-          <button class="btn danger" aria-label="${esc(t('remove'))} ${esc(c.label)}">${ic('trash')}<span>${esc(t('remove'))}</span></button>
-        </form>
-      </div>`).join('') || `<p class="muted">${esc(t('noCourtsYet'))}</p>`}</div>
-      <form class="row" method="post" action="/courts" style="margin-top:14px">
-        <div><label for="courtlabel">${esc(t('addCourt'))}</label>
-          <input id="courtlabel" name="label" placeholder="Court 1 / Center" required></div>
-        <div style="flex:0 0 auto"><button>${ic('plus')}${esc(t('add'))}</button></div>
-      </form>
+      <p class="muted">${esc(t('courtsHelp'))} ${esc(t('courtsDefaultsHelp'))}</p>
+      ${courtList(courts, '/courts', t)}
     </div>`
   const venueFields = (x, prefix) => `
     <div class="row">
@@ -976,14 +985,22 @@ export function tournamentPage({
   // Before the draw the rounds tab is the draw itself; after it, the scores
   // are the primary task and the round message is one collapsed preview above
   // them — it posts itself when a round completes, so it rarely needs opening.
+  // Courts belong to the night. Once a schedule names one it can still be
+  // renamed (its matches follow) but not removed from under the schedule.
+  const inSchedule = new Set(matches.map((m) => m.court))
+  const nightCourts = courts.map((c) => ({ ...c, locked: inSchedule.has(c.label) }))
+  const courtsCard = `
+    <div class="card"><h3>${ic('court')}${esc(t('courtsNight'))} <span class="pill">${courts.length}</span></h3>
+      <p class="muted">${esc(t('courtsNightHelp'))}${matches.length ? ` ${esc(t('courtsNightLocked'))}` : ''}</p>
+      ${courtList(nightCourts, `/t/${tour.id}/courts`, t, { fixed: matches.length > 0 })}
+    </div>`
   const roundsPanel = !matches.length ? `
     <div class="card"><h3>${ic('list')}${esc(t('schedule'))}</h3>
       <p class="muted">${esc(t('noSchedule'))}</p>
       <form method="post" action="/t/${tour.id}/schedule"><div class="actions">
         <button ${teams.length < 2 ? 'disabled' : ''}>${ic('shuffle')}${esc(t('drawSchedule'))}</button></div></form>
       ${teams.length < 2 ? `<p class="hint">${esc(t('needTwoPairs'))}</p>` : ''}
-      ${courts.length ? '' : `<p class="note">${esc(t('addCourtsFirst'))}</p>`}
-    </div>` : `
+    </div>${courtsCard}` : `
     <div class="card"><h3>${ic('compass')}${esc(t('roundTitle'))} <span class="pill on">${
       esc(t('roundN', { n: now }))}</span></h3>
       <p class="muted">${esc(t('roundHelp'))}</p>
@@ -1006,7 +1023,7 @@ export function tournamentPage({
           formnovalidate>${esc(t('postRound', { n: r }))}</button>
       </div>${matches.filter((m) => m.round === r).map((m) => matchBlock(m, t)).join('')}`).join('')}
       <div class="savebar"><button>${ic('check')}${esc(t('saveAll'))}</button></div>
-    </form>`
+    </form>${courtsCard}`
 
   // The table stays a table on a phone: a ranking is read down a column, and
   // four short numbers fit beside a name. Headings abbreviate below 480px.
