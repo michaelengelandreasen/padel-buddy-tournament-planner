@@ -126,6 +126,18 @@ not read is said per field and left for the host; *Create with 16 players*
 makes the tournament and signs everyone up in one go. `src/import.js`, tested
 against the real message in `test/fixtures/maia.txt`.
 
+## Pairs
+
+Before the draw, the Teams tab is a pairs board: numbered seats, two to a pair,
+and a tray of whoever is still unpaired — what an imported roster mostly is.
+Drag a player onto a seat (pointer events, so a thumb works as well as a mouse),
+or tap one player and then another to swap them; Enter/Space do the same from
+the keyboard. *Pair up the rest at random* deals the tray into the empty seats
+(woman/man on a mixed level where genders are known); *Reshuffle everyone*
+starts over. Nothing is written until *Save pairs*, which sets each player's
+partner both ways (`src/pairs.js`). Once the schedule is drawn the pairs are the
+schedule, and the board becomes a list.
+
 ## Language
 
 English or Portuguese, chosen with the `EN`/`PT` toggle in the header or in

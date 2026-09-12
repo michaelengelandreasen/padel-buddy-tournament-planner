@@ -64,9 +64,17 @@
     {
       "title": "HTTP Basic login (padel/buddy) on both URLs",
       "state": "done"
+    },
+    {
+      "title": "Pairs board: drag-and-drop (touch + mouse), tap-to-swap, randomiser, save partners both ways",
+      "state": "done"
     }
   ],
   "activity": [
+    {
+      "at": "2026-09-12T21:46:07.261307Z",
+      "text": "Teams tab is a pairs board before the draw: seats + unpaired tray, pointer-event drag, tap-to-swap, keyboard; \"Pair up the rest at random\" (F/M-aware on mixed), \"Reshuffle everyone\"; Save writes partners both ways. 30/30 tests."
+    },
     {
       "at": "2026-09-12T21:39:48.092799Z",
       "text": "Paste-and-review import of the club message: parser in src/import.js reads date, time window → duration, level, venue, numbered roster with (dupla) pairs; the new-tournament form fills in, Create signs everyone up. 27/27 tests."
@@ -97,5 +105,5 @@
   "summary": "The club's nights ran on a printed sheet and a PDF. Now the group gets one message per round saying who is on which court and where every pair goes next, posted automatically when the round before it is scored; !where Mike answers one person. Telegram posts by itself (bot token is the whole setup, the group is learned from the first command); WhatsApp stays a paste-from-outbox draft because it has no group API.",
   "next": "Confirm whether the club's level scale really runs to 9 (the message said \"M9\"); the ladder stops at 7 and the import leaves the level for the host to pick",
   "url": "https://padeladmin.webperfology.com",
-  "updated": "2026-09-12T21:39:48.092799Z"
+  "updated": "2026-09-12T21:46:07.261307Z"
 }

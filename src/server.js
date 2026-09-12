@@ -3,7 +3,7 @@ import { timingSafeEqual } from 'node:crypto'
 import {
   addCourt, addSignup, clubLanguage, createTournament, deleteCourt, getClub, getTournament,
   listCourts, listMatches, listSignups, listTournaments, recordScore, rememberTelegramChat,
-  replaceMatches, saveClub, telegramChat,
+  replaceMatches, saveClub, setPartner, telegramChat,
 } from './db.js'
 import { buildTeams, schedule, standings } from './formats/nonstop.js'
 import { handle, roundMessage, signupMessage, standingsMessage } from './bot.js'
@@ -11,6 +11,7 @@ import { parseWhen, validateWhen } from './dates.js'
 import { currentRound, roundComplete, roundsOf } from './rounds.js'
 import { parseLevel } from './levels.js'
 import { parseBoard } from './import.js'
+import { partnersFromSeats } from './pairs.js'
 import { LANGUAGES, isLanguage, translator } from './i18n.js'
 import { bus, listen } from './messaging/transport.js'
 import { normalizeCommand } from './messaging/telegram.js'
@@ -265,6 +266,28 @@ const routes = [
         { reason: hasNext ? `round ${next}` : 'final' })
     }
     return { to: `/t/${id}?posted=scores&n=${changed}#rounds` }
+  }],
+
+  // The pairs board: seats → partners, written both ways. Only while the night
+  // is still open — once the schedule is drawn, the pairs are the schedule.
+  ['POST', /^\/t\/(\d+)\/pairs$/, async (m, req, t) => {
+    const id = Number(m[1])
+    const tour = getTournament(id)
+    if (!tour) return { html: V.page('404', '<h1>404</h1>', { t }), code: 404 }
+    if (listMatches(id).length) return { to: `/t/${id}#teams` }
+    const f = await body(req)
+    let seats = []
+    try { seats = JSON.parse(f.seats || '[]') } catch { seats = [] }
+    if (!Array.isArray(seats)) seats = []
+    const signups = listSignups(id)
+    const partner = partnersFromSeats(seats, signups.map((x) => x.name))
+    let pairs = 0
+    for (const x of signups) {
+      const want = partner.get(x.name) || ''
+      if (want !== x.partner) setPartner(id, x.name, want)
+      if (want) pairs++
+    }
+    return { to: `/t/${id}?posted=pairs&n=${pairs / 2}#teams` }
   }],
 
   // Post on demand, for a host who wants the board or a round in the group now.

@@ -138,6 +138,84 @@ show(fromHash()||document.body.dataset.tab||tabs[0].dataset.tab,false);
 window.addEventListener('hashchange',function(){var h=fromHash();if(h)show(h,false)});
 })();`
 
+/**
+ * The pairs board, in the browser. Pointer events rather than HTML5 drag and
+ * drop, because the latter does not exist on a phone and a host pairs people up
+ * standing at the desk with one thumb. Tap-then-tap and Enter/Space do the same
+ * moves for anyone who can't drag. The board is only a picture until Save.
+ */
+const PAIRS_JS = `(function(){
+var board=document.getElementById('pairs');if(!board)return;
+var form=board.closest('form'),field=form.querySelector('[name=seats]');
+var seatsOf=function(){return [].slice.call(board.querySelectorAll('.seat'))};
+var tray=board.querySelector('.tray');
+function chipsIn(el){return [].slice.call(el.querySelectorAll('.chip'))}
+function place(chip,target){
+  if(!target)return;
+  if(target.classList.contains('chip')){
+    var a=chip.parentNode,b=target.parentNode;if(a===b&&a===tray)return;
+    var nb=target.nextSibling;a.insertBefore(target,chip.nextSibling);
+    if(b===tray)b.appendChild(chip);else b.insertBefore(chip,nb);
+    if(a===tray){a.appendChild(target)}
+    return}
+  if(target.classList.contains('seat')){if(chipsIn(target).length)return;target.appendChild(chip);return}
+  if(target===tray){tray.appendChild(chip)}
+}
+var sel=null;
+function select(chip){if(sel)sel.classList.remove('sel');sel=chip===sel?null:chip;if(sel)sel.classList.add('sel');
+  board.querySelectorAll('.pick').forEach(function(e){e.classList.remove('pick')});
+  if(sel){seatsOf().forEach(function(s){if(!chipsIn(s).length)s.classList.add('pick')});if(sel.parentNode!==tray)tray.classList.add('pick')}}
+board.addEventListener('click',function(e){
+  var chip=e.target.closest('.chip');
+  if(chip){if(sel&&sel!==chip){place(sel,chip);select(null)}else select(chip);return}
+  var seat=e.target.closest('.seat,.tray');
+  if(seat&&sel){place(sel,seat);select(null)}
+});
+board.addEventListener('keydown',function(e){
+  var chip=e.target.closest('.chip');if(!chip)return;
+  if(e.key==='Enter'||e.key===' '){e.preventDefault();chip.click()}
+});
+var drag=null;
+board.addEventListener('pointerdown',function(e){
+  var chip=e.target.closest('.chip');if(!chip||e.button)return;
+  drag={chip:chip,x:e.clientX,y:e.clientY,on:false,ghost:null,over:null};
+  chip.setPointerCapture(e.pointerId);
+});
+function targetAt(x,y){var el=document.elementFromPoint(x,y);if(!el)return null;
+  var c=el.closest('.chip');if(c&&c!==drag.ghost)return c;return el.closest('.seat,.tray')}
+board.addEventListener('pointermove',function(e){
+  if(!drag)return;
+  if(!drag.on){if(Math.hypot(e.clientX-drag.x,e.clientY-drag.y)<6)return;
+    drag.on=true;var r=drag.chip.getBoundingClientRect();
+    drag.ghost=drag.chip.cloneNode(true);drag.ghost.classList.add('lift');
+    drag.ghost.style.left=r.left+'px';drag.ghost.style.top=r.top+'px';drag.ghost.style.width=r.width+'px';
+    drag.dx=e.clientX-r.left;drag.dy=e.clientY-r.top;document.body.appendChild(drag.ghost);
+    drag.chip.classList.add('ghost');select(null)}
+  drag.ghost.style.left=(e.clientX-drag.dx)+'px';drag.ghost.style.top=(e.clientY-drag.dy)+'px';
+  var t=targetAt(e.clientX,e.clientY);if(t!==drag.over){if(drag.over)drag.over.classList.remove('over');
+    drag.over=t;if(t)t.classList.add('over')}
+});
+function endDrag(e){
+  if(!drag)return;var d=drag;drag=null;
+  if(!d.on)return;
+  d.chip.classList.remove('ghost');if(d.ghost)d.ghost.remove();if(d.over)d.over.classList.remove('over');
+  var t=targetAt(e.clientX,e.clientY);if(t&&t!==d.chip)place(d.chip,t);
+}
+board.addEventListener('pointerup',endDrag);board.addEventListener('pointercancel',endDrag);
+function shuffle(list){for(var i=list.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=list[i];list[i]=list[j];list[j]=t}return list}
+function deal(all){
+  var seats=seatsOf(),pool=all?shuffle(chipsIn(board)):shuffle(chipsIn(tray));
+  if(all)seats.forEach(function(s){chipsIn(s).forEach(function(c){tray.appendChild(c)})});
+  seats.forEach(function(s){if(!chipsIn(s).length&&pool.length)s.appendChild(pool.shift())});
+  pool.forEach(function(c){tray.appendChild(c)});select(null)}
+form.querySelector('[data-act=rest]').addEventListener('click',function(){deal(false)});
+form.querySelector('[data-act=all]').addEventListener('click',function(){deal(true)});
+form.addEventListener('submit',function(){
+  var pairs=[],ps=[].slice.call(board.querySelectorAll('.pair'));
+  ps.forEach(function(p){pairs.push(chipsIn(p).map(function(c){return c.dataset.name}))});
+  field.value=JSON.stringify(pairs)});
+})();`
+
 /** A tab strip + its panels. `tabs` is [{id, icon, label, count?, body}]. */
 function tabbed(tabs, active) {
   const strip = `<div class="tabs" role="tablist">${tabs.map((x) => `<button type="button" role="tab"
@@ -363,6 +441,45 @@ details.preview pre{margin-top:8px}
 .readout .roster{flex:1 1 100%;columns:2;column-gap:24px;margin:4px 0 0;padding-left:1.4em;font-size:.95rem}
 .readout .roster li{break-inside:avoid;padding:2px 0}
 @media (max-width:480px){.readout .roster{columns:1}}
+/*
+ * The pairs board. Seats are the shape a pair has — two slots side by side —
+ * and the tray is everyone still unplaced. A player is a chip that moves by
+ * finger, mouse, tap-then-tap, or keyboard; the board only ever *shows* an
+ * arrangement, and Save is what writes it.
+ */
+.pairs{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr));margin-top:12px}
+.pair{display:grid;grid-template-columns:auto minmax(0,1fr) minmax(0,1fr);gap:8px;align-items:center;
+  padding:8px 10px;border:1px solid var(--line);border-radius:12px;background:var(--surface-2)}
+.pair .num{font-weight:800;color:var(--brand);font-variant-numeric:tabular-nums;min-width:1.6ch;text-align:right}
+.seat{min-width:0;min-height:48px;border:1.5px dashed var(--line);border-radius:10px;display:flex;
+  align-items:center;padding:3px;transition:border-color .15s ease-out,background .15s ease-out}
+.seat.over,.tray.over{border-color:var(--brand);background:color-mix(in oklab,var(--brand) 10%,var(--surface-2))}
+.seat.pick,.tray.pick{border-style:solid;border-color:color-mix(in oklab,var(--brand) 60%,var(--line))}
+.chip{appearance:none;border:1px solid var(--line);background:var(--surface);color:var(--ink);
+  border-radius:9px;padding:0 10px;min-height:40px;width:100%;min-width:0;font:inherit;font-weight:600;text-align:left;
+  display:inline-flex;align-items:center;gap:8px;cursor:grab;touch-action:none;user-select:none;
+  overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.chip:hover{border-color:var(--muted);filter:none}
+.chip .name{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.chip .g{flex:0 0 auto;font-size:.7rem;font-weight:800;padding:1px 6px;border-radius:999px;
+  background:var(--surface-2);color:var(--muted)}
+.chip .g.F{background:#4A2B4F;color:#F5C2F0} .chip .g.M{background:var(--court-ink);color:var(--court)}
+.chip.sel{border-color:var(--brand);box-shadow:0 0 0 3px color-mix(in oklab,var(--brand) 30%,transparent)}
+.chip.lift{position:fixed;z-index:20;width:auto;pointer-events:none;cursor:grabbing;
+  box-shadow:0 12px 28px -8px rgba(0,0,0,.7);transform:scale(1.04)}
+.chip.ghost{opacity:.35}
+.tray{min-height:56px;border:1.5px dashed var(--line);border-radius:12px;padding:6px;margin-top:12px;
+  display:flex;flex-wrap:wrap;gap:6px;transition:border-color .15s ease-out,background .15s ease-out}
+.tray .chip{width:auto;max-width:100%}
+.tray:empty::before{content:attr(data-empty);color:var(--muted);padding:8px 6px;font-size:.9rem}
+.pairsbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:14px}
+.pairsbar .spacer{flex:1 1 auto}
+/* On a phone the two seats stack, so a name is never squeezed to its first letters. */
+@media (max-width:480px){
+  .pairsbar button{flex:1 1 100%}
+  .pair{grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto auto;column-gap:10px;row-gap:6px}
+  .pair .num{grid-row:1/3;align-self:center}
+}
 
 /*
  * On a phone the nav becomes a tab bar under the thumb. Four labelled items no
@@ -451,7 +568,7 @@ export function page(title, body, { nav = '', script = '', t = translator(), her
 <strong>Padel Buddy</strong><small>${esc(t('navTournaments'))}</small></a>
 <nav>${nav}</nav>${langToggle(t.lang, here)}</header>
 ${SPRITE}
-<div class="wrap">${body}</div><script>${TABS_JS}</script>${script ? `<script>${script}</script>` : ''}</body></html>`
+<div class="wrap">${body}</div><script>${TABS_JS}</script><script>${PAIRS_JS}</script>${script ? `<script>${script}</script>` : ''}</body></html>`
 }
 
 const navFor = (here, t) => [['/', 'navOverview', 'home'], ['/tournaments', 'navTournaments', 'trophy'],
@@ -676,6 +793,10 @@ export function flashLine(flash, t) {
     return `<div class="flash" role="status"><strong>${
       esc(t('importedSignups', { n: Number(flash.signed) || 0 }))}</strong></div>`
   }
+  if (flash.what === 'pairs') {
+    return `<div class="flash" role="status"><strong>${
+      esc(t('savedPairs', { n: Number(flash.n) || 0 }))}</strong></div>`
+  }
   if (flash.what === 'scores') {
     const n = Number(flash.n) || 0
     return `<div class="flash" role="status"><strong>${
@@ -712,13 +833,45 @@ export function tournamentPage({
       </div>
     </div>`
 
-  const teamsPanel = `
-    <div class="card"><h3>${ic('users')}${esc(t('teams'))} (${teams.length})</h3>
-      ${offLevel.length ? `<p class="err">${ic('alert')} ${esc(t('mixedWarning', {
-        bad: offLevel.length, total: teams.length,
-        verb: t(offLevel.length === 1 ? 'isNotAre' : 'areNotIs'),
-        names: offLevel.map((x) => x.name).join(', '),
-      }))}</p>` : ''}
+  // Before the draw the Teams tab is the pairs board; after it, the list. A
+  // seat per two players, one extra for an odd count so nobody is off the board.
+  const chip = (p) => `<button type="button" class="chip" data-name="${esc(p.name)}" draggable="false">${
+    p.gender === 'F' || p.gender === 'M' ? `<span class="g ${p.gender}">${p.gender}</span>` : ''}<span class="name">${esc(p.name)}</span></button>`
+  const everyone = teams.flatMap((x) => x.players).concat(waiting)
+  const seatCount = Math.max(teams.length, Math.ceil(everyone.length / 2))
+  const mixedNote = offLevel.length ? `<p class="err">${ic('alert')} ${esc(t('mixedWarning', {
+    bad: offLevel.length, total: teams.length,
+    verb: t(offLevel.length === 1 ? 'isNotAre' : 'areNotIs'),
+    names: offLevel.map((x) => x.name).join(', '),
+  }))}</p>` : ''
+  const pairsBoard = matches.length ? '' : `
+    <form class="card" method="post" action="/t/${tour.id}/pairs">
+      <h3>${ic('users')}${esc(t('pairsTitle'))} <span class="pill on">${esc(t('importPairs', { n: teams.length }))}</span></h3>
+      <p class="muted">${esc(t('pairsHelp'))}</p>
+      ${flashFor('pairs')}
+      ${mixedNote}
+      <div id="pairs">
+        <div class="pairs">${Array.from({ length: seatCount }, (_, i) => `<div class="pair">
+          <span class="num">${i + 1}</span>
+          ${[0, 1].map((k) => `<div class="seat" aria-label="${esc(t('seatEmpty'))}">${
+            teams[i] && teams[i].players[k] ? chip(teams[i].players[k]) : ''}</div>`).join('')}
+        </div>`).join('')}</div>
+        <div class="tray" data-empty="${esc(t('nobodyYet'))}" aria-label="${esc(t('unpaired'))}">${
+          waiting.map(chip).join('')}</div>
+      </div>
+      <input type="hidden" name="seats" value="[]">
+      <div class="pairsbar">
+        <button type="button" class="btn ghost" data-act="rest">${ic('shuffle')}${esc(t('pairUpRest'))}</button>
+        <button type="button" class="btn ghost" data-act="all">${ic('repeat')}${esc(t('reshuffleAll'))}</button>
+        <span class="spacer"></span>
+        <button>${ic('check')}${esc(t('savePairs'))}</button>
+      </div>
+    </form>`
+
+  const teamsPanel = pairsBoard || `
+    <div class="card"><h3>${ic('users')}${esc(t('teams'))} (${teams.length})
+      <span class="muted" style="font-weight:400;font-size:.9rem">— ${esc(t('pairsLocked'))}</span></h3>
+      ${mixedNote}
       ${wrapTable(`<tbody>${teams.map((x, i) => `<tr><td class="pos">${i + 1}</td>
         <td class="lead">${esc(x.name)}</td>
         <td>${x.mixed ? `<span class="pill on">${esc(t('mixed'))}</span>` : ''}</td></tr>`).join('')

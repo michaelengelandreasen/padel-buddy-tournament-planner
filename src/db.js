@@ -267,6 +267,10 @@ export function addSignup(tid, { name, gender, partner, wa_id }) {
   return listSignups(tid)
 }
 
+/** Write one player's partner — the pairs board saves both halves of a pair. */
+export const setPartner = (tid, name, partner) =>
+  run('UPDATE signups SET partner = ? WHERE tournament_id = ? AND name = ?', partner ?? '', tid, name)
+
 export function removeSignup(tid, name) {
   const hit = one(
     'SELECT * FROM signups WHERE tournament_id = ? AND lower(name) = lower(?)', tid, name)

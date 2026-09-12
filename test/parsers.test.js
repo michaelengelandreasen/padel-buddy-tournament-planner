@@ -312,3 +312,38 @@ test('import: a readable level is accepted, a missing roster is said out loud', 
   assert.ok(empty.warnings.some((w) => /numbered players/.test(w)))
   assert.ok(empty.warnings.some((w) => /No date/.test(w)))
 })
+
+// ---- pairing ----
+import { pairUp, partnersFromSeats, reshuffle } from '../src/pairs.js'
+
+const P = (name, gender = '') => ({ name, gender })
+const fixed = () => 0.5   // a "random" that never reorders; Fisher–Yates with 0.5 is deterministic
+
+test('pairs: the rest are dealt into empty seats and existing pairs are kept', () => {
+  const r = pairUp([[P('Ana'), P('Rui')], [P('Zé')]], [P('Bea'), P('Cátia'), P('Duarte')], { random: fixed })
+  assert.equal(r.pairs[0].map((p) => p.name).join('&'), 'Ana&Rui')
+  assert.equal(r.pairs[1].length, 2)
+  assert.equal(r.pairs[1][0].name, 'Zé')
+  assert.equal(r.pairs.flat().length, 6)
+  assert.deepEqual(r.tray, [])
+})
+
+test('pairs: a mixed level deals woman/man where genders are known', () => {
+  const tray = [P('A', 'M'), P('B', 'M'), P('C', 'F'), P('D', 'F')]
+  const r = pairUp([], tray, { mixed: true, random: fixed })
+  for (const pair of r.pairs) {
+    assert.equal(pair.length, 2)
+    assert.notEqual(pair[0].gender, pair[1].gender)
+  }
+  const all = reshuffle([[P('A'), P('B')]], [P('C')], { random: fixed })
+  assert.equal(all.pairs.flat().length, 3)
+})
+
+test('pairs: seats become partners both ways, and unknown or repeated names are ignored', () => {
+  const names = ['Ana', 'Rui', 'Bea', 'Zé']
+  const partner = partnersFromSeats([['Ana', 'Rui'], ['Bea'], ['Ghost', 'Zé'], ['Ana', 'Zé']], names)
+  assert.equal(partner.get('Ana'), 'Rui')
+  assert.equal(partner.get('Rui'), 'Ana')
+  assert.equal(partner.get('Bea'), '')
+  assert.equal(partner.get('Zé'), '')          // Ana was already seated; Ghost is nobody
+})
