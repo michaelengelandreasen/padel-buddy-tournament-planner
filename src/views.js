@@ -513,6 +513,8 @@ details.fold summary h3{margin:0;flex:1 1 auto}
 details.fold summary>.i{color:var(--muted);transition:transform .15s ease-out}
 details.fold[open] summary>.i{transform:rotate(90deg)}
 details.fold[open] summary{margin-bottom:8px}
+.outmsg{margin-bottom:18px}
+.outmsg .actions{margin-top:8px;align-items:center}
 /* Standings: a real grid at every width. */
 table.standings td.pos{font-weight:800;color:var(--brand);width:2.4ch;font-variant-numeric:tabular-nums}
 table.standings td.team{font-weight:600;overflow-wrap:anywhere}
@@ -918,7 +920,8 @@ export function flashLine(flash, t) {
 }
 
 export function tournamentPage({
-  tournament: tour, teams, waiting, matches, table, message, roundText, tableText = '', courts, flash, t,
+  tournament: tour, teams, waiting, matches, table, message, roundText, tableText = '', scheduleText = '',
+  courts, flash, t,
 }) {
   const rounds = roundsOf(matches)
   const now = currentRound(matches)
@@ -1033,6 +1036,18 @@ export function tournamentPage({
       <details class="preview"><summary>${ic('arrow')}${esc(t('preview'))}</summary>
         <pre class="msg" id="msg-round">${esc(roundText)}</pre></details>
     </div>
+    ${scheduleText ? `<div class="card"><h3>${ic('calendar')}${esc(t('allRounds'))}</h3>
+      <p class="muted">${esc(t('allRoundsHelp'))}</p>
+      ${flashFor('schedule')}
+      <div class="actions" style="margin-top:8px">
+        <form method="post" action="/t/${tour.id}/post">
+          <input type="hidden" name="what" value="schedule">
+          <button>${ic('megaphone')}${esc(t('postToGroups'))}</button></form>
+        ${copyBtn('msg-schedule', t)}
+      </div>
+      <details class="preview"><summary>${ic('arrow')}${esc(t('preview'))}</summary>
+        <pre class="msg" id="msg-schedule">${esc(scheduleText)}</pre></details>
+    </div>` : ''}
     <form class="card" method="post" action="/t/${tour.id}/scores">
       <h3>${ic('list')}${esc(t('schedule'))}</h3>
       ${flashFor('scores')}
@@ -1212,7 +1227,10 @@ export function groupsPage({ groups, chat, log, t }) {
     </div>
     <div class="card"><h3>${ic('inbox')}${esc(t('outboxTitle'))}</h3>
       ${groups.outbox().length
-        ? groups.outbox().map((m) => `<pre class="msg" style="margin-bottom:12px">${esc(m.text)}</pre>`).join('')
+        ? groups.outbox().map((m, i) => `<div class="outmsg">
+          <pre class="msg" id="out-${i}">${esc(m.text)}</pre>
+          <div class="actions">${copyBtn(`out-${i}`, t)}${m.reason ? `<span class="pill">${esc(m.reason)}</span>` : ''}</div>
+        </div>`).join('')
         : `<p class="muted">${esc(t('nothingWaiting'))}</p>`}
     </div>`, { nav: navFor('/groups', t), t, here: '/groups' })
 }

@@ -263,6 +263,12 @@ const EN = {
   seatEmpty: 'empty seat',
   courtName: 'Court name',
   courtN: 'Court {n}',
+  allRounds: 'All rounds',
+  allRoundsHelp: 'Every round in one message — the whole night on one screen, the way the printed '
+    + 'sheet was. Offered up to four courts, where it still fits a phone.',
+  scheduleWord: 'Schedule',
+  roundAt: 'Round {n} · {at}',
+  helpSchedule: 'every round, court by court',
   courtsNight: 'Courts for this night',
   courtsNightHelp: 'Only this tournament — rename, add or remove courts here and nothing else changes. '
     + 'New nights start from the defaults in Settings.',
@@ -536,6 +542,12 @@ const PT = {
   seatEmpty: 'lugar vazio',
   courtName: 'Nome do campo',
   courtN: 'Campo {n}',
+  allRounds: 'Todas as rondas',
+  allRoundsHelp: 'Todas as rondas numa só mensagem — a noite inteira num ecrã, como era a folha '
+    + 'impressa. Disponível até quatro campos, onde ainda cabe num telemóvel.',
+  scheduleWord: 'Calendário',
+  roundAt: 'Ronda {n} · {at}',
+  helpSchedule: 'todas as rondas, campo a campo',
   courtsNight: 'Campos desta noite',
   courtsNightHelp: 'Só este torneio — muda o nome, adiciona ou remove campos aqui e nada mais se altera. '
     + 'As noites novas começam com os campos por defeito das Definições.',

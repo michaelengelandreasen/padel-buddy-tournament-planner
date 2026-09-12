@@ -187,6 +187,12 @@ export function handle(text, { waId = '', isHost = true, lang = clubLanguage() }
     return say(whereMessage(t, rest, lang), { reason: 'where' })
   }
 
+  if (cmd === 'schedule' || cmd === 'rounds' || cmd === 'calendario' || cmd === 'calendário') {
+    const t = tonight()
+    if (!t) return say(s('noTournamentOpenShort'))
+    return say(scheduleMessage(t, lang), { reason: 'schedule' })
+  }
+
   if (cmd === 'table' || cmd === 'standings' || cmd === 'tabela') {
     const t = tonight()
     if (!t) return say(s('noTournamentOpenShort'))
@@ -401,6 +407,35 @@ export function whereMessage(tour, query, lang = clubLanguage()) {
   return lines.join('\n')
 }
 
+/**
+ * Every round in one message — the printed sheet, as a message.
+ *
+ * One line per match, the court first, because that is how the sheet is read:
+ * find the round, find your court. Kept for nights of up to four courts; past
+ * that it stops fitting a phone screen and the per-round message is better.
+ */
+export function scheduleMessage(tour, lang = clubLanguage()) {
+  const s = translator(lang)
+  const { teams, matches } = night(tour)
+  if (!matches.length) return s('noScheduleYet')
+  const lines = [
+    `🗓 ${b(s('scheduleWord'))} · ${s('boardFormat')} ${levelTight(tour.level) || ''}`.trim(),
+  ]
+  if (tour.play_date) lines.push(`📆 ${dayName(tour.play_date, { lang })} ${shortDate(tour.play_date)}`)
+  const range = timeRange(tour.play_time, tour.duration_min, { lang })
+  if (range) lines.push(`🕒 ${range} · ${s('minRounds', { n: tour.round_min })}`)
+  for (const r of roundsOf(matches)) {
+    const plan = roundPlan({ tournament: tour, matches, teams, round: r })
+    const at = clock(plan.start, { lang })
+    lines.push('', b(at ? s('roundAt', { n: r, at }) : s('roundN', { n: r })))
+    for (const g of plan.games) {
+      lines.push(`${courtName(g.court, s, { always: true })}: ${g.team_a} 🆚 ${g.team_b}`)
+    }
+    if (plan.resting.length) lines.push(`☕ ${plan.resting.join(', ')}`)
+  }
+  return lines.join('\n')
+}
+
 /** The table, short enough to read on a phone between points. */
 export function standingsMessage(tour, lang = clubLanguage()) {
   const s = translator(lang)
@@ -435,6 +470,7 @@ export function helpMessage(lang = clubLanguage()) {
     `\`!round\` — ${s('helpRound')}`,
     `\`!next\` — ${s('helpNext')}`,
     `\`!table\` — ${s('helpTable')}`,
+    `\`!schedule\` — ${s('helpSchedule')}`,
     '',
     `_${s('helpDates', { examples: '`2026-09-05`, `5 Sep`, `sexta 19:00`, `Friday`' })}_`,
   ].join('\n')

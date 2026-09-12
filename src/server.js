@@ -9,7 +9,7 @@ import {
   renameCourt, replaceMatches, saveClub, setPartner, telegramChat,
 } from './db.js'
 import { buildTeams, schedule, standings } from './formats/nonstop.js'
-import { handle, roundMessage, signupMessage, standingsMessage } from './bot.js'
+import { handle, roundMessage, scheduleMessage, signupMessage, standingsMessage } from './bot.js'
 import { parseWhen, validateWhen } from './dates.js'
 import { currentRound, roundComplete, roundsOf } from './rounds.js'
 import { parseLevel } from './levels.js'
@@ -232,6 +232,8 @@ const routes = [
       roundText: v.matches.length
         ? roundMessage(v.tournament, currentRound(v.matches), t.lang) : '',
       tableText: v.table.length ? standingsMessage(v.tournament, t.lang) : '',
+      // The whole night in one message stays readable up to four courts.
+      scheduleText: v.matches.length && v.courts.length <= 4 ? scheduleMessage(v.tournament, t.lang) : '',
       t }) }
   }],
 
@@ -355,20 +357,22 @@ const routes = [
     const f = await body(req)
     const round = Number.parseInt(f.round, 10)
     const isRound = Number.isFinite(round)
-    const isTable = f.what === 'table'
+    const what = f.what === 'table' ? 'table' : f.what === 'schedule' ? 'schedule'
+      : isRound ? `round-${round}` : 'board'
+    const text = what === 'table' ? standingsMessage(tour, t.lang)
+      : what === 'schedule' ? scheduleMessage(tour, t.lang)
+        : isRound ? roundMessage(tour, round, t.lang) : signupMessage(tour, '', t.lang)
+    const meta = what === 'board' ? { key: `board:${id}`, pin: true, reason: 'board' }
+      : { reason: what === 'table' ? 'standings' : what === 'schedule' ? 'schedule' : `round ${round}` }
     // A deliberate press waits for the answer — a second of latency is worth
     // being told whether Telegram actually took it. Automatic posts don't wait.
-    const results = await groups.send(
-      isTable ? standingsMessage(tour, t.lang)
-        : isRound ? roundMessage(tour, round, t.lang) : signupMessage(tour, '', t.lang),
-      isTable ? { reason: 'standings' }
-        : isRound ? { reason: `round ${round}` } : { key: `board:${id}`, pin: true, reason: 'board' })
+    const results = await groups.send(text, meta)
     const tg = results.find((r) => r.channel === 'telegram')
     const code = !tg ? '' : tg.error ? 'err' : tg.edited ? 'edit' : tg.delivered ? 'ok' : 'wait'
-    const q = new URLSearchParams({ posted: isTable ? 'table' : isRound ? `round-${round}` : 'board' })
+    const q = new URLSearchParams({ posted: what })
     if (code) q.set('tg', code)
     if (tg?.error) q.set('err', String(tg.error).slice(0, 120))
-    return { to: `/t/${id}?${q}#${isTable ? 'table' : isRound ? 'rounds' : 'board'}` }
+    return { to: `/t/${id}?${q}#${what === 'table' ? 'table' : what === 'board' ? 'board' : 'rounds'}` }
   }],
 
   ['GET', /^\/groups$/, (_m, _r, t) => ({ html: V.groupsPage({ groups, chat: telegramChat(), t }) })],

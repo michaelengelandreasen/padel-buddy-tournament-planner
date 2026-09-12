@@ -256,6 +256,11 @@ Court 2 — Sofia Marques & Tiago Ferreira
 ☕ Adriana Osório & Manuel Lima
 ```
 
+On nights of up to four courts the Rounds tab also offers **All rounds** — every
+round in one message, court by court, the printed sheet as a message — with
+Copy and Post; the bot answers `!schedule` with the same. Every message waiting
+in the outbox (Groups) has its own Copy button.
+
 The next-round block is one line per pair rather than the fixtures, because a
 player reading it is not asking who they play — they are asking where to stand.
 Round 1 is posted when the schedule is drawn; every later round is posted when
