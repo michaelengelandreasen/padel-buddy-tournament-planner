@@ -373,7 +373,8 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 .pill{display:inline-block;padding:3px 10px;border-radius:999px;background:var(--surface-2);
   color:var(--muted);font-size:.78rem;font-weight:700;white-space:nowrap}
 .pill.on{background:var(--brand-deep);color:var(--brand-soft)}
-.pill.wrap{white-space:normal;line-height:1.3}
+.pill{align-self:center}
+td.active{gap:8px;font-size:.9rem}
 .muted{color:var(--muted)} .mono{font-family:ui-monospace,Menlo,monospace}
 .grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr))}
 .note{padding:10px 14px;background:color-mix(in oklab,var(--accent) 8%,var(--surface-2));
@@ -720,13 +721,14 @@ export function overview({ club, tournaments, courts, live, pinned = 0, night = 
     </div>
     <div class="card"><h3>${ic('trophy')}${esc(t('tournaments'))}</h3>
       ${tournaments.length ? wrapTable(`<thead><tr><th>${esc(t('when'))}</th><th>${esc(t('level'))}</th>
-        <th class="num">${esc(t('courts'))}</th><th>${esc(t('status'))}</th><th></th></tr></thead><tbody>
+        <th class="num">${esc(t('courts'))}</th><th>${esc(t('status'))}</th><th></th><th></th></tr></thead><tbody>
       ${tournaments.map((x) => `<tr>
         <td class="lead" data-l="">${esc(humanWhen(x, { lang: t.lang }))}</td>
         <td data-l="${esc(t('level'))}">${levelCell(x.level, t)}</td>
         <td class="num" data-l="${esc(t('courts'))}">${x.courts}</td>
-        <td data-l="${esc(t('status'))}"><span class="pill">${esc(statusLabel(x.status, t))}</span>${
-          x.id === night ? ` <span class="pill on wrap">${esc(t('activeNight'))}${x.id === pinned ? '' : ` · ${esc(t('autoNight'))}`}</span>` : ''}</td>
+        <td data-l="${esc(t('status'))}"><span class="pill">${esc(statusLabel(x.status, t))}</span></td>
+        ${x.id === night ? `<td class="full active" data-l=""><span class="pill on">${esc(t('activeNight'))}</span>${
+          x.id === pinned ? '' : ` <span class="muted">${esc(t('autoNight'))}</span>`}</td>` : '<td data-l=""></td>'}
         <td class="full rowact"><a class="tap" href="/t/${x.id}">${esc(t('open'))} ${ic('arrow')}</a>
           <form method="post" action="/t/${x.id}/delete" onsubmit="return confirm(${
             JSON.stringify(t('deleteConfirm', { name: `${x.level || ''} ${humanWhen(x, { lang: t.lang })}`.trim() })).replace(/"/g, '&quot;')})">
@@ -1124,7 +1126,7 @@ export function tournamentPage({
       <span>${ic('clock')}${esc(t('minutes', { n: tour.duration_min }))}</span>
       <span>${ic('repeat')}${esc(t('minRounds', { n: tour.round_min }))}</span>
       <span class="pill">${esc(statusLabel(tour.status, t))}</span>
-      ${night ? `<span class="pill on wrap">${esc(t('activeNight'))}${pinned ? '' : ` · ${esc(t('autoNight'))}`}</span>` : ''}
+      ${night ? `<span><span class="pill on">${esc(t('activeNight'))}</span>${pinned ? '' : ` <span class="muted">${esc(t('autoNight'))}</span>`}</span>` : ''}
       <a href="/t/${tour.id}/tv">${ic('tv')}${esc(t('tvView'))}</a>
       <form method="post" action="/t/${tour.id}/activate" class="inline" title="${esc(t('activeHelp'))}">
         ${pinned ? '<input type="hidden" name="off" value="1">' : ''}
