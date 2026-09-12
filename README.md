@@ -128,6 +128,15 @@ not read is said per field and left for the host; *Create with 16 players*
 makes the tournament and signs everyone up in one go. `src/import.js`, tested
 against the real message in `test/fixtures/maia.txt`.
 
+## Venues
+
+Settings → Venues keeps the other places the club plays — name, address, map
+link — editable in place. A night at one of them is announced with that name
+and that map link instead of the club's. The new-tournament form offers the
+saved names on its Venue field, and a pasted message that names one (`M9 -
+MAIA` when a venue called M9 is saved) fills it in by itself; accents and case
+don't matter, and the longest saved name wins.
+
 ## Pairs
 
 Before the draw, the Teams tab is a pairs board: numbered seats, two to a pair,

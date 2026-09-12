@@ -47,6 +47,17 @@ db.exec(`
     sort   INTEGER NOT NULL DEFAULT 0
   );
 
+  -- Other places the club plays. A night away is announced with that venue's
+  -- name and map link instead of the club's; tournaments name the venue as
+  -- text, so an old row keeps saying where it was even if the venue goes.
+  CREATE TABLE IF NOT EXISTS venues (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    name      TEXT NOT NULL,
+    address   TEXT NOT NULL DEFAULT '',
+    maps_url  TEXT NOT NULL DEFAULT '',
+    sort      INTEGER NOT NULL DEFAULT 0
+  );
+
   CREATE TABLE IF NOT EXISTS tournaments (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
     format       TEXT NOT NULL DEFAULT 'non-stop',
@@ -202,6 +213,50 @@ export const savePost = (key, chatId, messageId) =>
          chat_id = excluded.chat_id, message_id = excluded.message_id, at = datetime('now')`,
     key, String(chatId), Number(messageId))
 export const forgetPost = (key) => run('DELETE FROM posts WHERE key = ?', key)
+
+export const listVenues = () => all('SELECT * FROM venues ORDER BY sort, id')
+const cleanVenue = (v) => ({
+  name: String(v.name ?? '').replace(/\s+/g, ' ').trim().slice(0, 80),
+  address: String(v.address ?? '').trim().slice(0, 160),
+  maps_url: /^https?:\/\//.test(String(v.maps_url ?? '').trim()) ? String(v.maps_url).trim().slice(0, 300) : '',
+})
+export function addVenue(v) {
+  const c = cleanVenue(v)
+  if (!c.name) return null
+  run('INSERT INTO venues (name, address, maps_url, sort) VALUES (?, ?, ?, ?)',
+    c.name, c.address, c.maps_url, listVenues().length)
+  return listVenues().at(-1)
+}
+export function updateVenue(id, v) {
+  const c = cleanVenue(v)
+  if (!c.name) return null
+  run('UPDATE venues SET name = ?, address = ?, maps_url = ? WHERE id = ?', c.name, c.address, c.maps_url, id)
+  return one('SELECT * FROM venues WHERE id = ?', id)
+}
+export const deleteVenue = (id) => run('DELETE FROM venues WHERE id = ?', id)
+
+/** Accents and case aside — "m9 - maia" finds "M9 Maia". */
+const fold = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  .toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+
+/**
+ * The saved venue a free-text name refers to, or null. Exact first; then a
+ * saved name contained in the text or the text in it, longest name wins — so
+ * "M9 - Maia" matches a venue called "M9" and not one called "Maia Padel" by
+ * accident of both containing "maia".
+ */
+export function findVenue(text) {
+  const q = fold(text)
+  if (!q) return null
+  const venues = listVenues()
+  const exact = venues.find((v) => fold(v.name) === q)
+  if (exact) return exact
+  const hits = venues.filter((v) => {
+    const n = fold(v.name)
+    return n && (` ${q} `.includes(` ${n} `) || ` ${n} `.includes(` ${q} `))
+  })
+  return hits.sort((a, b) => fold(b.name).length - fold(a.name).length)[0] || null
+}
 
 export const listCourts = () => all('SELECT * FROM courts ORDER BY sort, id')
 export const addCourt = (label, sort = 0) =>

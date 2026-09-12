@@ -1,7 +1,8 @@
 import { createServer } from 'node:http'
 import { timingSafeEqual } from 'node:crypto'
 import {
-  addCourt, addSignup, clubLanguage, createTournament, deleteCourt, getClub, getTournament,
+  addCourt, addSignup, addVenue, clubLanguage, createTournament, deleteCourt, deleteVenue,
+  findVenue, getClub, getTournament, listVenues, updateVenue,
   listCourts, listMatches, listSignups, listTournaments, recordScore, rememberTelegramChat,
   renameCourt, replaceMatches, saveClub, setPartner, telegramChat,
 } from './db.js'
@@ -92,7 +93,10 @@ const routes = [
     live: groups.live, t }) })],
 
   ['GET', /^\/settings$/, (_m, _r, t) =>
-    ({ html: V.settings({ club: getClub(), courts: listCourts(), t }) })],
+    ({ html: V.settings({ club: getClub(), courts: listCourts(), venues: listVenues(), t }) })],
+  ['POST', /^\/venues$/, async (_m, req) => { addVenue(await body(req)); return { to: '/settings#venues' } }],
+  ['POST', /^\/venues\/(\d+)$/, async (m, req) => { updateVenue(Number(m[1]), await body(req)); return { to: '/settings#venues' } }],
+  ['POST', /^\/venues\/(\d+)\/delete$/, (m) => { deleteVenue(Number(m[1])); return { to: '/settings#venues' } }],
   // Every settings form says which tab it lives on, so a save lands back there.
   ['POST', /^\/settings$/, async (_m, req) => {
     const f = await body(req)
@@ -123,11 +127,14 @@ const routes = [
   ['POST', /^\/courts\/(\d+)\/delete$/, (m) => { deleteCourt(Number(m[1])); return { to: '/settings#courts' } }],
 
   ['GET', /^\/tournaments$/, (_m, _r, t) =>
-    ({ html: V.tournamentsPage({ tournaments: listTournaments(), t }) })],
+    ({ html: V.tournamentsPage({ tournaments: listTournaments(), venues: listVenues(), t }) })],
   // Paste the club's own message; the form fills itself in for the host to check.
   ['POST', /^\/tournaments\/import$/, async (_m, req, t) => {
     const f = await body(req)
     const read = parseBoard(f.text, { lang: t.lang })
+    // "M9 - MAIA" in the message is the saved venue "M9", if there is one.
+    const known = read.location ? findVenue(read.location) : null
+    if (known) { read.matchedVenue = known; read.location = known.name }
     const level = parseLevel(read.level, { lang: t.lang })
     const form = {
       level_category: level.ok ? level.category : 'MX',
@@ -136,8 +143,8 @@ const routes = [
       courts: read.courts, duration_min: read.duration_min, round_min: 12,
       roster: JSON.stringify(read.players.map(({ name, partner }) => ({ name, partner }))),
     }
-    return { html: V.tournamentsPage({ tournaments: listTournaments(), form, imported: read,
-      pasted: f.text, t }) }
+    return { html: V.tournamentsPage({ tournaments: listTournaments(), venues: listVenues(), form,
+      imported: read, pasted: f.text, t }) }
   }],
 
   ['POST', /^\/tournaments$/, async (_m, req, t) => {
@@ -146,7 +153,8 @@ const routes = [
     // is about anything else that can POST here. On a failure the page comes
     // back with the reason and what was typed, not a redirect that eats both.
     const bad = (error) => ({
-      html: V.tournamentsPage({ tournaments: listTournaments(), form: f, error, t }), code: 400,
+      html: V.tournamentsPage({ tournaments: listTournaments(), venues: listVenues(), form: f, error, t }),
+      code: 400,
     })
     const lang = t.lang
 

@@ -425,8 +425,8 @@ pre.msg{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--surface-2);
   .savebar button{flex:1 1 auto}}
 /* Four tabs share a phone's width; nothing scrolls off the edge. */
 @media (max-width:480px){
-  .tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:0}
-  .tabs button{justify-content:center;padding:0 4px;gap:5px;font-size:.84rem}
+  .tabs{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(max-content,1fr);gap:0;overflow-x:auto}
+  .tabs button{justify-content:center;padding:0 3px;gap:4px;font-size:.8rem}
   .tabs button .i{width:17px;height:17px}
   .tabs button .n{padding:0 6px;font-size:.7rem}
 }
@@ -452,6 +452,11 @@ details.preview pre{margin-top:8px}
 .courtrow .btn.danger span{display:none}
 .courtrow .btn.danger{padding:0 12px}
 @media (min-width:640px){.courtrow .btn.danger span{display:inline}.courtrow .btn.danger{padding:11px 16px}}
+.venuelist{display:flex;flex-direction:column;gap:12px;margin-top:10px}
+form.venue{padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--surface-2)}
+form.venue .actions{margin-top:12px}
+form.venue.add{margin-top:16px;background:transparent;border-style:dashed}
+form.venue h4{margin:0}
 /*
  * The pairs board. Seats are the shape a pair has — two slots side by side —
  * and the tray is everyone still unplaced. A player is a chip that moves by
@@ -650,7 +655,7 @@ export function overview({ club, tournaments, courts, live, t }) {
     </div>`, { nav: navFor('/', t), t, here: '/' })
 }
 
-export function settings({ club, courts, t }) {
+export function settings({ club, courts, venues = [], t }) {
   const clubForm = `
     <form class="card" method="post" action="/settings">
       <h3>${ic('flag')}${esc(t('club'))}</h3>
@@ -685,6 +690,32 @@ export function settings({ club, courts, t }) {
         <div style="flex:0 0 auto"><button>${ic('plus')}${esc(t('add'))}</button></div>
       </form>
     </div>`
+  const venueFields = (x, prefix) => `
+    <div class="row">
+      <div><label for="${prefix}name">${esc(t('venueName'))}</label>
+        <input id="${prefix}name" name="name" value="${esc(x.name || '')}" maxlength="80" required placeholder="M9 Maia"></div>
+      <div><label for="${prefix}maps">${esc(t('mapsLink'))}</label>
+        <input id="${prefix}maps" name="maps_url" type="url" value="${esc(x.maps_url || '')}" placeholder="https://maps.app.goo.gl/…"></div>
+    </div>
+    <label for="${prefix}addr">${esc(t('address'))}</label>
+    <input id="${prefix}addr" name="address" value="${esc(x.address || '')}" maxlength="160">`
+  const venuesPanel = `
+    <div class="card">
+      <h3>${ic('pin')}${esc(t('venues'))}</h3>
+      <p class="muted">${esc(t('venuesHelp'))}</p>
+      <div class="venuelist">${venues.map((x) => `<form class="venue" method="post" action="/venues/${x.id}">
+        ${venueFields(x, `v${x.id}`)}
+        <div class="actions">
+          <button>${ic('check')}${esc(t('save'))}</button>
+          <button class="btn danger" formaction="/venues/${x.id}/delete" formnovalidate>${ic('trash')}${esc(t('remove'))}</button>
+        </div>
+      </form>`).join('') || `<p class="muted">${esc(t('noVenuesYet'))}</p>`}</div>
+      <form class="venue add" method="post" action="/venues">
+        <h4>${esc(t('addVenue'))}</h4>
+        ${venueFields({}, 'vnew')}
+        <div class="actions"><button>${ic('plus')}${esc(t('add'))}</button></div>
+      </form>
+    </div>`
   const langForm = `
     <form class="card" method="post" action="/settings">
       <h3>${ic('globe')}${esc(t('language'))}</h3>
@@ -712,12 +743,13 @@ export function settings({ club, courts, t }) {
     ${tabbed([
       { id: 'club', icon: 'flag', label: t('club'), body: clubForm },
       { id: 'courts', icon: 'court', label: t('courts'), count: courts.length, body: courtsPanel },
+      { id: 'venues', icon: 'pin', label: t('venues'), count: venues.length || null, body: venuesPanel },
       { id: 'language', icon: 'globe', label: t('language'), body: langForm },
       { id: 'policy', icon: 'doc', label: t('tabPolicy'), body: policyForm },
     ], 'club')}`, { nav: navFor('/settings', t), t, here: '/settings', tab: 'club' })
 }
 
-export function tournamentsPage({ tournaments, form = {}, error = '', imported = null, pasted = '', t }) {
+export function tournamentsPage({ tournaments, venues = [], form = {}, error = '', imported = null, pasted = '', t }) {
   const today = todayISO()
   const cat = form.level_category || 'MX'
   const grade = String(form.level_grade || (imported ? '' : 4))
@@ -737,7 +769,7 @@ export function tournamentsPage({ tournaments, form = {}, error = '', imported =
       <strong>${esc(t('importFound'))}</strong>
       <span class="pill on">${esc(t('importPlayers', { n: imported.players.length }))}</span>
       ${pairs ? `<span class="pill on">${esc(t('importPairs', { n: pairs }))}</span>` : ''}
-      ${imported.location ? `<span class="muted">${esc(t('importLocation', { place: imported.location }))}</span>` : ''}
+      ${imported.location ? `<span class="muted">${esc(t(imported.matchedVenue ? 'importVenueMatched' : 'importLocation', { place: imported.location }))}</span>` : ''}
       ${imported.warnings.map((w) => `<p class="err">${ic('alert')} ${esc(w)}</p>`).join('')}
       ${imported.players.length ? `<ol class="roster">${imported.players.map((p) =>
         `<li>${esc(p.name)}${p.partner ? ` <span class="muted">&amp; ${esc(p.partner)}</span>` : ''}</li>`).join('')}</ol>` : ''}
@@ -771,7 +803,9 @@ export function tournamentsPage({ tournaments, form = {}, error = '', imported =
             value="${esc(form.play_time ?? '19:00')}"></div>
       </div>
       <label for="venue">${esc(t('venue'))}</label>
-      <input id="venue" name="venue" value="${esc(form.venue || '')}" maxlength="80" placeholder="${esc(t('venueHelp'))}">
+      <input id="venue" name="venue" value="${esc(form.venue || '')}" maxlength="80" list="venues"
+        placeholder="${esc(t('venueHelp'))}" autocomplete="off">
+      <datalist id="venues">${venues.map((x) => `<option value="${esc(x.name)}">`).join('')}</datalist>
       <div class="row">
         <div><label for="courts">${esc(t('courts'))}</label>
           <input id="courts" name="courts" type="number" min="1" max="20"

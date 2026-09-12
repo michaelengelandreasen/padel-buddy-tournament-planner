@@ -1,6 +1,6 @@
 import {
   addSignup, clubLanguage, clubRules, createTournament, currentTournament,
-  getClub, listMatches, listSignups, playingTournament, removeSignup,
+  findVenue, getClub, listMatches, listSignups, playingTournament, removeSignup,
 } from './db.js'
 import { buildTeams, slots, standings } from './formats/nonstop.js'
 import { clock, dayName, parseWhen, shortDate, timeRange, validateWhen } from './dates.js'
@@ -235,9 +235,12 @@ export function boardMessage(t, prefix = '', lang = clubLanguage()) {
   if (range) lines.push(`🕒 ${range}`)
   lines.push(`📈 ${s('boardFormat')} ${levelTight(t.level) || '—'}`)
   lines.push('')
-  // A night away from home says where; the club's map link is only the club's.
-  lines.push(`📍 ${t.venue || club.name}`)
-  if (!t.venue && club.maps_url) lines.push(club.maps_url)
+  // A night away from home says where, with that place's own map link if the
+  // venue is a saved one; the club's link is only ever the club's.
+  const away = t.venue ? findVenue(t.venue) : null
+  lines.push(`📍 ${away ? away.name : (t.venue || club.name)}`)
+  const link = t.venue ? away?.maps_url : club.maps_url
+  if (link) lines.push(link)
   lines.push('')
   lines.push(`${t.courts} ${s('courtsWord')}`)
   lines.push('')
