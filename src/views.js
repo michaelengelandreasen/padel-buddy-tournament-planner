@@ -128,7 +128,7 @@ const LOGO = `<svg class="mark" viewBox="0 0 108 108" aria-hidden="true">
  * back on Rounds), arrows move between tabs, and with no script every panel is
  * simply visible.
  */
-const TABS_JS = `(function(){
+const TABS_JS = `pbInit.push(function(){
 var tabs=[].slice.call(document.querySelectorAll('.tabs [role=tab]'));if(!tabs.length)return;
 function show(id,push){tabs.forEach(function(b){var on=b.dataset.tab===id;b.setAttribute('aria-selected',on?'true':'false');
 b.tabIndex=on?0:-1;var p=document.getElementById('tab-'+b.dataset.tab);if(p)p.classList.toggle('on',on)});
@@ -138,8 +138,8 @@ b.addEventListener('keydown',function(e){if(e.key!=='ArrowRight'&&e.key!=='Arrow
 var i=tabs.indexOf(b),n=tabs[(i+(e.key==='ArrowRight'?1:tabs.length-1))%tabs.length];n.focus();show(n.dataset.tab,true)})});
 function fromHash(){var h=location.hash.slice(1);return tabs.some(function(b){return b.dataset.tab===h})?h:''}
 show(fromHash()||document.body.dataset.tab||tabs[0].dataset.tab,false);
-window.addEventListener('hashchange',function(){var h=fromHash();if(h)show(h,false)});
-})();`
+if(!window.__pbHash){window.__pbHash=1;window.addEventListener('hashchange',function(){var h=location.hash.slice(1);var b=document.querySelector('.tabs [data-tab="'+h+'"]');if(b)b.click()})}
+});`
 
 /**
  * The pairs board, in the browser. Pointer events rather than HTML5 drag and
@@ -147,7 +147,7 @@ window.addEventListener('hashchange',function(){var h=fromHash();if(h)show(h,fal
  * standing at the desk with one thumb. Tap-then-tap and Enter/Space do the same
  * moves for anyone who can't drag. The board is only a picture until Save.
  */
-const PAIRS_JS = `(function(){
+const PAIRS_JS = `pbInit.push(function(){
 var board=document.getElementById('pairs');if(!board)return;
 var form=board.closest('form'),field=form.querySelector('[name=seats]');
 var seatsOf=function(){return [].slice.call(board.querySelectorAll('.seat'))};
@@ -217,14 +217,14 @@ form.addEventListener('submit',function(){
   var pairs=[],ps=[].slice.call(board.querySelectorAll('.pair'));
   ps.forEach(function(p){pairs.push(chipsIn(p).map(function(c){return c.dataset.name}))});
   field.value=JSON.stringify(pairs)});
-})();`
+});`
 
 /**
  * Copy buttons: whatever `data-copy` points at goes to the clipboard, and the
  * button says so for a moment. The old execCommand path stays for a browser
  * that refuses the clipboard API off a secure context.
  */
-const COPY_JS = `(function(){
+const COPY_JS = `pbInit.push(function(){
 document.querySelectorAll('[data-copy]').forEach(function(b){
   b.addEventListener('click',function(){
     var el=document.querySelector(b.dataset.copy);if(!el)return;var text=el.textContent;
@@ -235,7 +235,7 @@ document.querySelectorAll('[data-copy]').forEach(function(b){
     function fallback(){var r=document.createRange();r.selectNodeContents(el);var s=getSelection();s.removeAllRanges();s.addRange(r);
       try{document.execCommand('copy');done()}catch(e){}s.removeAllRanges()}
   })});
-})();`
+});`
 
 /**
  * A list of courts you edit in place: each row is its field, its Save, its
@@ -263,6 +263,47 @@ const courtList = (courts, base, t, { fixed = false } = {}) => `
 /** A Copy button for the message in `#id`. */
 const copyBtn = (id, t) => `<button type="button" class="btn ghost" data-copy="#${id}" data-done="${esc(t('copied'))}">${
   ic('board')}<span>${esc(t('copy'))}</span></button>`
+
+/**
+ * Saves without a page load.
+ *
+ * Every POST form on the page is fetched instead of navigated: the server
+ * answers as it always did — a redirect to the page it just changed — and the
+ * content of that page replaces this one's, tab kept, scroll kept, URL updated.
+ * A redirect to a *different* page (create, delete) is a real navigation and
+ * is followed as one. Anything unexpected falls back to a plain submit, so the
+ * server routes remain the one source of truth and scripting off still works.
+ */
+const AJAX_JS = `window.pbInit=window.pbInit||[];
+function pbBoot(){window.pbInit.forEach(function(f){try{f()}catch(e){console.error(e)}})}
+(function(){
+  var wrap=document.querySelector('.wrap');if(!wrap)return;
+  document.addEventListener('submit',function(e){
+    var form=e.target;if(!(form instanceof HTMLFormElement)||e.defaultPrevented)return;
+    if((form.method||'get').toLowerCase()!=='post'||!wrap.contains(form))return;
+    if(!window.fetch||!window.DOMParser)return;
+    e.preventDefault();
+    var btn=e.submitter,action=(btn&&btn.getAttribute('formaction'))||form.getAttribute('action')||location.pathname;
+    var data=btn?new FormData(form,btn):new FormData(form);
+    if(btn){btn.disabled=true;btn.classList.add('busy')}
+    var y=scrollY;
+    fetch(action,{method:'POST',body:new URLSearchParams(data),credentials:'same-origin',
+      headers:{'Accept':'text/html'},redirect:'follow'}).then(function(res){
+      var to=new URL(res.url,location.href);
+      if(to.pathname!==location.pathname){location.assign(to.href);return}
+      return res.text().then(function(html){
+        var doc=new DOMParser().parseFromString(html,'text/html');
+        var next=doc.querySelector('.wrap');if(!next)throw new Error('no page');
+        wrap.innerHTML=next.innerHTML;
+        document.title=doc.title;
+        var tab=doc.body.getAttribute('data-tab');if(tab)document.body.setAttribute('data-tab',tab);
+        history.replaceState(null,'',to.pathname+to.search+(to.hash||location.hash));
+        pbBoot();
+        scrollTo(0,y);
+      })
+    }).catch(function(err){console.error(err);if(btn){btn.disabled=false;btn.classList.remove('busy')}form.submit()});
+  });
+})();`
 
 /** A tab strip + its panels. `tabs` is [{id, icon, label, count?, body}]. */
 function tabbed(tabs, active) {
@@ -408,6 +449,7 @@ td.active{gap:8px;font-size:.9rem}
   border-color:color-mix(in oklab,var(--warn) 40%,var(--line))}
 .flash.bad strong{color:var(--warn)}
 button.done{border-color:var(--brand);color:var(--brand)}
+button.busy{opacity:.6;cursor:progress}
 @keyframes settle{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.flash{animation:none}}
 .hint{color:var(--muted);font-size:.82rem;margin:6px 0 0}
@@ -639,7 +681,7 @@ table.standings th .short{display:none}
 
 /** Progressive enhancement only: the two level selects already say what they mean. */
 const LEVEL_JS = `
-(function(){
+pbInit.push(function(){
   var c=document.getElementById('level_category'),g=document.getElementById('level_grade'),
       o=document.getElementById('level_preview');
   if(!c||!g||!o)return;
@@ -653,7 +695,7 @@ const LEVEL_JS = `
       ', '+gr.dataset.label.toLowerCase()+'. '+gr.dataset.blurb+'.';
   }
   c.addEventListener('change',paint);g.addEventListener('change',paint);paint();
-})();`
+});`
 
 /**
  * The language switch lives in the header because it is the one setting someone
@@ -677,7 +719,7 @@ export function page(title, body, { nav = '', script = '', t = translator(), her
 <strong>Padel Buddy</strong><small>${esc(t('navTournaments'))}</small></a>
 <nav>${nav}</nav>${langToggle(t.lang, here)}</header>
 ${SPRITE}
-<div class="wrap">${body}</div><script>${TABS_JS}</script><script>${PAIRS_JS}</script><script>${COPY_JS}</script>${script ? `<script>${script}</script>` : ''}</body></html>`
+<div class="wrap">${body}</div><script>${AJAX_JS}</script><script>${TABS_JS}</script><script>${PAIRS_JS}</script><script>${COPY_JS}</script>${script ? `<script>${script}</script>` : ''}<script>pbBoot()</script></body></html>`
 }
 
 const navFor = (here, t) => [['/', 'navOverview', 'home'], ['/tournaments', 'navTournaments', 'trophy'],

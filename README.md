@@ -363,6 +363,17 @@ on the host (unlike the broker) does not stamp it and the project vanishes.
 `TZ=Europe/Lisbon` in compose, because "has this date already been played" is a
 question about an evening in Matosinhos, not about UTC.
 
+## Saving without a page load
+
+Every POST form on a page is fetched instead of navigated: the server answers
+as it always did — a redirect to the page it just changed — and that page's
+content replaces the current one in place, tab kept, scroll kept, URL updated.
+A redirect to a *different* page (create, delete) is followed as a real
+navigation. Anything unexpected falls back to a plain submit, so the server
+routes stay the one source of truth and the console still works with scripting
+off. The page scripts (tabs, pairs board, copy buttons) are re-run after each
+swap.
+
 ## Tests
 
 The parsers are the only place where a human's typing becomes a stored value, so
