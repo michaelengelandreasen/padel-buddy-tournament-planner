@@ -368,3 +368,14 @@ test('import: a desktop copy with WhatsApp prefixes, and a roster without the ra
   assert.equal(plain.courts, 2)
   assert.equal(plain.location, '')
 })
+
+test('import: the time line in the ways people write it', () => {
+  const at = (line) => { const r = parseBoard(`📅 13/09/26\n${line}\n1🎾 A\n2🎾 B`, { now: NOW }); return `${r.time} ${r.duration_min}` }
+  assert.equal(at('⏱ 09:30- 11:30'), '09:30 120')
+  assert.equal(at('⏱ 9h30 - 11h30'), '09:30 120')
+  assert.equal(at('⏱ 9h - 11h'), '09:00 120')
+  assert.equal(at('⏱ 9 às 11'), '09:00 120')
+  assert.equal(at('🕒 9-11h'), '09:00 120')
+  assert.equal(at('⏱ 7pm - 9pm'), '19:00 120')
+  assert.equal(at('⏱ 19:00 - 20:30'), '19:00 90')
+})

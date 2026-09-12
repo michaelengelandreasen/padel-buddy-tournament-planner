@@ -24,7 +24,13 @@ import { addMinutes, isTime, parseWhen } from './dates.js'
 import { parseLevel } from './levels.js'
 import { translator } from './i18n.js'
 
-const CLOCK = /([01]?\d|2[0-3])\s*[:h.]\s*([0-5]\d)/g
+/**
+ * A clock the way people type it: 09:30, 9.30, 9h30, 9h, 9H, 9am, 9 pm.
+ * Hours alone count when marked as hours ("9h") or paired by a range with
+ * another clock ("9 às 11", "9-11h") — a bare "9" on its own is not a time.
+ */
+const CLOCK = /\b([01]?\d|2[0-3])(?:\s*[:h.]\s*([0-5]\d)|\s*[hH](?![\p{L}])|\s*(am|pm)\b)/giu
+const BARE_RANGE = /\b([01]?\d|2[0-3])\s*(?:-|–|—|a|às|as|to|até)\s*([01]?\d|2[0-3])\s*[hH]?\b/iu
 const pad = (n) => String(n).padStart(2, '0')
 
 /** `rafa Campos` → `Rafa Campos`; particles like `de` stay down. */
@@ -81,7 +87,17 @@ export function parseBoard(text, { now = new Date(), lang } = {}) {
       continue
     }
     // Time: one clock is a start, two are a window and give the duration.
-    const clocks = [...bare.matchAll(CLOCK)].map((m) => `${pad(Number(m[1]))}:${m[2]}`)
+    let clocks = [...bare.matchAll(CLOCK)].map((m) => {
+      let h = Number(m[1])
+      if (m[3]) { h = h % 12 + (m[3].toLowerCase() === 'pm' ? 12 : 0) }
+      return `${pad(h)}:${m[2] || '00'}`
+    })
+    // "9 às 11" / "9-11h": two bare hours joined as a range. It wins over a
+    // lone "11h" found in the same line, and only counts on a line that is
+    // about time — it carries a clock emoji, or no time has been found yet.
+    const range = clocks.length < 2 && (/[⏱🕒🕐🕑🕓🕔🕕🕖🕗🕘🕙🕚🕛]/u.test(line) || !out.time)
+      && bare.match(BARE_RANGE)
+    if (range) clocks = [`${pad(Number(range[1]))}:00`, `${pad(Number(range[2]))}:00`]
     if (clocks.length && !out.time) {
       out.time = clocks[0]
       if (clocks[1] && isTime(clocks[1])) {
