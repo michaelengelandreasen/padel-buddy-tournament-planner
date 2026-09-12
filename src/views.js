@@ -79,8 +79,8 @@ const ICONS = {
     + '<path d="M12 9v4M12 17h.01"/>',
   level: '<path d="M3 20h18"/><path d="M6 16v-4M12 16V8M18 16V4"/>',
   timer: '<path d="M10 2h4"/><path d="M12 14v-4"/><circle cx="12" cy="14" r="8"/>',
-  grip: '<circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/>'
-    + '<circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/>',
+  grip: '<circle cx="9" cy="5" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="19" r="1.6"/>'
+    + '<circle cx="15" cy="5" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="19" r="1.6"/>',
 }
 // `hidden` alone is not enough: the UA stylesheet hides hidden HTML elements, and an
 // <svg> is not one, so without the inline style the sprite paints as a blank box.
@@ -464,7 +464,7 @@ details.preview pre{margin-top:8px}
 .chip:hover{border-color:var(--muted);filter:none}
 .chip .name{min-width:0;overflow:hidden;text-overflow:ellipsis}
 /* The handle: the one thing that says "this moves" before anyone tries. */
-.chip .grip{width:16px;height:16px;flex:0 0 auto;color:var(--muted);margin-left:-4px;fill:currentColor;stroke:none}
+.chip .grip{width:18px;height:18px;flex:0 0 auto;color:var(--muted);margin-left:-4px;fill:currentColor;stroke:none;opacity:.9}
 .chip:hover .grip,.chip.sel .grip{color:var(--brand)}
 .chip .g{flex:0 0 auto;font-size:.7rem;font-weight:800;padding:1px 6px;border-radius:999px;
   background:var(--surface-2);color:var(--muted)}
