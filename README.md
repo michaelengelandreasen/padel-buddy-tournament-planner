@@ -119,9 +119,11 @@ club's own wording.
 The club already posts each night in a fixed shape, and the host was retyping
 it. **Tournaments → Import a WhatsApp message**: paste it, press *Read the
 message*, and the new-tournament form fills itself in — date (`13/09/26`),
-start and duration from the time window (`09:30- 11:30` → 120 min), level,
-courts (players ÷ 4), and the numbered roster with names tidied (`rafa Campos`
-→ Rafa Campos) and `(dupla)` lines paired with the line above. What it could
+start and duration from the time window (`09:30- 11:30` → 120 min), the level
+if the message has one (`MX4 - Padel Tribe`), the venue otherwise (`M9 - MAIA`
+is the club M9 in Maia, and the board then prints that instead of the club
+name), courts (players ÷ 4), and the numbered roster with names tidied
+(`rafa Campos` → Rafa Campos) and `(dupla)` lines paired with the line above. What it could
 not read is said per field and left for the host; *Create with 16 players*
 makes the tournament and signs everyone up in one go. `src/import.js`, tested
 against the real message in `test/fixtures/maia.txt`.

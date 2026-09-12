@@ -281,9 +281,9 @@ test('import: the club message yields date, window, level, venue and roster', ()
   assert.equal(r.time, '09:30')
   assert.equal(r.duration_min, 120)
   assert.equal(r.end, '11:30')
-  assert.equal(r.levelRaw, 'M-9')
-  assert.equal(r.level, '')                       // not on the ladder: left for the host
-  assert.equal(r.location, 'Maia')
+  assert.equal(r.level, '')                       // no level line: left for the host
+  assert.equal(r.location, 'M9 - Maia')            // the club is M9, in Maia
+  assert.ok(r.warnings.some((w) => /No level/.test(w)))
   assert.equal(r.players.length, 16)
   assert.equal(r.courts, 4)
 })

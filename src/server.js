@@ -118,11 +118,11 @@ const routes = [
   ['POST', /^\/tournaments\/import$/, async (_m, req, t) => {
     const f = await body(req)
     const read = parseBoard(f.text, { lang: t.lang })
-    const level = parseLevel(read.level || read.levelRaw, { lang: t.lang })
+    const level = parseLevel(read.level, { lang: t.lang })
     const form = {
-      level_category: level.ok ? level.category : (read.levelRaw.split('-')[0] || 'MX'),
+      level_category: level.ok ? level.category : 'MX',
       level_grade: level.ok ? String(level.grade) : '',
-      play_date: read.date, play_time: read.time,
+      play_date: read.date, play_time: read.time, venue: read.location,
       courts: read.courts, duration_min: read.duration_min, round_min: 12,
       roster: JSON.stringify(read.players.map(({ name, partner }) => ({ name, partner }))),
     }
@@ -154,7 +154,7 @@ const routes = [
       return Number.isFinite(n) && n >= min && n <= max ? n : fallback
     }
     const created = createTournament({
-      level: level.code, play_date: when.date, play_time: when.time,
+      level: level.code, play_date: when.date, play_time: when.time, venue: f.venue,
       courts: num(f.courts, 3, 1, 20),
       duration_min: num(f.duration_min, 90, 10, 600),
       round_min: num(f.round_min, 12, 5, 120),

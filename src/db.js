@@ -56,6 +56,7 @@ db.exec(`
     courts       INTEGER NOT NULL DEFAULT 2,
     duration_min INTEGER NOT NULL DEFAULT 90,
     round_min    INTEGER NOT NULL DEFAULT 12,
+    venue        TEXT NOT NULL DEFAULT '',      -- where this night is, if not the club itself
     status       TEXT NOT NULL DEFAULT 'open',   -- open | scheduled | done
     created_at   TEXT NOT NULL DEFAULT (datetime('now'))
   );
@@ -124,6 +125,9 @@ function migrate() {
   const cols = db.prepare('PRAGMA table_info(tournaments)').all().map((c) => c.name)
   if (!cols.includes('play_time')) {
     db.exec("ALTER TABLE tournaments ADD COLUMN play_time TEXT NOT NULL DEFAULT ''")
+  }
+  if (!cols.includes('venue')) {
+    db.exec("ALTER TABLE tournaments ADD COLUMN venue TEXT NOT NULL DEFAULT ''")
   }
   const rows = db.prepare('SELECT id, level, play_date, play_time FROM tournaments').all()
   const fix = db.prepare('UPDATE tournaments SET level = ?, play_date = ?, play_time = ? WHERE id = ?')
@@ -247,10 +251,10 @@ export function deleteTournament(id) {
 
 export function createTournament(t) {
   const r = run(
-    `INSERT INTO tournaments (format, level, play_date, play_time, courts, duration_min, round_min)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO tournaments (format, level, play_date, play_time, courts, duration_min, round_min, venue)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     t.format ?? 'non-stop', t.level ?? '', t.play_date ?? '', t.play_time ?? '',
-    t.courts ?? 2, t.duration_min ?? 90, t.round_min ?? 12,
+    t.courts ?? 2, t.duration_min ?? 90, t.round_min ?? 12, String(t.venue ?? '').trim().slice(0, 80),
   )
   return getTournament(Number(r.lastInsertRowid))
 }

@@ -79,6 +79,8 @@ const ICONS = {
     + '<path d="M12 9v4M12 17h.01"/>',
   level: '<path d="M3 20h18"/><path d="M6 16v-4M12 16V8M18 16V4"/>',
   timer: '<path d="M10 2h4"/><path d="M12 14v-4"/><circle cx="12" cy="14" r="8"/>',
+  grip: '<circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/>'
+    + '<circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/>',
 }
 // `hidden` alone is not enough: the UA stylesheet hides hidden HTML elements, and an
 // <svg> is not one, so without the inline style the sprite paints as a blank box.
@@ -461,6 +463,9 @@ details.preview pre{margin-top:8px}
   overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .chip:hover{border-color:var(--muted);filter:none}
 .chip .name{min-width:0;overflow:hidden;text-overflow:ellipsis}
+/* The handle: the one thing that says "this moves" before anyone tries. */
+.chip .grip{width:16px;height:16px;flex:0 0 auto;color:var(--muted);margin-left:-4px;fill:currentColor;stroke:none}
+.chip:hover .grip,.chip.sel .grip{color:var(--brand)}
 .chip .g{flex:0 0 auto;font-size:.7rem;font-weight:800;padding:1px 6px;border-radius:999px;
   background:var(--surface-2);color:var(--muted)}
 .chip .g.F{background:#4A2B4F;color:#F5C2F0} .chip .g.M{background:var(--court-ink);color:var(--court)}
@@ -749,6 +754,8 @@ export function tournamentsPage({ tournaments, form = {}, error = '', imported =
           <input id="play_time" name="play_time" type="time"
             value="${esc(form.play_time ?? '19:00')}"></div>
       </div>
+      <label for="venue">${esc(t('venue'))}</label>
+      <input id="venue" name="venue" value="${esc(form.venue || '')}" maxlength="80" placeholder="${esc(t('venueHelp'))}">
       <div class="row">
         <div><label for="courts">${esc(t('courts'))}</label>
           <input id="courts" name="courts" type="number" min="1" max="20"
@@ -836,6 +843,7 @@ export function tournamentPage({
   // Before the draw the Teams tab is the pairs board; after it, the list. A
   // seat per two players, one extra for an odd count so nobody is off the board.
   const chip = (p) => `<button type="button" class="chip" data-name="${esc(p.name)}" draggable="false">${
+    ic('grip', 'grip')}${
     p.gender === 'F' || p.gender === 'M' ? `<span class="g ${p.gender}">${p.gender}</span>` : ''}<span class="name">${esc(p.name)}</span></button>`
   const everyone = teams.flatMap((x) => x.players).concat(waiting)
   const seatCount = Math.max(teams.length, Math.ceil(everyone.length / 2))
@@ -934,6 +942,7 @@ export function tournamentPage({
     <h1>${esc(tour.level) || esc(t('statusOpen'))} · ${esc(humanWhen(tour, { lang: t.lang }))}</h1>
     <p class="muted">${esc(levelLabel(tour.level, t))}</p>
     <p class="meta">
+      ${tour.venue ? `<span>${ic('pin')}${esc(tour.venue)}</span>` : ''}
       <span>${ic('court')}${esc(t('courtsN', { n: tour.courts }))}</span>
       <span>${ic('clock')}${esc(t('minutes', { n: tour.duration_min }))}</span>
       <span>${ic('repeat')}${esc(t('minRounds', { n: tour.round_min }))}</span>

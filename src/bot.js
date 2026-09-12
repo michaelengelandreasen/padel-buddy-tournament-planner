@@ -235,8 +235,9 @@ export function boardMessage(t, prefix = '', lang = clubLanguage()) {
   if (range) lines.push(`🕒 ${range}`)
   lines.push(`📈 ${s('boardFormat')} ${levelTight(t.level) || '—'}`)
   lines.push('')
-  lines.push(`📍 ${club.name}`)
-  if (club.maps_url) lines.push(club.maps_url)
+  // A night away from home says where; the club's map link is only the club's.
+  lines.push(`📍 ${t.venue || club.name}`)
+  if (!t.venue && club.maps_url) lines.push(club.maps_url)
   lines.push('')
   lines.push(`${t.courts} ${s('courtsWord')}`)
   lines.push('')

@@ -34,6 +34,8 @@ export function tidyName(raw) {
     const low = w.toLowerCase()
     if (i > 0 && PARTICLES.has(low)) return low
     // Only lift a first letter; "McDonald" and "DJ" are somebody's own spelling.
+    // A short code with a digit ("m9") is a name, and reads better upper-case.
+    if (/^[a-z]\d+$/.test(low)) return low.toUpperCase()
     return w === low ? low.charAt(0).toUpperCase() + low.slice(1) : w
   }).join(' ')
 }
@@ -46,7 +48,7 @@ export function parseBoard(text, { now = new Date(), lang } = {}) {
   const t = translator(lang)
   const lines = String(text || '').replace(/\r/g, '').split('\n')
   const out = {
-    date: '', time: '', duration_min: 0, level: '', levelRaw: '', location: '',
+    date: '', time: '', duration_min: 0, level: '', location: '',
     courts: 0, players: [], warnings: [],
   }
 
@@ -77,18 +79,21 @@ export function parseBoard(text, { now = new Date(), lang } = {}) {
       }
       continue
     }
-    // Level and venue: `M9 - MAIA`, `MX4 · Padel Tribe`, `Nonstop MX4`.
+    // Level, if the line has one that is actually a level: `MX4 - Padel Tribe`,
+    // `Nonstop MX4`. A code that does not parse is not a level — `M9 - MAIA`
+    // is a club called M9, in Maia — so the whole line is the venue instead.
     const lv = bare.match(/\b(MX|M|F)\s*-?\s*(\d)\b/i)
-    if (lv && !out.levelRaw) {
-      out.levelRaw = `${lv[1].toUpperCase()}-${lv[2]}`
-      const parsed = parseLevel(out.levelRaw, { lang })
-      if (parsed.ok) out.level = parsed.code
-      else out.warnings.push(t('importLevelUnknown', { raw: out.levelRaw }))
+    const parsed = lv ? parseLevel(`${lv[1].toUpperCase()}-${lv[2]}`, { lang }) : { ok: false }
+    if (parsed.ok && !out.level) {
+      out.level = parsed.code
       const rest = bare.replace(/nonstop|non-stop/i, '').replace(lv[0], '').replace(/^[\s\-–·:]+|[\s\-–·:]+$/g, '')
-      if (rest) out.location = tidyName(rest.toLowerCase())
+      if (rest && !out.location) out.location = tidyName(rest.toLowerCase())
       continue
     }
+    // Anything else in the header is where the night is.
+    if (!out.location && /\p{L}/u.test(bare)) out.location = tidyName(bare.toLowerCase())
   }
+  if (!out.level) out.warnings.push(t('importNoLevel'))
 
   // The roster. "(dupla)" on a line pairs it with the line above.
   let prev = null
