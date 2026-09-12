@@ -228,8 +228,11 @@ Old rows are dragged through the same parsers on boot (`migrate()` in
 !help
 ```
 
-On the night (they read the tournament being *played*, which is not the newest
-one open — a club announces Friday while Saturday is still on court):
+On the night they read the **active night**: the one pinned from its page
+("Make this the active night", shown on the Overview), or — unpinned — what
+the calendar says: the night on court now, else the next one up, else the most
+recent, so `!table` still answers on Sunday for Saturday. A club announces
+Friday while Saturday is still on court, so "newest open" was never the answer.
 
 ```
 !where Mike      where you play now, and where you go next   (!onde)

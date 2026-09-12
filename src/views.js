@@ -79,6 +79,7 @@ const ICONS = {
     + '<path d="M12 9v4M12 17h.01"/>',
   level: '<path d="M3 20h18"/><path d="M6 16v-4M12 16V8M18 16V4"/>',
   timer: '<path d="M10 2h4"/><path d="M12 14v-4"/><circle cx="12" cy="14" r="8"/>',
+  x: '<path d="M18 6 6 18M6 6l12 12"/>',
   grip: '<circle cx="9" cy="5" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="19" r="1.6"/>'
     + '<circle cx="15" cy="5" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="19" r="1.6"/>',
 }
@@ -372,6 +373,7 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 .pill{display:inline-block;padding:3px 10px;border-radius:999px;background:var(--surface-2);
   color:var(--muted);font-size:.78rem;font-weight:700;white-space:nowrap}
 .pill.on{background:var(--brand-deep);color:var(--brand-soft)}
+.pill.wrap{white-space:normal;line-height:1.3}
 .muted{color:var(--muted)} .mono{font-family:ui-monospace,Menlo,monospace}
 .grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr))}
 .note{padding:10px 14px;background:color-mix(in oklab,var(--accent) 8%,var(--surface-2));
@@ -514,6 +516,12 @@ details.fold summary>.i{color:var(--muted);transition:transform .15s ease-out}
 details.fold[open] summary>.i{transform:rotate(90deg)}
 details.fold[open] summary{margin-bottom:8px}
 .danger-zone{display:flex;justify-content:flex-end;margin:4px 0 8px}
+.meta form.inline{display:inline-flex;margin:0}
+button.link.danger{color:var(--warn);text-decoration-color:color-mix(in oklab,var(--warn) 40%,transparent)}
+button.link.danger:hover{color:var(--warn)}
+td.rowact{display:flex;align-items:center;gap:12px}
+td.rowact form{margin:0}
+@media (max-width:560px){table.stack td.rowact{display:inline-flex}}
 .outmsg{margin-bottom:18px}
 .outmsg .actions{margin-top:8px;align-items:center}
 /* Standings: a real grid at every width. */
@@ -696,7 +704,7 @@ const levelCell = (code, t) => code
   ? `<span class="pill on">${esc(code)}</span> <span class="muted">${esc(levelShort(code, t))}</span>`
   : `<span class="muted">${esc(t('statusOpen'))}</span>`
 
-export function overview({ club, tournaments, courts, live, t }) {
+export function overview({ club, tournaments, courts, live, pinned = 0, night = 0, t }) {
   return page(t('navOverview'), `
     <h1>${esc(club.name)}</h1>
     <p class="meta"><span>${ic('pin')}${esc(club.address) || esc(t('noAddress'))}</span>${
@@ -717,8 +725,13 @@ export function overview({ club, tournaments, courts, live, t }) {
         <td class="lead" data-l="">${esc(humanWhen(x, { lang: t.lang }))}</td>
         <td data-l="${esc(t('level'))}">${levelCell(x.level, t)}</td>
         <td class="num" data-l="${esc(t('courts'))}">${x.courts}</td>
-        <td data-l="${esc(t('status'))}"><span class="pill">${esc(statusLabel(x.status, t))}</span></td>
-        <td class="full"><a class="tap" href="/t/${x.id}">${esc(t('open'))} ${ic('arrow')}</a></td></tr>`).join('')}</tbody>`, 'stack')
+        <td data-l="${esc(t('status'))}"><span class="pill">${esc(statusLabel(x.status, t))}</span>${
+          x.id === night ? ` <span class="pill on wrap">${esc(t('activeNight'))}${x.id === pinned ? '' : ` · ${esc(t('autoNight'))}`}</span>` : ''}</td>
+        <td class="full rowact"><a class="tap" href="/t/${x.id}">${esc(t('open'))} ${ic('arrow')}</a>
+          <form method="post" action="/t/${x.id}/delete" onsubmit="return confirm(${
+            JSON.stringify(t('deleteConfirm', { name: `${x.level || ''} ${humanWhen(x, { lang: t.lang })}`.trim() })).replace(/"/g, '&quot;')})">
+            <button class="link danger" aria-label="${esc(t('deleteTournament'))}">${ic('trash')}<span>${esc(t('remove'))}</span></button>
+          </form></td></tr>`).join('')}</tbody>`, 'stack')
         : `<p class="muted">${esc(t('noTournaments'))}</p>`}
       <div class="actions"><a class="btn" href="/tournaments">${ic('plus')}${esc(t('newTournament'))}</a></div>
     </div>`, { nav: navFor('/', t), t, here: '/' })
@@ -923,7 +936,7 @@ export function flashLine(flash, t) {
 
 export function tournamentPage({
   tournament: tour, teams, waiting, matches, table, message, roundText, tableText = '', scheduleText = '',
-  courts, flash, t,
+  courts, flash, pinned = false, night = false, t,
 }) {
   const rounds = roundsOf(matches)
   const now = currentRound(matches)
@@ -1101,7 +1114,12 @@ export function tournamentPage({
       <span>${ic('clock')}${esc(t('minutes', { n: tour.duration_min }))}</span>
       <span>${ic('repeat')}${esc(t('minRounds', { n: tour.round_min }))}</span>
       <span class="pill">${esc(statusLabel(tour.status, t))}</span>
-      <a href="/t/${tour.id}/tv">${ic('tv')}${esc(t('tvView'))}</a></p>
+      ${night ? `<span class="pill on wrap">${esc(t('activeNight'))}${pinned ? '' : ` · ${esc(t('autoNight'))}`}</span>` : ''}
+      <a href="/t/${tour.id}/tv">${ic('tv')}${esc(t('tvView'))}</a>
+      <form method="post" action="/t/${tour.id}/activate" class="inline" title="${esc(t('activeHelp'))}">
+        ${pinned ? '<input type="hidden" name="off" value="1">' : ''}
+        <button class="link">${ic(pinned ? 'x' : 'pin')}${esc(pinned ? t('unsetActive') : t('makeActive'))}</button>
+      </form></p>
     ${tabbed([
       { id: 'board', icon: 'board', label: t('tabBoard'), body: board },
       { id: 'teams', icon: 'users', label: t('tabTeams'), count: teams.length, body: teamsPanel },

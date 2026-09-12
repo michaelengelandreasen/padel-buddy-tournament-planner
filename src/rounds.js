@@ -134,3 +134,23 @@ export const courtName = (label, t, { always = false } = {}) => {
   if (always && !/^(court|campo)\b/i.test(l)) return t('courtN', { n: l })
   return l
 }
+
+/**
+ * Which night the bot is talking about, when nobody has said.
+ *
+ * A night that is on court right now wins. Otherwise the next one coming up —
+ * tomorrow's night, not this morning's, at eleven at night. Only when nothing
+ * lies ahead does the most recent past night count, so `!table` still answers
+ * on Sunday for Saturday. Each candidate: {play_date, play_time, duration_min}.
+ */
+export function pickNight(nights, now = new Date()) {
+  const startOf = (t) => new Date(`${t.play_date}T${t.play_time || '00:00'}:00`)
+  const endOf = (t) => new Date(startOf(t).getTime() + (Number(t.duration_min) || 120) * 60000)
+  const dated = nights.filter((t) => /^\d{4}-\d{2}-\d{2}$/.test(t.play_date))
+  const live = dated.filter((t) => startOf(t) <= now && now < endOf(t))
+  if (live.length) return live.sort((a, b) => startOf(a) - startOf(b))[0]
+  const ahead = dated.filter((t) => startOf(t) > now).sort((a, b) => startOf(a) - startOf(b))
+  if (ahead.length) return ahead[0]
+  const past = dated.filter((t) => endOf(t) <= now).sort((a, b) => endOf(b) - endOf(a))
+  return past[0] || nights[0] || null
+}

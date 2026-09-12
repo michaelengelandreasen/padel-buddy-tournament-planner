@@ -388,3 +388,19 @@ test('courts: a bare number gets the word; in a message every court does', () =>
   assert.equal(courtName('Court Center', t, { always: true }), 'Court Center')
   assert.equal(courtName('3', translator('pt'), { always: true }), 'Campo 3')
 })
+
+// ---- which night the bot talks about ----
+import { pickNight } from '../src/rounds.js'
+
+test('night: on court now beats everything; else the next up; else the last one', () => {
+  const sat = { id: 13, play_date: '2026-09-12', play_time: '11:00', duration_min: 120 }
+  const sun = { id: 17, play_date: '2026-09-13', play_time: '09:30', duration_min: 120 }
+  const fri = { id: 14, play_date: '2026-09-18', play_time: '20:30', duration_min: 90 }
+  const at = (iso) => pickNight([sat, sun, fri], new Date(iso)).id
+  assert.equal(at('2026-09-12T11:30:00'), 13)   // Saturday, mid-tournament
+  assert.equal(at('2026-09-12T23:38:00'), 17)   // Saturday night: tomorrow's, not this morning's
+  assert.equal(at('2026-09-13T10:00:00'), 17)   // Sunday, on court
+  assert.equal(at('2026-09-14T12:00:00'), 14)   // Monday: Friday is next
+  assert.equal(at('2026-09-20T12:00:00'), 14)   // after everything: the most recent
+  assert.equal(pickNight([], new Date()), null)
+})

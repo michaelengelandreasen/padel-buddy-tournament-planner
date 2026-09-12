@@ -1,8 +1,8 @@
 import { createServer } from 'node:http'
 import { timingSafeEqual } from 'node:crypto'
 import {
-  addCourt, addSignup, addTournamentCourt, addVenue, clubLanguage, createTournament, deleteCourt,
-  deleteTournament,
+  activeTournament, addCourt, addSignup, addTournamentCourt, addVenue, clubLanguage, createTournament,
+  deleteCourt, deleteTournament, playingTournament, setActiveTournament,
   deleteTournamentCourt, deleteVenue, listTournamentCourts, renameCourts, renameTournamentCourt,
   renameTournamentCourts,
   findVenue, getClub, getTournament, listVenues, updateVenue,
@@ -105,7 +105,13 @@ function view(id) {
 const routes = [
   ['GET', /^\/$/, (_m, _r, t) => ({ html: V.overview({
     club: getClub(), tournaments: listTournaments(), courts: listCourts(),
-    live: groups.live, t }) })],
+    live: groups.live, pinned: activeTournament()?.id || 0, night: playingTournament()?.id || 0, t }) })],
+  // Pin (or unpin) the night the bot talks about.
+  ['POST', /^\/t\/(\d+)\/activate$/, async (m, req) => {
+    const f = await body(req)
+    setActiveTournament(f.off ? 0 : Number(m[1]))
+    return { to: `/t/${m[1]}` }
+  }],
 
   ['GET', /^\/settings$/, (_m, _r, t) =>
     ({ html: V.settings({ club: getClub(), courts: listCourts(), venues: listVenues(), t }) })],
@@ -233,7 +239,9 @@ const routes = [
       what: q.get('posted'), tg: q.get('tg') || '', err: (q.get('err') || '').slice(0, 120),
       n: q.get('n') || '',
     } : q.get('signed') ? { what: 'board', signed: q.get('signed') } : null
+    const pinnedId = activeTournament()?.id || 0
     return { html: V.tournamentPage({ ...v, flash,
+      pinned: pinnedId === v.tournament.id, night: playingTournament()?.id === v.tournament.id,
       message: signupMessage(v.tournament, '', t.lang),
       // What the group would see right now, so a host can read it before
       // deciding to send it.

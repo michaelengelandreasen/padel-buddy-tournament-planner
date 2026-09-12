@@ -1,7 +1,8 @@
 import { DatabaseSync } from 'node:sqlite'
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
-import { parseWhen, toDate, todayISO } from './dates.js'
+import { parseWhen } from './dates.js'
+import { pickNight } from './rounds.js'
 import { parseLevel } from './levels.js'
 import { DEFAULT_LANGUAGE, isLanguage, translator } from './i18n.js'
 
@@ -37,7 +38,10 @@ db.exec(`
     -- Which Telegram group the bot lives in. Learned from the first command it
     -- sees there rather than configured, because no club captain should have to
     -- find out what a numeric chat id is.
-    telegram_chat_id TEXT NOT NULL DEFAULT ''
+    telegram_chat_id TEXT NOT NULL DEFAULT '',
+    -- The night the host has pinned as "the one" — what the bot, the automatic
+    -- posts and the TV talk about. Empty means: work it out from the calendar.
+    active_tournament_id INTEGER NOT NULL DEFAULT 0
   );
   INSERT OR IGNORE INTO club (id, name) VALUES (1, 'Padel Club');
 
@@ -142,7 +146,7 @@ function seedTournamentCourts(tid, count) {
 function migrate() {
   const clubCols = db.prepare('PRAGMA table_info(club)').all().map((c) => c.name)
   for (const [col, def] of [['language', "'en'"], ['rules_en', "''"], ['rules_pt', "''"],
-    ['telegram_chat_id', "''"]]) {
+    ['telegram_chat_id', "''"], ['active_tournament_id', '0']]) {
     if (!clubCols.includes(col)) {
       db.exec(`ALTER TABLE club ADD COLUMN ${col} TEXT NOT NULL DEFAULT ${def}`)
     }
@@ -384,31 +388,35 @@ export const getTournament = (id) =>
 export const currentTournament = () =>
   one("SELECT * FROM tournaments WHERE status != 'done' ORDER BY id DESC LIMIT 1")
 
+/** The night the host pinned, if it still exists. */
+export function activeTournament() {
+  const id = getClub()?.active_tournament_id
+  return id ? getTournament(id) || null : null
+}
+export const setActiveTournament = (id) =>
+  run('UPDATE club SET active_tournament_id = ? WHERE id = 1', Number(id) || 0)
+
 /**
  * The tournament being *played*, which is not the same question as the newest
  * one open.
  *
- * A club opens next Friday's night while Saturday morning's is still on court,
- * so `currentTournament` — newest not yet done — is the right answer for `!in`
- * and the wrong one for "where do I go next". This picks the night with a draw
- * whose date is nearest to now: during a tournament that is today's, and between
- * tournaments it is the one just played, which is what `!table` should show.
+ * The host's pinned night wins outright. Otherwise the calendar decides among
+ * the nights that have a draw: on court now, else the next one up, else the
+ * most recent — see {@link pickNight}. A club opens next Friday while Saturday
+ * is still on court, so "newest open" is the wrong answer for "where do I go".
  */
-export function playingTournament(today = todayISO()) {
+export function playingTournament(now = new Date()) {
+  const pinned = activeTournament()
+  if (pinned) return pinned
   const drawn = all(`SELECT * FROM tournaments t
     WHERE EXISTS (SELECT 1 FROM matches m WHERE m.tournament_id = t.id)`)
-  if (!drawn.length) return null
-  const here = toDate(today)
-  const away = (t) => {
-    const d = toDate(t.play_date)
-    return d && here ? Math.abs(d - here) : Number.POSITIVE_INFINITY
-  }
-  return drawn.sort((a, b) => away(a) - away(b) || b.id - a.id)[0]
+  return pickNight(drawn, now)
 }
 
 /** Wipe a tournament and everything hanging off it — used by the seed script. */
 export function deleteTournament(id) {
   forgetPost(`board:${id}`)
+  if (getClub()?.active_tournament_id === Number(id)) setActiveTournament(0)
   run('DELETE FROM tournament_courts WHERE tournament_id = ?', id)
   run('DELETE FROM matches WHERE tournament_id = ?', id)
   run('DELETE FROM signups WHERE tournament_id = ?', id)
