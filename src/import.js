@@ -40,20 +40,33 @@ export function tidyName(raw) {
   }).join(' ')
 }
 
-/** A roster line: a number, the racket (or a dot/dash), a name, an optional note. */
-const ROSTER = /^\s*(\d{1,2})\s*(?:🎾|[-.):])?\s*(.+?)\s*$/u
+/**
+ * A roster line: a number, then the racket or a separator, then a name. The
+ * separator is required — "13/09/26" starts with a number too, and so does
+ * "3 Courts". Any number of players is fine; nobody writes 100.
+ */
+const ROSTER = /^\s*(\d{1,2})\s*(?:🎾|[-–.):])\s*(.+?)\s*$/u
 const PAIR_NOTE = /\(\s*(dupla|pair|par|par(?:ceiro|ceira)|with|com)\s*\)/iu
+
+/**
+ * What WhatsApp itself prepends when a message is copied from the desktop app
+ * or exported: `[12/09/26, 10:15:23] Mike: ` or `12/09/26, 10:15 - Mike: `.
+ * Left in, that date and time are the copy's, not the night's, and every
+ * roster line starts with a bracket instead of a number.
+ */
+const COPY_PREFIX = /^\s*\[?\d{1,2}[/.]\d{1,2}[/.]\d{2,4},?\s+\d{1,2}:\d{2}(?::\d{2})?\]?\s*[-–]?\s*[^:\n]{1,40}:\s*/u
 
 export function parseBoard(text, { now = new Date(), lang } = {}) {
   const t = translator(lang)
   const lines = String(text || '').replace(/\r/g, '').split('\n')
+    .map((l) => l.replace(COPY_PREFIX, '').replace(/\uFE0F/g, ''))
   const out = {
     date: '', time: '', duration_min: 0, level: '', location: '',
     courts: 0, players: [], warnings: [],
   }
 
   // Header lines are the ones before the first numbered player.
-  const firstPlayer = lines.findIndex((l) => ROSTER.test(l) && /🎾/u.test(l))
+  const firstPlayer = lines.findIndex((l) => ROSTER.test(l))
   const head = (firstPlayer >= 0 ? lines.slice(0, firstPlayer) : lines).map((l) => l.trim()).filter(Boolean)
   const body = firstPlayer >= 0 ? lines.slice(firstPlayer) : []
 

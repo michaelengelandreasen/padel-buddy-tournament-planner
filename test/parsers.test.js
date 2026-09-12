@@ -347,3 +347,24 @@ test('pairs: seats become partners both ways, and unknown or repeated names are 
   assert.equal(partner.get('Bea'), '')
   assert.equal(partner.get('Zé'), '')          // Ana was already seated; Ghost is nobody
 })
+
+test('import: a desktop copy with WhatsApp prefixes, and a roster without the racket', () => {
+  const copied = [
+    '[12/09/26, 10:15:23] Mike: 📅 13/09/26 - Domingo',
+    '[12/09/26, 10:15:23] Mike: ⏱️ 09:30- 11:30',
+    '[12/09/26, 10:15:23] Mike: M9 - MAIA',
+    '[12/09/26, 10:15:23] Mike: 1🎾 Rui Basto',
+    '[12/09/26, 10:15:23] Mike: 2🎾 Ana',
+  ].join('\r\n')
+  const r = parseBoard(copied, { now: NOW })
+  assert.equal(r.date, '2026-09-13')
+  assert.equal(r.time, '09:30')
+  assert.equal(r.duration_min, 120)
+  assert.equal(r.location, 'M9 - Maia')
+  assert.deepEqual(r.players.map((p) => p.name), ['Rui Basto', 'Ana'])
+
+  const plain = parseBoard('📅 13/09/26\n⏱ 09:30-11:30\n1. Rui Basto\n2 - Ana\n3) Zé\n4. Bea\n5. Tó', { now: NOW })
+  assert.deepEqual(plain.players.map((p) => p.name), ['Rui Basto', 'Ana', 'Zé', 'Bea', 'Tó'])
+  assert.equal(plain.courts, 2)
+  assert.equal(plain.location, '')
+})
