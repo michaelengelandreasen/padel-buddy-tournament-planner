@@ -356,6 +356,13 @@ details.preview summary::-webkit-details-marker{display:none}
 details.preview summary .i{transition:transform .15s ease-out}
 details.preview[open] summary .i{transform:rotate(90deg)}
 details.preview pre{margin-top:8px}
+.readout{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:0 0 14px;padding:12px 14px;
+  border-radius:12px;background:var(--surface-2);border:1px solid var(--line)}
+.readout strong{flex:0 0 auto}
+.readout .muted,.readout .err{flex:1 1 100%;margin:0;font-size:.9rem}
+.readout .roster{flex:1 1 100%;columns:2;column-gap:24px;margin:4px 0 0;padding-left:1.4em;font-size:.95rem}
+.readout .roster li{break-inside:avoid;padding:2px 0}
+@media (max-width:480px){.readout .roster{columns:1}}
 
 /*
  * On a phone the nav becomes a tab bar under the thumb. Four labelled items no
@@ -410,8 +417,12 @@ const LEVEL_JS = `
   var c=document.getElementById('level_category'),g=document.getElementById('level_grade'),
       o=document.getElementById('level_preview');
   if(!c||!g||!o)return;
+  var fallback=o.textContent;
   function paint(){
     var gr=g.options[g.selectedIndex];
+    // No grade yet (an import that could not read the level): keep the plain
+    // hint rather than painting "M- — Men's, . ." out of empty parts.
+    if(!g.value){o.textContent=fallback;return}
     o.textContent=c.value+'-'+g.value+' — '+c.options[c.selectedIndex].dataset.label+
       ', '+gr.dataset.label.toLowerCase()+'. '+gr.dataset.blurb+'.';
   }
@@ -568,21 +579,44 @@ export function settings({ club, courts, t }) {
     ], 'club')}`, { nav: navFor('/settings', t), t, here: '/settings', tab: 'club' })
 }
 
-export function tournamentsPage({ tournaments, form = {}, error = '', t }) {
+export function tournamentsPage({ tournaments, form = {}, error = '', imported = null, pasted = '', t }) {
   const today = todayISO()
   const cat = form.level_category || 'MX'
-  const grade = String(form.level_grade || 4)
+  const grade = String(form.level_grade || (imported ? '' : 4))
   const catOpts = categories(t).map((c) => `<option value="${c.code}" data-label="${esc(c.label)}"
     ${c.code === cat ? 'selected' : ''}>${esc(c.label)} (${c.code})</option>`).join('')
-  const gradeOpts = grades(t).map((g) => `<option value="${g.grade}" data-label="${esc(g.label)}"
+  const gradeOpts = (grade ? '' : `<option value="" data-label="" data-blurb="" selected disabled>—</option>`)
+    + grades(t).map((g) => `<option value="${g.grade}" data-label="${esc(g.label)}"
     data-blurb="${esc(g.blurb)}" ${String(g.grade) === grade ? 'selected' : ''}
     >${g.grade} — ${esc(g.label)}</option>`).join('')
   const cmd = '!tournament non-stop level MX-4 date 2026-09-05 11:00 courts 3 duration 120'
 
+  // What the import understood, shown beside the fields it filled in so the
+  // host checks a summary rather than re-reading sixteen lines.
+  const pairs = imported ? imported.players.filter((p) => p.partner).length / 2 : 0
+  const readout = imported ? `
+    <div class="readout">
+      <strong>${esc(t('importFound'))}</strong>
+      <span class="pill on">${esc(t('importPlayers', { n: imported.players.length }))}</span>
+      ${pairs ? `<span class="pill on">${esc(t('importPairs', { n: pairs }))}</span>` : ''}
+      ${imported.location ? `<span class="muted">${esc(t('importLocation', { place: imported.location }))}</span>` : ''}
+      ${imported.warnings.map((w) => `<p class="err">${ic('alert')} ${esc(w)}</p>`).join('')}
+      ${imported.players.length ? `<ol class="roster">${imported.players.map((p) =>
+        `<li>${esc(p.name)}${p.partner ? ` <span class="muted">&amp; ${esc(p.partner)}</span>` : ''}</li>`).join('')}</ol>` : ''}
+    </div>` : ''
+
   return page(t('newTournament'), `
     <h1>${esc(t('newTournament'))}</h1>
+    <form class="card" method="post" action="/tournaments/import">
+      <h3>${ic('chat')}${esc(t('importTitle'))}</h3>
+      <p class="muted">${esc(t('importHelp'))}</p>
+      <textarea name="text" rows="8" placeholder="${esc(t('importPlaceholder'))}" required>${esc(pasted)}</textarea>
+      <div class="actions"><button class="${imported ? 'btn ghost' : ''}">${ic('board')}${esc(t('importRead'))}</button></div>
+    </form>
     <form class="card" method="post" action="/tournaments">
       ${error ? `<p class="err">${ic('alert')} ${esc(error)}</p>` : ''}
+      ${readout}
+      ${form.roster ? `<input type="hidden" name="roster" value="${esc(form.roster)}">` : ''}
       <div class="row">
         <div><label for="level_category">${esc(t('category'))}</label>
           <select id="level_category" name="level_category">${catOpts}</select></div>
@@ -609,7 +643,8 @@ export function tournamentsPage({ tournaments, form = {}, error = '', t }) {
           <input id="round_min" name="round_min" type="number" min="5" max="120"
             value="${esc(form.round_min || 12)}"></div>
       </div>
-      <div class="actions"><button>${ic('plus')}${esc(t('create'))}</button></div>
+      <div class="actions"><button>${ic('plus')}${esc(imported && imported.players.length
+        ? t('importCreateWith', { n: imported.players.length }) : t('create'))}</button></div>
       <p class="note" style="margin-top:16px">${
         esc(t('botDoesTheSame', { cmd: '\u0000' })).replace('\u0000',
           `<span class="mono">${esc(cmd)}</span>`)}</p>
@@ -637,6 +672,10 @@ export function flashLine(flash, t) {
   if (flash.tg === 'edit') bits.push(`<strong>${esc(t('sentTelegramEdited'))}</strong>`)
   if (flash.tg === 'err') bits.push(`<strong>${esc(t('sendFailed', { error: flash.err || '' }))}</strong>`)
   if (flash.tg === 'wait') bits.push(`<strong>${esc(t('telegramWaiting'))}</strong>`)
+  if (flash.signed) {
+    return `<div class="flash" role="status"><strong>${
+      esc(t('importedSignups', { n: Number(flash.signed) || 0 }))}</strong></div>`
+  }
   if (flash.what === 'scores') {
     const n = Number(flash.n) || 0
     return `<div class="flash" role="status"><strong>${

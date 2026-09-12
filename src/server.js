@@ -1,7 +1,7 @@
 import { createServer } from 'node:http'
 import { timingSafeEqual } from 'node:crypto'
 import {
-  addCourt, clubLanguage, createTournament, deleteCourt, getClub, getTournament,
+  addCourt, addSignup, clubLanguage, createTournament, deleteCourt, getClub, getTournament,
   listCourts, listMatches, listSignups, listTournaments, recordScore, rememberTelegramChat,
   replaceMatches, saveClub, telegramChat,
 } from './db.js'
@@ -10,6 +10,7 @@ import { handle, roundMessage, signupMessage, standingsMessage } from './bot.js'
 import { parseWhen, validateWhen } from './dates.js'
 import { currentRound, roundComplete, roundsOf } from './rounds.js'
 import { parseLevel } from './levels.js'
+import { parseBoard } from './import.js'
 import { LANGUAGES, isLanguage, translator } from './i18n.js'
 import { bus, listen } from './messaging/transport.js'
 import { normalizeCommand } from './messaging/telegram.js'
@@ -112,6 +113,22 @@ const routes = [
 
   ['GET', /^\/tournaments$/, (_m, _r, t) =>
     ({ html: V.tournamentsPage({ tournaments: listTournaments(), t }) })],
+  // Paste the club's own message; the form fills itself in for the host to check.
+  ['POST', /^\/tournaments\/import$/, async (_m, req, t) => {
+    const f = await body(req)
+    const read = parseBoard(f.text, { lang: t.lang })
+    const level = parseLevel(read.level || read.levelRaw, { lang: t.lang })
+    const form = {
+      level_category: level.ok ? level.category : (read.levelRaw.split('-')[0] || 'MX'),
+      level_grade: level.ok ? String(level.grade) : '',
+      play_date: read.date, play_time: read.time,
+      courts: read.courts, duration_min: read.duration_min, round_min: 12,
+      roster: JSON.stringify(read.players.map(({ name, partner }) => ({ name, partner }))),
+    }
+    return { html: V.tournamentsPage({ tournaments: listTournaments(), form, imported: read,
+      pasted: f.text, t }) }
+  }],
+
   ['POST', /^\/tournaments$/, async (_m, req, t) => {
     const f = await body(req)
     // The form offers only valid choices, so this is not about the browser — it
@@ -141,7 +158,22 @@ const routes = [
       duration_min: num(f.duration_min, 90, 10, 600),
       round_min: num(f.round_min, 12, 5, 120),
     })
-    return { to: `/t/${created.id}` }
+    // A roster that came with an imported message signs everyone up at once.
+    // Names are re-checked here — the field is a hidden input, and hidden
+    // inputs are whatever the browser was told to send.
+    let signed = 0
+    try {
+      const roster = JSON.parse(f.roster || '[]')
+      if (Array.isArray(roster)) {
+        for (const p of roster.slice(0, 64)) {
+          const name = String(p?.name || '').replace(/\s+/g, ' ').trim().slice(0, 80)
+          if (!name) continue
+          addSignup(created.id, { name, gender: '', partner: String(p?.partner || '').slice(0, 80), wa_id: '' })
+          signed++
+        }
+      }
+    } catch { /* not JSON: nothing to sign up */ }
+    return { to: `/t/${created.id}${signed ? `?signed=${signed}` : ''}#board` }
   }],
 
   ['GET', /^\/t\/(\d+)$/, (m, req, t) => {
@@ -153,7 +185,7 @@ const routes = [
     const flash = q.get('posted') ? {
       what: q.get('posted'), tg: q.get('tg') || '', err: (q.get('err') || '').slice(0, 120),
       n: q.get('n') || '',
-    } : null
+    } : q.get('signed') ? { what: 'board', signed: q.get('signed') } : null
     return { html: V.tournamentPage({ ...v, courts: listCourts(), flash,
       message: signupMessage(v.tournament, '', t.lang),
       // What the group would see right now, so a host can read it before

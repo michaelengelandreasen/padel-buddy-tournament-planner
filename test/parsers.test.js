@@ -267,3 +267,48 @@ test('telegram: slash commands, with or without the bot name, are the club synta
   assert.equal(normalizeCommand('!in Ana F', 'padelbot'), '!in Ana F')
   assert.equal(normalizeCommand('hello', 'padelbot'), 'hello')
 })
+
+// ---- importing the club's own message ----
+import { readFileSync } from 'node:fs'
+import { parseBoard, tidyName } from '../src/import.js'
+
+const MAIA = readFileSync(new URL('./fixtures/maia.txt', import.meta.url), 'utf8')
+const NOW = new Date('2026-09-12T10:00:00')
+
+test('import: the club message yields date, window, level, venue and roster', () => {
+  const r = parseBoard(MAIA, { now: NOW })
+  assert.equal(r.date, '2026-09-13')
+  assert.equal(r.time, '09:30')
+  assert.equal(r.duration_min, 120)
+  assert.equal(r.end, '11:30')
+  assert.equal(r.levelRaw, 'M-9')
+  assert.equal(r.level, '')                       // not on the ladder: left for the host
+  assert.equal(r.location, 'Maia')
+  assert.equal(r.players.length, 16)
+  assert.equal(r.courts, 4)
+})
+
+test('import: names are tidied and "(dupla)" pairs a line with the one above', () => {
+  const r = parseBoard(MAIA, { now: NOW })
+  const by = Object.fromEntries(r.players.map((p) => [p.n, p]))
+  assert.equal(by[8].name, 'Pedro')
+  assert.equal(by[9].name, 'Rafa Campos')
+  assert.equal(by[14].name, 'Tiago Delgado')
+  assert.equal(by[14].partner, 'Pedro Delgado')
+  assert.equal(by[13].partner, 'Tiago Delgado')
+  assert.equal(by[15].partner, '')
+  assert.equal(tidyName('maria de sousa'), 'Maria de sousa'.replace('sousa', 'Sousa'))
+  assert.equal(tidyName('McDonald'), 'McDonald')
+})
+
+test('import: a readable level is accepted, a missing roster is said out loud', () => {
+  const r = parseBoard('📅 20/09/26\n⏱ 19h00 - 20h30\nMX4 - Padel Tribe\n1🎾 Ana\n2🎾 Rui', { now: NOW })
+  assert.equal(r.level, 'MX-4')
+  assert.equal(r.location, 'Padel Tribe')
+  assert.equal(r.duration_min, 90)
+  assert.equal(r.courts, 1)
+  const empty = parseBoard('hello', { now: NOW })
+  assert.equal(empty.players.length, 0)
+  assert.ok(empty.warnings.some((w) => /numbered players/.test(w)))
+  assert.ok(empty.warnings.some((w) => /No date/.test(w)))
+})

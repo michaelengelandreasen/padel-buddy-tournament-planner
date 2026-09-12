@@ -114,6 +114,18 @@ The **IMPORTANT** block is the club's drop-out policy, edited in Settings and
 stored in both languages so switching the club over doesn't silently lose the
 club's own wording.
 
+## Importing the club's own message
+
+The club already posts each night in a fixed shape, and the host was retyping
+it. **Tournaments → Import a WhatsApp message**: paste it, press *Read the
+message*, and the new-tournament form fills itself in — date (`13/09/26`),
+start and duration from the time window (`09:30- 11:30` → 120 min), level,
+courts (players ÷ 4), and the numbered roster with names tidied (`rafa Campos`
+→ Rafa Campos) and `(dupla)` lines paired with the line above. What it could
+not read is said per field and left for the host; *Create with 16 players*
+makes the tournament and signs everyone up in one go. `src/import.js`, tested
+against the real message in `test/fixtures/maia.txt`.
+
 ## Language
 
 English or Portuguese, chosen with the `EN`/`PT` toggle in the header or in

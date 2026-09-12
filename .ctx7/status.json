@@ -56,9 +56,21 @@
     {
       "title": "Tabbed tournament + settings pages, Save all scores, Padel Buddy branding",
       "state": "done"
+    },
+    {
+      "title": "Import a tournament from the club's WhatsApp message (date, window, level, roster, pairs)",
+      "state": "done"
+    },
+    {
+      "title": "HTTP Basic login (padel/buddy) on both URLs",
+      "state": "done"
     }
   ],
   "activity": [
+    {
+      "at": "2026-09-12T21:39:48.092799Z",
+      "text": "Paste-and-review import of the club message: parser in src/import.js reads date, time window → duration, level, venue, numbered roster with (dupla) pairs; the new-tournament form fills in, Create signs everyone up. 27/27 tests."
+    },
     {
       "at": "2026-09-09T10:19:13.019022Z",
       "text": "Console restyled to Padel Buddy (palette + mark). Tournament page is four tabs (Board/Teams/Rounds/Table), Rounds is one form with Save all + per-match Save; empty boxes no longer coerce to 0-0. Settings tabbed too."
@@ -83,7 +95,7 @@
   "status": "active",
   "headline": "Where do I go next — round messages in the groups, Telegram live",
   "summary": "The club's nights ran on a printed sheet and a PDF. Now the group gets one message per round saying who is on which court and where every pair goes next, posted automatically when the round before it is scored; !where Mike answers one person. Telegram posts by itself (bot token is the whole setup, the group is learned from the first command); WhatsApp stays a paste-from-outbox draft because it has no group API.",
-  "next": "Decide how to gate the public console: a Cloudflare Access policy on the hostname, or a password in the app",
+  "next": "Confirm whether the club's level scale really runs to 9 (the message said \"M9\"); the ladder stops at 7 and the import leaves the level for the host to pick",
   "url": "https://padeladmin.webperfology.com",
-  "updated": "2026-09-09T10:19:13.019061Z"
+  "updated": "2026-09-12T21:39:48.092799Z"
 }
