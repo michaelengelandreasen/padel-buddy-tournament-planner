@@ -278,6 +278,24 @@ export function updateVenue(id, v) {
 }
 export const deleteVenue = (id) => run('DELETE FROM venues WHERE id = ?', id)
 
+/**
+ * Several venues from pasted lines: `Name | https://maps…` or just `Name`.
+ * A name already saved is skipped rather than doubled. Returns how many landed.
+ */
+export function addVenuesFromText(text) {
+  const have = new Set(listVenues().map((v) => v.name.toLowerCase()))
+  let n = 0
+  for (const raw of String(text || '').split('\n')) {
+    const [name, ...rest] = raw.split('|').map((x) => x.trim())
+    if (!name) continue
+    const link = rest.find((x) => /^https?:\/\//.test(x)) || ''
+    const address = rest.filter((x) => x && x !== link).join(', ')
+    if (have.has(name.toLowerCase())) continue
+    if (addVenue({ name, maps_url: link, address })) { have.add(name.toLowerCase()); n++ }
+  }
+  return n
+}
+
 /** Accents and case aside — "m9 - maia" finds "M9 Maia". */
 const fold = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
   .toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()

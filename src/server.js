@@ -1,7 +1,8 @@
 import { createServer } from 'node:http'
 import { timingSafeEqual } from 'node:crypto'
 import {
-  activeTournament, addCourt, addSignup, addTournamentCourt, addVenue, clubLanguage, createTournament,
+  activeTournament, addCourt, addSignup, addTournamentCourt, addVenue, addVenuesFromText, clubLanguage,
+  createTournament,
   deleteCourt, deleteTournament, playingTournament, setActiveTournament,
   deleteTournamentCourt, deleteVenue, listTournamentCourts, renameCourts, renameTournamentCourt,
   renameTournamentCourts,
@@ -113,9 +114,16 @@ const routes = [
     return { to: `/t/${m[1]}` }
   }],
 
-  ['GET', /^\/settings$/, (_m, _r, t) =>
-    ({ html: V.settings({ club: getClub(), courts: listCourts(), venues: listVenues(), t }) })],
+  ['GET', /^\/settings$/, (_m, req, t) => {
+    const q = new URL(req.url, 'http://x').searchParams
+    return { html: V.settings({ club: getClub(), courts: listCourts(), venues: listVenues(), t,
+      notice: q.has('added') ? t('addedVenues', { n: Number(q.get('added')) || 0 }) : '' }) }
+  }],
   ['POST', /^\/venues$/, async (_m, req) => { addVenue(await body(req)); return { to: '/settings#venues' } }],
+  ['POST', /^\/venues\/bulk$/, async (_m, req) => {
+    const f = await body(req)
+    return { to: `/settings?added=${addVenuesFromText(f.text)}#venues` }
+  }],
   ['POST', /^\/venues\/(\d+)$/, async (m, req) => { updateVenue(Number(m[1]), await body(req)); return { to: '/settings#venues' } }],
   ['POST', /^\/venues\/(\d+)\/delete$/, (m) => { deleteVenue(Number(m[1])); return { to: '/settings#venues' } }],
   // Every settings form says which tab it lives on, so a save lands back there.

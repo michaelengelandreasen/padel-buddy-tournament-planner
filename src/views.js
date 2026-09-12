@@ -794,7 +794,7 @@ export function overview({ club, tournaments, courts, live, pinned = 0, night = 
     </div>`, { nav: navFor('/', t), t, here: '/' })
 }
 
-export function settings({ club, courts, venues = [], t }) {
+export function settings({ club, courts, venues = [], notice = '', t }) {
   const clubForm = `
     <form class="card" method="post" action="/settings">
       <h3>${ic('flag')}${esc(t('club'))}</h3>
@@ -835,9 +835,16 @@ export function settings({ club, courts, venues = [], t }) {
           <button class="btn danger" formaction="/venues/${x.id}/delete" formnovalidate>${ic('trash')}${esc(t('remove'))}</button>
         </div>
       </form>`).join('') || `<p class="muted">${esc(t('noVenuesYet'))}</p>`}</div>
+      ${notice ? `<div class="flash" role="status"><strong>${esc(notice)}</strong></div>` : ''}
       <form class="venue add" method="post" action="/venues">
         <h4>${esc(t('addVenue'))}</h4>
         ${venueFields({}, 'vnew')}
+        <div class="actions"><button>${ic('plus')}${esc(t('add'))}</button></div>
+      </form>
+      <form class="venue add" method="post" action="/venues/bulk">
+        <h4>${esc(t('addVenues'))}</h4>
+        <p class="muted">${esc(t('addVenuesHelp'))}</p>
+        <textarea name="text" rows="5" required placeholder="M9 | https://maps.app.goo.gl/…&#10;Padel Norte&#10;Clube de Ténis do Porto | https://maps.app.goo.gl/…"></textarea>
         <div class="actions"><button>${ic('plus')}${esc(t('add'))}</button></div>
       </form>
     </div>`

@@ -154,7 +154,9 @@ link — editable in place. A night at one of them is announced with that name
 and that map link instead of the club's. The new-tournament form offers the
 saved names on its Venue field, and a pasted message that names one (`M9 -
 MAIA` when a venue called M9 is saved) fills it in by itself; accents and case
-don't matter, and the longest saved name wins.
+don't matter, and the longest saved name wins. Several venues can be added at
+once from pasted lines — `Name | map link`, or just a name; names already saved
+are skipped.
 
 ## The table
 
