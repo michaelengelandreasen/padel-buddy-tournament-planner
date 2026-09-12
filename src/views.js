@@ -927,7 +927,7 @@ export function flashLine(flash, t) {
   }
   if (flash.what === 'pairs') {
     return `<div class="flash" role="status"><strong>${
-      esc(t('savedPairs', { n: Number(flash.n) || 0 }))}</strong></div>`
+      esc(t('savedPairs', { n: Number(flash.n) || 0 }))}</strong>${flash.tg === 'redrawn' ? `<span>${esc(t('redrawn'))}</span>` : ''}</div>`
   }
   if (flash.what === 'scores') {
     const n = Number(flash.n) || 0
@@ -983,10 +983,12 @@ export function tournamentPage({
     verb: t(offLevel.length === 1 ? 'isNotAre' : 'areNotIs'),
     names: offLevel.map((x) => x.name).join(', '),
   }))}</p>` : ''
-  const pairsBoard = matches.length ? '' : `
-    <form class="card" method="post" action="/t/${tour.id}/pairs">
+  const scored = matches.some((m) => m.score_a != null || m.score_b != null)
+  const pairsBoard = `
+    <form class="card" method="post" action="/t/${tour.id}/pairs"${matches.length && scored
+      ? ` onsubmit="return confirm(${JSON.stringify(t('pairsRedrawConfirm')).replace(/"/g, '&quot;')})"` : ''}>
       <h3>${ic('users')}${esc(t('pairsTitle'))} <span class="pill on">${esc(t('importPairs', { n: teams.length }))}</span></h3>
-      <p class="muted">${esc(t('pairsHelp'))}</p>
+      <p class="muted">${esc(t('pairsHelp'))}${matches.length ? ` ${esc(t('pairsLocked'))}` : ''}</p>
       ${flashFor('pairs')}
       ${mixedNote}
       <div id="pairs">
@@ -1000,16 +1002,14 @@ export function tournamentPage({
       </div>
       <input type="hidden" name="seats" value="[]">
       <div class="pairsbar">
-        <button>${ic('check')}${esc(t('save'))}</button>
+        <button>${ic(matches.length ? 'shuffle' : 'check')}${esc(matches.length ? t('saveAndRedraw') : t('save'))}</button>
         <button type="button" class="btn ghost" data-act="rest">${ic('shuffle')}${esc(t('pairUpRest'))}</button>
         <button type="button" class="btn ghost" data-act="all">${ic('repeat')}${esc(t('reshuffleAll'))}</button>
       </div>
     </form>`
 
-  const teamsPanel = pairsBoard || `
-    <div class="card"><h3>${ic('users')}${esc(t('teams'))} (${teams.length})
-      <span class="muted" style="font-weight:400;font-size:.9rem">— ${esc(t('pairsLocked'))}</span></h3>
-      ${mixedNote}
+  const teamsPanel = pairsBoard + (teams.length ? `
+    <div class="card"><h3>${ic('users')}${esc(t('teams'))} (${teams.length})</h3>
       ${wrapTable(`<tbody>${teams.map((x, i) => `<tr><td class="pos">${i + 1}</td>
         <td class="lead">${esc(x.name)}</td>
         <td>${x.mixed ? `<span class="pill on">${esc(t('mixed'))}</span>` : ''}</td></tr>`).join('')
@@ -1018,7 +1018,7 @@ export function tournamentPage({
         ${wrapTable(`<tbody>${waiting.map((p) => `<tr><td class="lead">${esc(p.name)}</td>
           <td class="muted full">${esc(p.partner ? t('waitingOn', { name: p.partner })
             : t('noPartner'))}</td></tr>`).join('')}</tbody>`, 'stack')}` : ''}
-    </div>`
+    </div>` : '')
 
   // Before the draw the rounds tab is the draw itself; after it, the scores
   // are the primary task and the round message is one collapsed preview above

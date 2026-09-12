@@ -349,7 +349,6 @@ const routes = [
     const id = Number(m[1])
     const tour = getTournament(id)
     if (!tour) return { html: V.page('404', '<h1>404</h1>', { t }), code: 404 }
-    if (listMatches(id).length) return { to: `/t/${id}#teams` }
     const f = await body(req)
     let seats = []
     try { seats = JSON.parse(f.seats || '[]') } catch { seats = [] }
@@ -362,7 +361,18 @@ const routes = [
       if (want !== x.partner) setPartner(id, x.name, want)
       if (want) pairs++
     }
-    return { to: `/t/${id}?posted=pairs&n=${pairs / 2}#teams` }
+    // The schedule is drawn from the pairs; once it exists, changed pairs mean
+    // a redrawn schedule. Not re-announced to the groups — the host posts the
+    // new round 1 when the night actually starts.
+    let redrawn = false
+    if (listMatches(id).length) {
+      const v = view(id)
+      const { matches } = schedule(v.teams, v.courts.map((c) => c.label),
+        { durationMin: tour.duration_min, roundMin: tour.round_min })
+      replaceMatches(id, matches)
+      redrawn = true
+    }
+    return { to: `/t/${id}?posted=pairs&n=${pairs / 2}${redrawn ? '&tg=redrawn' : ''}#teams` }
   }],
 
   // Post on demand, for a host who wants the board or a round in the group now.

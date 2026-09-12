@@ -172,8 +172,9 @@ or tap one player and then another to swap them; Enter/Space do the same from
 the keyboard. *Pair up the rest at random* deals the tray into the empty seats
 (woman/man on a mixed level where genders are known); *Reshuffle everyone*
 starts over. Nothing is written until *Save pairs*, which sets each player's
-partner both ways (`src/pairs.js`). Once the schedule is drawn the pairs are the
-schedule, and the board becomes a list.
+partner both ways (`src/pairs.js`). The board stays available after the draw:
+the schedule is drawn from the pairs, so *Save and redraw* replaces it — it asks
+first once scores have been entered, since they go with the old schedule.
 
 ## Language
 

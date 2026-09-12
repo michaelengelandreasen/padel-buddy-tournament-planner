@@ -256,7 +256,10 @@ const EN = {
   unpaired: 'Unpaired',
   pairsHelp: 'Drag a player onto a seat, or tap one player and then another to swap them. '
     + 'Nothing is written until you save.',
-  pairsLocked: 'Pairs are fixed once the schedule is drawn.',
+  pairsLocked: 'The schedule is drawn from these pairs. Saving a change here redraws it.',
+  pairsRedrawConfirm: 'Save these pairs and redraw the schedule? Scores entered so far are lost.',
+  saveAndRedraw: 'Save and redraw',
+  redrawn: 'Pairs saved and the schedule redrawn.',
   pairUpRest: 'Pair up the rest at random',
   reshuffleAll: 'Reshuffle everyone',
   savedPairs: 'Saved {n} pairs.',
@@ -544,7 +547,10 @@ const PT = {
   unpaired: 'Sem dupla',
   pairsHelp: 'Arrasta um jogador para um lugar, ou toca num jogador e depois noutro para os trocar. '
     + 'Nada é gravado até guardares.',
-  pairsLocked: 'As duplas ficam fixas depois de o calendário ser sorteado.',
+  pairsLocked: 'O calendário foi sorteado a partir destas duplas. Guardar uma alteração aqui sorteia-o de novo.',
+  pairsRedrawConfirm: 'Guardar estas duplas e sortear o calendário de novo? Os resultados já introduzidos perdem-se.',
+  saveAndRedraw: 'Guardar e sortear de novo',
+  redrawn: 'Duplas guardadas e calendário sorteado de novo.',
   pairUpRest: 'Formar as restantes ao acaso',
   reshuffleAll: 'Baralhar toda a gente',
   savedPairs: 'Guardadas {n} duplas.',
