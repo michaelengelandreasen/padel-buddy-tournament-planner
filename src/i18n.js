@@ -263,6 +263,9 @@ const EN = {
   seatEmpty: 'empty seat',
   courtName: 'Court name',
   courtN: 'Court {n}',
+  deleteTournament: 'Delete this tournament',
+  deleteConfirm: 'Delete {name}? Sign-ups, the schedule and every score go with it.',
+  deletedTournament: 'Tournament deleted.',
   allRounds: 'All rounds',
   allRoundsHelp: 'Every round in one message — the whole night on one screen, the way the printed '
     + 'sheet was. Offered up to four courts, where it still fits a phone.',
@@ -542,6 +545,9 @@ const PT = {
   seatEmpty: 'lugar vazio',
   courtName: 'Nome do campo',
   courtN: 'Campo {n}',
+  deleteTournament: 'Apagar este torneio',
+  deleteConfirm: 'Apagar {name}? As inscrições, o calendário e todos os resultados vão com ele.',
+  deletedTournament: 'Torneio apagado.',
   allRounds: 'Todas as rondas',
   allRoundsHelp: 'Todas as rondas numa só mensagem — a noite inteira num ecrã, como era a folha '
     + 'impressa. Disponível até quatro campos, onde ainda cabe num telemóvel.',

@@ -128,6 +128,12 @@ not read is said per field and left for the host; *Create with 16 players*
 makes the tournament and signs everyone up in one go. `src/import.js`, tested
 against the real message in `test/fixtures/maia.txt`.
 
+## Deleting a tournament
+
+At the bottom of a tournament's Board tab. It asks first, and it is the one
+thing here with no undo: sign-ups, courts, schedule, scores and the pinned
+board's memory go with it.
+
 ## Courts belong to the night
 
 Which courts are booked, and what they are called, changes from night to

@@ -513,6 +513,7 @@ details.fold summary h3{margin:0;flex:1 1 auto}
 details.fold summary>.i{color:var(--muted);transition:transform .15s ease-out}
 details.fold[open] summary>.i{transform:rotate(90deg)}
 details.fold[open] summary{margin-bottom:8px}
+.danger-zone{display:flex;justify-content:flex-end;margin:4px 0 8px}
 .outmsg{margin-bottom:18px}
 .outmsg .actions{margin-top:8px;align-items:center}
 /* Standings: a real grid at every width. */
@@ -803,7 +804,7 @@ export function settings({ club, courts, venues = [], t }) {
     ], 'club')}`, { nav: navFor('/settings', t), t, here: '/settings', tab: 'club' })
 }
 
-export function tournamentsPage({ tournaments, venues = [], form = {}, error = '', imported = null, pasted = '', t }) {
+export function tournamentsPage({ tournaments, venues = [], form = {}, error = '', imported = null, pasted = '', notice = '', t }) {
   const today = todayISO()
   const cat = form.level_category || 'MX'
   const grade = String(form.level_grade || (imported ? '' : 4))
@@ -831,6 +832,7 @@ export function tournamentsPage({ tournaments, venues = [], form = {}, error = '
 
   return page(t('newTournament'), `
     <h1>${esc(t('newTournament'))}</h1>
+    ${notice ? `<div class="flash" role="status"><strong>${esc(notice)}</strong></div>` : ''}
     <form class="card" method="post" action="/tournaments/import">
       <h3>${ic('chat')}${esc(t('importTitle'))}</h3>
       <p class="muted">${esc(t('importHelp'))}</p>
@@ -944,7 +946,11 @@ export function tournamentPage({
         ${copyBtn('msg-board', t)}
         <a class="btn ghost" href="/groups">${ic('inbox')}${esc(t('outbox'))}</a>
       </div>
-    </div>`
+    </div>
+    <form class="danger-zone" method="post" action="/t/${tour.id}/delete"
+      onsubmit="return confirm(${JSON.stringify(t('deleteConfirm', { name: `${tour.level || ''} ${humanWhen(tour, { lang: t.lang })}`.trim() })).replace(/"/g, '&quot;')})">
+      <button class="btn danger">${ic('trash')}${esc(t('deleteTournament'))}</button>
+    </form>`
 
   // Before the draw the Teams tab is the pairs board; after it, the list. A
   // seat per two players, one extra for an odd count so nobody is off the board.

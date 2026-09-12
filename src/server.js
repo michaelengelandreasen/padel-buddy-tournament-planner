@@ -2,6 +2,7 @@ import { createServer } from 'node:http'
 import { timingSafeEqual } from 'node:crypto'
 import {
   addCourt, addSignup, addTournamentCourt, addVenue, clubLanguage, createTournament, deleteCourt,
+  deleteTournament,
   deleteTournamentCourt, deleteVenue, listTournamentCourts, renameCourts, renameTournamentCourt,
   renameTournamentCourts,
   findVenue, getClub, getTournament, listVenues, updateVenue,
@@ -146,8 +147,15 @@ const routes = [
   }],
   ['POST', /^\/courts\/(\d+)\/delete$/, (m) => { deleteCourt(Number(m[1])); return { to: '/settings#courts' } }],
 
-  ['GET', /^\/tournaments$/, (_m, _r, t) =>
-    ({ html: V.tournamentsPage({ tournaments: listTournaments(), venues: listVenues(), t }) })],
+  ['GET', /^\/tournaments$/, (_m, req, t) =>
+    ({ html: V.tournamentsPage({ tournaments: listTournaments(), venues: listVenues(), t,
+      notice: new URL(req.url, 'http://x').searchParams.has('deleted') ? t('deletedTournament') : '' }) })],
+  // Gone means gone: sign-ups, courts, schedule, scores and the pinned board's
+  // memory. The page asks first; this is the only thing here with no undo.
+  ['POST', /^\/t\/(\d+)\/delete$/, (m) => {
+    if (getTournament(Number(m[1]))) deleteTournament(Number(m[1]))
+    return { to: '/tournaments?deleted=1' }
+  }],
   // Paste the club's own message; the form fills itself in for the host to check.
   ['POST', /^\/tournaments\/import$/, async (_m, req, t) => {
     const f = await body(req)
