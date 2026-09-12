@@ -330,7 +330,7 @@ export function roundMessage(tour, round, lang = clubLanguage()) {
   for (const g of plan.games) {
     const scored = g.score_a != null && g.score_b != null
     const tail = (n) => (scored ? ` — ${n}` : '')
-    lines.push('', b(courtName(g.court, s)))
+    lines.push('', b(courtName(g.court, s, { always: true })))
     lines.push(`${g.team_a}${tail(g.score_a)}`)
     lines.push(`🆚 ${g.team_b}${tail(g.score_b)}`)
   }
@@ -352,7 +352,7 @@ export function roundMessage(tour, round, lang = clubLanguage()) {
         || String(a.court).localeCompare(String(x.court), undefined, { numeric: true })
         || a.name.localeCompare(x.name))
     for (const g of goes) {
-      lines.push(g.court ? `${courtName(g.court, s)} — ${g.name}` : `☕ ${g.name}`)
+      lines.push(g.court ? `${courtName(g.court, s, { always: true })} — ${g.name}` : `☕ ${g.name}`)
     }
   }
 
@@ -385,7 +385,7 @@ export function whereMessage(tour, query, lang = clubLanguage()) {
   const lines = [`📍 ${b(team)}`]
   const when = clockWindow(tour, plan, lang)
   lines.push(now
-    ? `🎾 ${s('nowShort')} · ${b(courtName(now.court, s))}${when ? ` (${when})` : ''}`
+    ? `🎾 ${s('nowShort')} · ${b(courtName(now.court, s, { always: true }))}${when ? ` (${when})` : ''}`
     : `☕ ${s('restingThisRound')}${when ? ` (${when})` : ''}`)
   if (now) lines.push(`🆚 ${opponentIn(now, team)}`)
 
@@ -395,7 +395,7 @@ export function whereMessage(tour, query, lang = clubLanguage()) {
     const nextCourt = courtsByTeam(matches, round + 1).get(team)
     const at = clock(plan.end, { lang })
     lines.push(nextCourt
-      ? `⏭ ${s('nextGoTo', { court: courtName(nextCourt, s), at: at || '—' })}`
+      ? `⏭ ${s('nextGoTo', { court: courtName(nextCourt, s, { always: true }), at: at || '—' })}`
       : `⏭ ${s('nextYouRest', { at: at || '—' })}`)
   }
   return lines.join('\n')

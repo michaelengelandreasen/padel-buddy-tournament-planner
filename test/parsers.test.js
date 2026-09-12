@@ -206,7 +206,7 @@ test('board: a level mismatch is shown, not smoothed over', () => {
 
 // ---- the night: where do I go next ----
 import {
-  courtsByTeam, currentRound, roundComplete, roundPlan, roundWindow, teamsNamed,
+  courtName, courtsByTeam, currentRound, roundComplete, roundPlan, roundWindow, teamsNamed,
 } from '../src/rounds.js'
 import { normalizeCommand, toHtml } from '../src/messaging/markup.js'
 
@@ -378,4 +378,13 @@ test('import: the time line in the ways people write it', () => {
   assert.equal(at('🕒 9-11h'), '09:00 120')
   assert.equal(at('⏱ 7pm - 9pm'), '19:00 120')
   assert.equal(at('⏱ 19:00 - 20:30'), '19:00 90')
+})
+
+test('courts: a bare number gets the word; in a message every court does', () => {
+  const t = translator('en')
+  assert.equal(courtName('1', t), 'Court 1')
+  assert.equal(courtName('Center', t), 'Center')
+  assert.equal(courtName('Center', t, { always: true }), 'Court Center')
+  assert.equal(courtName('Court Center', t, { always: true }), 'Court Center')
+  assert.equal(courtName('3', translator('pt'), { always: true }), 'Campo 3')
 })

@@ -125,7 +125,12 @@ export const roundComplete = (matches, round) => {
  * them — "1", "2", "Center" — and only a bare number gets the word put back:
  * "Court 1" in a message, "1" in the box you rename it in.
  */
-export const courtName = (label, t) => {
+export const courtName = (label, t, { always = false } = {}) => {
   const l = String(label ?? '').trim()
-  return /^\d+$/.test(l) ? t('courtN', { n: l }) : l
+  if (/^\d+$/.test(l)) return t('courtN', { n: l })
+  // In a group message every court is written out — "Court Center" — so the
+  // line reads as a place even to someone who has never seen the club's names.
+  // Unless the name already carries the word, in either language.
+  if (always && !/^(court|campo)\b/i.test(l)) return t('courtN', { n: l })
+  return l
 }
