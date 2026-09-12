@@ -949,7 +949,11 @@ export function tournamentPage({
   const flashFor = (what) => (flash && flash.what === what ? flashLine(flash, t) : '')
   // A mixed level asks every pair to be one of each. The host would otherwise
   // find out at the draw, which is too late to fix by messaging anyone.
-  const offLevel = isMixedLevel(tour.level) ? teams.filter((x) => !x.mixed) : []
+  // Only a pair whose genders are both known, and the same, is off a mixed
+  // level. An imported roster knows nobody's gender, and that is not a fault.
+  const known = (p) => p.gender === 'M' || p.gender === 'F'
+  const offLevel = isMixedLevel(tour.level)
+    ? teams.filter((x) => x.players.every(known) && !x.mixed) : []
   const allDone = rounds.length > 0 && rounds.every((r) => roundComplete(matches, r))
   // Where the host is in the night decides which tab opens: sign-ups before the
   // draw, the rounds during it, the table once every score is in.
