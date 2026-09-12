@@ -84,9 +84,17 @@
     {
       "title": "Courts per tournament (seeded from club defaults; edited on the Rounds tab)",
       "state": "done"
+    },
+    {
+      "title": "Clubs as a list with a home club; club form and venues merged",
+      "state": "done"
     }
   ],
   "activity": [
+    {
+      "at": "2026-09-12T23:31:25.033567Z",
+      "text": "Venues and the single club merged into one Clubs list (Settings → Clubs; home picked there or on the Overview). Saves swap the page in place via fetch. Import survives WhatsApp copy prefixes; time line read in every spelling. Active night pinned or read off the calendar."
+    },
     {
       "at": "2026-09-12T21:46:07.261307Z",
       "text": "Teams tab is a pairs board before the draw: seats + unpaired tray, pointer-event drag, tap-to-swap, keyboard; \"Pair up the rest at random\" (F/M-aware on mixed), \"Reshuffle everyone\"; Save writes partners both ways. 30/30 tests."
@@ -121,5 +129,5 @@
   "summary": "The club's nights ran on a printed sheet and a PDF. Now the group gets one message per round saying who is on which court and where every pair goes next, posted automatically when the round before it is scored; !where Mike answers one person. Telegram posts by itself (bot token is the whole setup, the group is learned from the first command); WhatsApp stays a paste-from-outbox draft because it has no group API.",
   "next": "Confirm whether the club's level scale really runs to 9 (the message said \"M9\"); the ladder stops at 7 and the import leaves the level for the host to pick",
   "url": "https://padeladmin.webperfology.com",
-  "updated": "2026-09-12T22:19:03.303589Z"
+  "updated": "2026-09-12T23:31:25.033567Z"
 }

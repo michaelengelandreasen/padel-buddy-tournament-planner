@@ -168,6 +168,23 @@ function migrate() {
   if (!cols.includes('venue')) {
     db.exec("ALTER TABLE tournaments ADD COLUMN venue TEXT NOT NULL DEFAULT ''")
   }
+  // Clubs are a list now, one of them home. A club row that still carries a
+  // name of its own becomes the first entry in that list, and home, once.
+  {
+    const club = db.prepare('SELECT * FROM club WHERE id = 1').get()
+    const names = db.prepare('SELECT id, name FROM venues').all()
+    const same = names.find((v) => v.name.trim().toLowerCase() === String(club.name || '').trim().toLowerCase())
+    let homeId = Number(club.home_venue_id) || 0
+    if (!same && club.name && club.name !== 'Padel Club') {
+      const r = db.prepare('INSERT INTO venues (name, address, maps_url, sort) VALUES (?, ?, ?, ?)')
+        .run(club.name, club.address || '', club.maps_url || '', -1)
+      if (!homeId) homeId = Number(r.lastInsertRowid)
+    } else if (same && !homeId) homeId = same.id
+    if (homeId && homeId !== Number(club.home_venue_id)) {
+      db.prepare('UPDATE club SET home_venue_id = ? WHERE id = 1').run(homeId)
+    }
+  }
+
   // Courts used to be stored as "Court 3"; the word is put back on display, so
   // a stored label is just the number (or the name). Strip it wherever a label
   // is written, but only when what is left is a number — "Court Center" stays.
@@ -309,7 +326,7 @@ export function addVenuesFromText(text) {
 export function homePlace() {
   const club = getClub()
   const id = Number(club?.home_venue_id) || 0
-  const v = id ? one('SELECT * FROM venues WHERE id = ?', id) : null
+  const v = (id && one('SELECT * FROM venues WHERE id = ?', id)) || listVenues()[0] || null
   return v ? { name: v.name, address: v.address, maps_url: v.maps_url, venue: v }
     : { name: club.name, address: club.address, maps_url: club.maps_url, venue: null }
 }

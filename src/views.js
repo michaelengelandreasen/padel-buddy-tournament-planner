@@ -562,6 +562,7 @@ details.preview pre{margin-top:8px}
 @media (min-width:640px){.courtrow .btn.danger span{display:inline}.courtrow .btn.danger{padding:11px 16px}}
 .venuelist{display:flex;flex-direction:column;gap:12px;margin-top:10px}
 form.venue{padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--surface-2)}
+form.venue .pill .i{width:14px;height:14px;vertical-align:-2px}
 form.venue .actions{margin-top:12px}
 form.venue.add{margin-top:16px;background:transparent;border-style:dashed}
 form.venue h4{margin:0}
@@ -771,10 +772,9 @@ export function overview({ club, home = null, venues = [], tournaments, courts, 
     <h1>${esc(here.name)}</h1>
     <p class="meta"><span>${ic('pin')}${esc(here.address) || esc(t('noAddress'))}</span>${
       here.maps_url ? `<a href="${esc(here.maps_url)}" target="_blank" rel="noopener">${esc(t('openInMaps'))}${ic('arrow')}</a>` : ''}</p>
-    ${venues.length ? `<form class="home" method="post" action="/home" title="${esc(t('homeVenueHelp'))}">
+    ${venues.length > 1 ? `<form class="home" method="post" action="/home" title="${esc(t('homeVenueHelp'))}">
       ${ic('home')}<label for="homev">${esc(t('homeVenue'))}</label>
       <select id="homev" name="home_venue_id" onchange="this.form.requestSubmit()">
-        <option value="0"${here.venue ? '' : ' selected'}>${esc(t('theClubItself', { name: club.name }))}</option>
         ${venues.map((x) => `<option value="${x.id}"${here.venue && here.venue.id === x.id ? ' selected' : ''}>${esc(x.name)}</option>`).join('')}
       </select>
       <noscript><button class="btn ghost">${ic('check')}${esc(t('save'))}</button></noscript>
@@ -808,21 +808,7 @@ export function overview({ club, home = null, venues = [], tournaments, courts, 
     </div>`, { nav: navFor('/', t), t, here: '/' })
 }
 
-export function settings({ club, courts, venues = [], notice = '', t }) {
-  const clubForm = `
-    <form class="card" method="post" action="/settings">
-      <h3>${ic('flag')}${esc(t('club'))}</h3>
-      <label for="cname">${esc(t('clubName'))}</label>
-      <input id="cname" name="name" value="${esc(club.name)}" required>
-      <label for="caddr">${esc(t('address'))}</label>
-      <input id="caddr" name="address" value="${esc(club.address)}"
-        placeholder="R. Gonçalves Zarco 1813, 4450-685 Matosinhos">
-      <label for="cmaps">${esc(t('mapsLink'))}</label>
-      <input id="cmaps" name="maps_url" type="url" value="${esc(club.maps_url)}"
-        placeholder="https://maps.app.goo.gl/…">
-      <input type="hidden" name="tab" value="club">
-      <div class="actions"><button>${ic('check')}${esc(t('save'))}</button></div>
-    </form>`
+export function settings({ club, courts, venues = [], notice = '', home = 0, t }) {
   const courtsPanel = `
     <div class="card">
       <h3>${ic('court')}${esc(t('courts'))}</h3>
@@ -843,9 +829,11 @@ export function settings({ club, courts, venues = [], notice = '', t }) {
       <h3>${ic('pin')}${esc(t('venues'))}</h3>
       <p class="muted">${esc(t('venuesHelp'))}</p>
       <div class="venuelist">${venues.map((x) => `<form class="venue" method="post" action="/venues/${x.id}">
+        ${x.id === home ? `<span class="pill on">${ic('home')} ${esc(t('homeBadge'))}</span>` : ''}
         ${venueFields(x, `v${x.id}`)}
         <div class="actions">
           <button>${ic('check')}${esc(t('save'))}</button>
+          ${x.id === home ? '' : `<button class="btn ghost" formaction="/home" formnovalidate name="home_venue_id" value="${x.id}">${ic('home')}${esc(t('makeHome'))}</button>`}
           <button class="btn danger" formaction="/venues/${x.id}/delete" formnovalidate>${ic('trash')}${esc(t('remove'))}</button>
         </div>
       </form>`).join('') || `<p class="muted">${esc(t('noVenuesYet'))}</p>`}</div>
@@ -887,12 +875,11 @@ export function settings({ club, courts, venues = [], notice = '', t }) {
   return page(t('settings'), `
     <h1>${esc(t('settings'))}</h1>
     ${tabbed([
-      { id: 'club', icon: 'flag', label: t('club'), body: clubForm },
+      { id: 'venues', icon: 'flag', label: t('venues'), count: venues.length || null, body: venuesPanel },
       { id: 'courts', icon: 'court', label: t('courts'), count: courts.length, body: courtsPanel },
-      { id: 'venues', icon: 'pin', label: t('venues'), count: venues.length || null, body: venuesPanel },
       { id: 'language', icon: 'globe', label: t('language'), body: langForm },
       { id: 'policy', icon: 'doc', label: t('tabPolicy'), body: policyForm },
-    ], 'club')}`, { nav: navFor('/settings', t), t, here: '/settings', tab: 'club' })
+    ], 'venues')}`, { nav: navFor('/settings', t), t, here: '/settings', tab: 'venues' })
 }
 
 export function tournamentsPage({ tournaments, venues = [], form = {}, error = '', imported = null, pasted = '', notice = '', filter = '', t }) {

@@ -113,7 +113,8 @@ const routes = [
     const f = await body(req)
     const id = Number(f.home_venue_id) || 0
     saveClub({ home_venue_id: id && listVenues().some((v) => v.id === id) ? id : 0 })
-    return { to: '/' }
+    // Back to where the choice was made: the Overview, or the Clubs tab.
+    return { to: /\/settings/.test(req.headers.referer || '') ? '/settings#venues' : '/' }
   }],
   // Pin (or unpin) the night the bot talks about.
   ['POST', /^\/t\/(\d+)\/activate$/, async (m, req) => {
@@ -125,6 +126,7 @@ const routes = [
   ['GET', /^\/settings$/, (_m, req, t) => {
     const q = new URL(req.url, 'http://x').searchParams
     return { html: V.settings({ club: getClub(), courts: listCourts(), venues: listVenues(), t,
+      home: homePlace().venue?.id || 0,
       notice: q.has('added') ? t('addedVenues', { n: Number(q.get('added')) || 0 }) : '' }) }
   }],
   ['POST', /^\/venues$/, async (_m, req) => { addVenue(await body(req)); return { to: '/settings#venues' } }],
@@ -138,7 +140,7 @@ const routes = [
   ['POST', /^\/settings$/, async (_m, req) => {
     const f = await body(req)
     saveClub(f)
-    return { to: `/settings#${/^[a-z]+$/.test(f.tab || '') ? f.tab : 'club'}` }
+    return { to: `/settings#${/^[a-z]+$/.test(f.tab || '') ? f.tab : 'venues'}` }
   }],
 
   // The header toggle. Same handler as the settings form, so there is one place

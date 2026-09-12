@@ -147,33 +147,19 @@ own Save. Labels are what the club calls the court — `1`, `2`, `Center` — an
 the word is put back only on display and in messages when the label is a bare
 number ("Court 1"), so the box you rename it in holds just the number.
 
-## Venues
+## Clubs
 
-The top of the Overview is **home**: the club's own name and address, or any
-saved venue, chosen from the picker there (saves as it changes). Nights with no
-venue of their own are announced from home — the board's 📍 line and map link,
-the tournament header, the TV title, and what "at home" means in the nights
-lists.
-
-Settings → Venues keeps the other places the club plays — name, address, map
-link — editable in place. A night at one of them is announced with that name
-and that map link instead of the club's. The new-tournament form offers the
-saved names on its Venue field, and a pasted message that names one (`M9 -
-MAIA` when a venue called M9 is saved) fills it in by itself; accents and case
-don't matter, and the longest saved name wins. Several venues can be added at
-once from pasted lines — `Name | map link`, or just a name; names already saved
-are skipped.
-
-## The table
-
-The Table tab is a real grid at every width (abbreviated headings on a phone),
-and under it the same standings as a message — medals, points, wins/played —
-with **Copy** for pasting into WhatsApp and **Post to the groups**. The board
-and the round message previews carry the same Copy button.
-
-In a tournament's header the small pin opens the venue on Google Maps (the
-saved venue's link away, the club's at home) and the venue's name opens the
-list of every night played there (`/tournaments?venue=…`).
+The group plays at more than one club, so clubs are a list — Settings → Clubs:
+name, address, map link, each editable in place; add one, or several at once
+from pasted lines (`Name | map link`, names already saved are skipped). One
+club is **home**, marked there or picked at the top of the Overview, and the
+Overview's header is the home club. A night that does not say otherwise is at
+home: the board's 📍 line and map link, the tournament header, the TV title.
+A night elsewhere names its club on the form (the saved names are offered) or
+gets it from a pasted message (`M9 - MAIA` when a club called M9 is saved;
+accents and case aside, longest saved name winning). In a tournament's header
+the small pin opens the club on Google Maps and the name opens every night
+played there (`/tournaments?venue=…`).
 
 ## Pairs
 
