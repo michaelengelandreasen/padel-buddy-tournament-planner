@@ -218,6 +218,28 @@ form.addEventListener('submit',function(){
   field.value=JSON.stringify(pairs)});
 })();`
 
+/**
+ * Copy buttons: whatever `data-copy` points at goes to the clipboard, and the
+ * button says so for a moment. The old execCommand path stays for a browser
+ * that refuses the clipboard API off a secure context.
+ */
+const COPY_JS = `(function(){
+document.querySelectorAll('[data-copy]').forEach(function(b){
+  b.addEventListener('click',function(){
+    var el=document.querySelector(b.dataset.copy);if(!el)return;var text=el.textContent;
+    var done=function(){var was=b.innerHTML;b.classList.add('done');b.querySelector('span').textContent=b.dataset.done;
+      setTimeout(function(){b.classList.remove('done');b.innerHTML=was},1600)};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(done,function(){fallback()})}
+    else fallback();
+    function fallback(){var r=document.createRange();r.selectNodeContents(el);var s=getSelection();s.removeAllRanges();s.addRange(r);
+      try{document.execCommand('copy');done()}catch(e){}s.removeAllRanges()}
+  })});
+})();`
+
+/** A Copy button for the message in `#id`. */
+const copyBtn = (id, t) => `<button type="button" class="btn ghost" data-copy="#${id}" data-done="${esc(t('copied'))}">${
+  ic('board')}<span>${esc(t('copy'))}</span></button>`
+
 /** A tab strip + its panels. `tabs` is [{id, icon, label, count?, body}]. */
 function tabbed(tabs, active) {
   const strip = `<div class="tabs" role="tablist">${tabs.map((x) => `<button type="button" role="tab"
@@ -347,6 +369,7 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 .flash.bad{background:color-mix(in oklab,var(--warn) 12%,var(--surface));
   border-color:color-mix(in oklab,var(--warn) 40%,var(--line))}
 .flash.bad strong{color:var(--warn)}
+button.done{border-color:var(--brand);color:var(--brand)}
 @keyframes settle{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.flash{animation:none}}
 .hint{color:var(--muted);font-size:.82rem;margin:6px 0 0}
@@ -457,6 +480,16 @@ form.venue{padding:12px 14px;border:1px solid var(--line);border-radius:12px;bac
 form.venue .actions{margin-top:12px}
 form.venue.add{margin-top:16px;background:transparent;border-style:dashed}
 form.venue h4{margin:0}
+/* Standings: a real grid at every width. */
+table.standings td.pos{font-weight:800;color:var(--brand);width:2.4ch;font-variant-numeric:tabular-nums}
+table.standings td.team{font-weight:600;overflow-wrap:anywhere}
+table.standings tr.top td.team{color:var(--ink)}
+table.standings th .short{display:none}
+@media (max-width:480px){
+  table.standings th .long{display:none} table.standings th .short{display:inline}
+  table.standings th,table.standings td{padding:9px 6px}
+  table.standings td.team{font-size:.95rem}
+}
 /*
  * The pairs board. Seats are the shape a pair has — two slots side by side —
  * and the tray is everyone still unplaced. A player is a chip that moves by
@@ -586,7 +619,7 @@ export function page(title, body, { nav = '', script = '', t = translator(), her
 <strong>Padel Buddy</strong><small>${esc(t('navTournaments'))}</small></a>
 <nav>${nav}</nav>${langToggle(t.lang, here)}</header>
 ${SPRITE}
-<div class="wrap">${body}</div><script>${TABS_JS}</script><script>${PAIRS_JS}</script>${script ? `<script>${script}</script>` : ''}</body></html>`
+<div class="wrap">${body}</div><script>${TABS_JS}</script><script>${PAIRS_JS}</script><script>${COPY_JS}</script>${script ? `<script>${script}</script>` : ''}</body></html>`
 }
 
 const navFor = (here, t) => [['/', 'navOverview', 'home'], ['/tournaments', 'navTournaments', 'trophy'],
@@ -866,7 +899,7 @@ export function flashLine(flash, t) {
 }
 
 export function tournamentPage({
-  tournament: tour, teams, waiting, matches, table, message, roundText, courts, flash, t,
+  tournament: tour, teams, waiting, matches, table, message, roundText, tableText = '', courts, flash, t,
 }) {
   const rounds = roundsOf(matches)
   const now = currentRound(matches)
@@ -882,10 +915,11 @@ export function tournamentPage({
   const board = `
     <div class="card"><h3>${ic('board')}${esc(t('signupBoard'))}</h3>
       ${flashFor('board')}
-      <pre class="msg">${esc(message)}</pre>
+      <pre class="msg" id="msg-board">${esc(message)}</pre>
       <div class="actions">
         <form method="post" action="/t/${tour.id}/post">
           <button>${ic('megaphone')}${esc(t('postToGroups'))}</button></form>
+        ${copyBtn('msg-board', t)}
         <a class="btn ghost" href="/groups">${ic('inbox')}${esc(t('outbox'))}</a>
       </div>
     </div>`
@@ -958,9 +992,10 @@ export function tournamentPage({
         <form method="post" action="/t/${tour.id}/post">
           <input type="hidden" name="round" value="${now}">
           <button>${ic('megaphone')}${esc(t('postToGroups'))}</button></form>
+        ${copyBtn('msg-round', t)}
       </div>
       <details class="preview"><summary>${ic('arrow')}${esc(t('preview'))}</summary>
-        <pre class="msg">${esc(roundText)}</pre></details>
+        <pre class="msg" id="msg-round">${esc(roundText)}</pre></details>
     </div>
     <form class="card" method="post" action="/t/${tour.id}/scores">
       <h3>${ic('list')}${esc(t('schedule'))}</h3>
@@ -973,19 +1008,32 @@ export function tournamentPage({
       <div class="savebar"><button>${ic('check')}${esc(t('saveAll'))}</button></div>
     </form>`
 
+  // The table stays a table on a phone: a ranking is read down a column, and
+  // four short numbers fit beside a name. Headings abbreviate below 480px.
+  const th = (key, short) => `<th class="num"><span class="long">${esc(t(key))}</span><span class="short">${esc(short)}</span></th>`
   const tablePanel = `
     <div class="card"><h3>${ic('trophy')}${esc(t('standings'))}</h3>
-      ${wrapTable(`<thead><tr><th>#</th><th>${esc(t('team'))}</th><th class="num">${esc(t('played'))}</th>
-        <th class="num">${esc(t('won'))}</th><th class="num">${esc(t('points'))}</th>
-        <th class="num">${esc(t('against'))}</th></tr></thead>
-      <tbody>${table.map((r, i) => `<tr><td class="pos">${i + 1}</td>
-        <td class="lead">${esc(r.team)}</td>
-        <td class="num" data-l="${esc(t('played'))}">${r.played}</td>
-        <td class="num" data-l="${esc(t('won'))}">${r.won}</td>
-        <td class="num" data-l="${esc(t('points'))}"><strong>${r.points}</strong></td>
-        <td class="num muted" data-l="${esc(t('against'))}">${r.against}</td></tr>`).join('')
-        || `<tr><td class="muted" colspan="6">${esc(t('noResults'))}</td></tr>`}</tbody>`, 'stack')}
-    </div>`
+      ${wrapTable(`<thead><tr><th>#</th><th>${esc(t('team'))}</th>${th('played', 'P')}${th('won', 'W')}${
+        th('points', 'Pts')}${th('against', 'Ag')}</tr></thead>
+      <tbody>${table.map((r, i) => `<tr class="${i < 3 ? 'top' : ''}"><td class="pos">${i + 1}</td>
+        <td class="team">${esc(r.team)}</td>
+        <td class="num">${r.played}</td>
+        <td class="num">${r.won}</td>
+        <td class="num"><strong>${r.points}</strong></td>
+        <td class="num muted">${r.against}</td></tr>`).join('')
+        || `<tr><td class="muted" colspan="6">${esc(t('noResults'))}</td></tr>`}</tbody>`, 'standings')}
+    </div>
+    ${tableText ? `<div class="card"><h3>${ic('chat')}${esc(t('shareTable'))}</h3>
+      <p class="muted">${esc(t('shareTableHelp'))}</p>
+      ${flashFor('table')}
+      <pre class="msg" id="msg-table">${esc(tableText)}</pre>
+      <div class="actions">
+        <form method="post" action="/t/${tour.id}/post">
+          <input type="hidden" name="what" value="table">
+          <button>${ic('megaphone')}${esc(t('postToGroups'))}</button></form>
+        ${copyBtn('msg-table', t)}
+      </div>
+    </div>` : ''}`
 
   return page(`${tour.level || ''} ${humanWhen(tour, { lang: t.lang })}`.trim(), `
     <h1>${esc(tour.level) || esc(t('statusOpen'))} · ${esc(humanWhen(tour, { lang: t.lang }))}</h1>

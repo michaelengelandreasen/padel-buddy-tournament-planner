@@ -412,7 +412,7 @@ export function standingsMessage(tour, lang = clubLanguage()) {
     `🏆 ${b(s('standings'))} · ${s('boardFormat')} ${levelTight(tour.level) || ''}`.trim(),
     '',
     ...table.map((r, i) => `${medal[i] || `${i + 1}.`} ${r.team} — ${
-      s('pointsWonShort', { points: r.points, won: r.won })}`),
+      s('pointsWonShort', { points: r.points, won: r.won, played: r.played })}`),
   ].join('\n')
 }
 

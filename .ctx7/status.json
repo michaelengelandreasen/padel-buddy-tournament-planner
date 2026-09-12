@@ -76,6 +76,10 @@
     {
       "title": "Saved venues: Settings tab, form datalist, import matching, board map link",
       "state": "done"
+    },
+    {
+      "title": "Standings as a real table + WhatsApp-ready text with Copy/Post",
+      "state": "done"
     }
   ],
   "activity": [
@@ -113,5 +117,5 @@
   "summary": "The club's nights ran on a printed sheet and a PDF. Now the group gets one message per round saying who is on which court and where every pair goes next, posted automatically when the round before it is scored; !where Mike answers one person. Telegram posts by itself (bot token is the whole setup, the group is learned from the first command); WhatsApp stays a paste-from-outbox draft because it has no group API.",
   "next": "Confirm whether the club's level scale really runs to 9 (the message said \"M9\"); the ladder stops at 7 and the import leaves the level for the host to pick",
   "url": "https://padeladmin.webperfology.com",
-  "updated": "2026-09-12T22:11:30.820954Z"
+  "updated": "2026-09-12T22:16:00.694852Z"
 }

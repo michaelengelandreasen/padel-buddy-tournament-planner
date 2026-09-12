@@ -137,6 +137,13 @@ saved names on its Venue field, and a pasted message that names one (`M9 -
 MAIA` when a venue called M9 is saved) fills it in by itself; accents and case
 don't matter, and the longest saved name wins.
 
+## The table
+
+The Table tab is a real grid at every width (abbreviated headings on a phone),
+and under it the same standings as a message — medals, points, wins/played —
+with **Copy** for pasting into WhatsApp and **Post to the groups**. The board
+and the round message previews carry the same Copy button.
+
 ## Pairs
 
 Before the draw, the Teams tab is a pairs board: numbered seats, two to a pair,

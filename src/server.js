@@ -211,6 +211,7 @@ const routes = [
       // deciding to send it.
       roundText: v.matches.length
         ? roundMessage(v.tournament, currentRound(v.matches), t.lang) : '',
+      tableText: v.table.length ? standingsMessage(v.tournament, t.lang) : '',
       t }) }
   }],
 
@@ -316,17 +317,20 @@ const routes = [
     const f = await body(req)
     const round = Number.parseInt(f.round, 10)
     const isRound = Number.isFinite(round)
+    const isTable = f.what === 'table'
     // A deliberate press waits for the answer — a second of latency is worth
     // being told whether Telegram actually took it. Automatic posts don't wait.
     const results = await groups.send(
-      isRound ? roundMessage(tour, round, t.lang) : signupMessage(tour, '', t.lang),
-      isRound ? { reason: `round ${round}` } : { key: `board:${id}`, pin: true, reason: 'board' })
+      isTable ? standingsMessage(tour, t.lang)
+        : isRound ? roundMessage(tour, round, t.lang) : signupMessage(tour, '', t.lang),
+      isTable ? { reason: 'standings' }
+        : isRound ? { reason: `round ${round}` } : { key: `board:${id}`, pin: true, reason: 'board' })
     const tg = results.find((r) => r.channel === 'telegram')
     const code = !tg ? '' : tg.error ? 'err' : tg.edited ? 'edit' : tg.delivered ? 'ok' : 'wait'
-    const q = new URLSearchParams({ posted: isRound ? `round-${round}` : 'board' })
+    const q = new URLSearchParams({ posted: isTable ? 'table' : isRound ? `round-${round}` : 'board' })
     if (code) q.set('tg', code)
     if (tg?.error) q.set('err', String(tg.error).slice(0, 120))
-    return { to: `/t/${id}?${q}#${isRound ? 'rounds' : 'board'}` }
+    return { to: `/t/${id}?${q}#${isTable ? 'table' : isRound ? 'rounds' : 'board'}` }
   }],
 
   ['GET', /^\/groups$/, (_m, _r, t) => ({ html: V.groupsPage({ groups, chat: telegramChat(), t }) })],
