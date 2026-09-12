@@ -520,10 +520,12 @@ details.fold[open] summary{margin-bottom:8px}
 .meta form.inline{display:inline-flex;margin:0}
 button.link.danger{color:var(--warn);text-decoration-color:color-mix(in oklab,var(--warn) 40%,transparent)}
 button.link.danger:hover{color:var(--warn)}
-td.rowact,div.rowact{display:flex;align-items:center;gap:8px;flex:0 0 auto}
-.rowact form{margin:0}
-.rowact .btn{min-height:40px;padding:0 14px}
-table.stack td.rowact{margin-top:6px}
+/* Both actions are direct flex items — the form around Remove is invisible to
+   layout — so they share one centre line, whichever table rule is in force. */
+td.rowact,div.rowact,table.stack td.rowact{display:flex;align-items:center;gap:8px;flex:0 0 auto}
+.rowact form{display:contents}
+.rowact .btn{min-height:40px;padding:0 14px;line-height:1}
+table.stack td.rowact{margin-top:6px;flex:1 1 100%}
 @media (max-width:560px){table.stack td.rowact{display:inline-flex}}
 .outmsg{margin-bottom:18px}
 .outmsg .actions{margin-top:8px;align-items:center}
