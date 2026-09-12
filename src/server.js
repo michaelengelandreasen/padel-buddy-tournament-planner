@@ -202,7 +202,7 @@ const routes = [
     return { html: V.tvPage({ ...v, club: getClub(), t }) }
   }],
 
-  ['POST', /^\/t\/(\d+)\/schedule$/, (m) => {
+  ['POST', /^\/t\/(\d+)\/schedule$/, (m, _r, t) => {
     const id = Number(m[1])
     const v = view(id)
     // Courts the club configured, capped by what this tournament booked. A club
