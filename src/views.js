@@ -520,8 +520,10 @@ details.fold[open] summary{margin-bottom:8px}
 .meta form.inline{display:inline-flex;margin:0}
 button.link.danger{color:var(--warn);text-decoration-color:color-mix(in oklab,var(--warn) 40%,transparent)}
 button.link.danger:hover{color:var(--warn)}
-td.rowact,div.rowact{display:flex;align-items:center;gap:12px;flex:0 0 auto}
+td.rowact,div.rowact{display:flex;align-items:center;gap:8px;flex:0 0 auto}
 .rowact form{margin:0}
+.rowact .btn{min-height:40px;padding:0 14px}
+table.stack td.rowact{margin-top:6px}
 @media (max-width:560px){table.stack td.rowact{display:inline-flex}}
 .outmsg{margin-bottom:18px}
 .outmsg .actions{margin-top:8px;align-items:center}
@@ -729,10 +731,10 @@ export function overview({ club, tournaments, courts, live, pinned = 0, night = 
         <td data-l="${esc(t('status'))}"><span class="pill">${esc(statusLabel(x.status, t))}</span></td>
         ${x.id === night ? `<td class="full active" data-l=""><span class="pill on">${esc(t('activeNight'))}</span>${
           x.id === pinned ? '' : ` <span class="muted">${esc(t('autoNight'))}</span>`}</td>` : '<td data-l=""></td>'}
-        <td class="full rowact"><a class="tap" href="/t/${x.id}">${esc(t('open'))} ${ic('arrow')}</a>
+        <td class="full rowact"><a class="btn ghost" href="/t/${x.id}">${esc(t('open'))}${ic('arrow')}</a>
           <form method="post" action="/t/${x.id}/delete" onsubmit="return confirm(${
             JSON.stringify(t('deleteConfirm', { name: `${x.level || ''} ${humanWhen(x, { lang: t.lang })}`.trim() })).replace(/"/g, '&quot;')})">
-            <button class="link danger" aria-label="${esc(t('deleteTournament'))}">${ic('trash')}<span>${esc(t('remove'))}</span></button>
+            <button class="btn danger" aria-label="${esc(t('deleteTournament'))}">${ic('trash')}<span>${esc(t('remove'))}</span></button>
           </form></td></tr>`).join('')}</tbody>`, 'stack')
         : `<p class="muted">${esc(t('noTournaments'))}</p>`}
       <div class="actions"><a class="btn" href="/tournaments">${ic('plus')}${esc(t('newTournament'))}</a></div>
@@ -903,7 +905,7 @@ export function tournamentsPage({ tournaments, venues = [], form = {}, error = '
         <a class="btn ghost" href="/t/${x.id}">${esc(t('open'))}${ic('arrow')}</a>
         <form method="post" action="/t/${x.id}/delete" onsubmit="return confirm(${
           JSON.stringify(t('deleteConfirm', { name: `${x.level || ''} ${humanWhen(x, { lang: t.lang })}`.trim() })).replace(/"/g, '&quot;')})">
-          <button class="link danger" aria-label="${esc(t('deleteTournament'))}">${ic('trash')}<span>${esc(t('remove'))}</span></button>
+          <button class="btn danger" aria-label="${esc(t('deleteTournament'))}">${ic('trash')}<span>${esc(t('remove'))}</span></button>
         </form>
       </div></div></div>`).join('')}
   `, { nav: navFor('/tournaments', t), script: LEVEL_JS, t, here: '/tournaments' })
