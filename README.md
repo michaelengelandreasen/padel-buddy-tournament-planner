@@ -149,6 +149,12 @@ number ("Court 1"), so the box you rename it in holds just the number.
 
 ## Venues
 
+The top of the Overview is **home**: the club's own name and address, or any
+saved venue, chosen from the picker there (saves as it changes). Nights with no
+venue of their own are announced from home — the board's 📍 line and map link,
+the tournament header, the TV title, and what "at home" means in the nights
+lists.
+
 Settings → Venues keeps the other places the club plays — name, address, map
 link — editable in place. A night at one of them is announced with that name
 and that map link instead of the club's. The new-tournament form offers the

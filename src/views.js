@@ -372,6 +372,11 @@ button .i,.btn .i,nav a .i{width:18px;height:18px}
 .meta{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;color:var(--muted);margin:0 0 .5rem}
 .meta>span,.meta>a{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 /* The pin opens the map, the name opens the venue's nights: two links, one item. */
+/* The home picker: one select, saves as it changes, sits with the address line. */
+form.home{display:flex;align-items:center;gap:8px;margin:0 0 16px;max-width:520px}
+form.home>.i{width:18px;height:18px;color:var(--muted);flex:0 0 auto}
+form.home label{margin:0;flex:0 0 auto}
+form.home select{flex:1 1 auto;min-width:0}
 .meta .place{display:inline-flex;align-items:center;gap:2px}
 .meta .pinlink{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;
   margin-left:-12px;border-radius:999px;color:var(--brand)}
@@ -760,11 +765,20 @@ const levelCell = (code, t) => code
   ? `<span class="pill on">${esc(code)}</span> <span class="muted">${esc(levelShort(code, t))}</span>`
   : `<span class="muted">${esc(t('statusOpen'))}</span>`
 
-export function overview({ club, tournaments, courts, live, pinned = 0, night = 0, t }) {
+export function overview({ club, home = null, venues = [], tournaments, courts, live, pinned = 0, night = 0, t }) {
+  const here = home || { name: club.name, address: club.address, maps_url: club.maps_url, venue: null }
   return page(t('navOverview'), `
-    <h1>${esc(club.name)}</h1>
-    <p class="meta"><span>${ic('pin')}${esc(club.address) || esc(t('noAddress'))}</span>${
-      club.maps_url ? `<a href="${esc(club.maps_url)}">${esc(t('openInMaps'))}${ic('arrow')}</a>` : ''}</p>
+    <h1>${esc(here.name)}</h1>
+    <p class="meta"><span>${ic('pin')}${esc(here.address) || esc(t('noAddress'))}</span>${
+      here.maps_url ? `<a href="${esc(here.maps_url)}" target="_blank" rel="noopener">${esc(t('openInMaps'))}${ic('arrow')}</a>` : ''}</p>
+    ${venues.length ? `<form class="home" method="post" action="/home" title="${esc(t('homeVenueHelp'))}">
+      ${ic('home')}<label for="homev">${esc(t('homeVenue'))}</label>
+      <select id="homev" name="home_venue_id" onchange="this.form.requestSubmit()">
+        <option value="0"${here.venue ? '' : ' selected'}>${esc(t('theClubItself', { name: club.name }))}</option>
+        ${venues.map((x) => `<option value="${x.id}"${here.venue && here.venue.id === x.id ? ' selected' : ''}>${esc(x.name)}</option>`).join('')}
+      </select>
+      <noscript><button class="btn ghost">${ic('check')}${esc(t('save'))}</button></noscript>
+    </form>` : ''}
     <div class="grid">
       <div class="card"><h3>${ic('court')}${esc(t('courts'))}</h3>
         <p class="muted">${courts.length ? courts.map((c) => esc(courtName(c.label, t))).join(' · ') : esc(t('noneYet'))}</p>

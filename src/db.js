@@ -41,7 +41,10 @@ db.exec(`
     telegram_chat_id TEXT NOT NULL DEFAULT '',
     -- The night the host has pinned as "the one" — what the bot, the automatic
     -- posts and the TV talk about. Empty means: work it out from the calendar.
-    active_tournament_id INTEGER NOT NULL DEFAULT 0
+    active_tournament_id INTEGER NOT NULL DEFAULT 0,
+    -- Where "home" is: 0 means the club's own name and address, otherwise a
+    -- saved venue. Nights with no venue of their own are announced from here.
+    home_venue_id INTEGER NOT NULL DEFAULT 0
   );
   INSERT OR IGNORE INTO club (id, name) VALUES (1, 'Padel Club');
 
@@ -146,7 +149,7 @@ function seedTournamentCourts(tid, count) {
 function migrate() {
   const clubCols = db.prepare('PRAGMA table_info(club)').all().map((c) => c.name)
   for (const [col, def] of [['language', "'en'"], ['rules_en', "''"], ['rules_pt', "''"],
-    ['telegram_chat_id', "''"], ['active_tournament_id', '0']]) {
+    ['telegram_chat_id', "''"], ['active_tournament_id', '0'], ['home_venue_id', '0']]) {
     if (!clubCols.includes(col)) {
       db.exec(`ALTER TABLE club ADD COLUMN ${col} TEXT NOT NULL DEFAULT ${def}`)
     }
@@ -215,7 +218,7 @@ export function clubLanguage() {
 /** Only the keys given are written, so the language form can't blank the address. */
 export function saveClub(patch) {
   const allowed = ['name', 'address', 'maps_url', 'language', 'rules_en', 'rules_pt',
-    'telegram_chat_id']
+    'telegram_chat_id', 'home_venue_id']
   const keys = allowed.filter((k) => patch[k] !== undefined)
   if (!keys.length) return getClub()
   const clean = (k) => (k === 'language' && !isLanguage(patch[k])
@@ -276,7 +279,10 @@ export function updateVenue(id, v) {
   run('UPDATE venues SET name = ?, address = ?, maps_url = ? WHERE id = ?', c.name, c.address, c.maps_url, id)
   return one('SELECT * FROM venues WHERE id = ?', id)
 }
-export const deleteVenue = (id) => run('DELETE FROM venues WHERE id = ?', id)
+export function deleteVenue(id) {
+  if (Number(getClub()?.home_venue_id) === Number(id)) saveClub({ home_venue_id: 0 })
+  run('DELETE FROM venues WHERE id = ?', id)
+}
 
 /**
  * Several venues from pasted lines: `Name | https://maps…` or just `Name`.
@@ -294,6 +300,18 @@ export function addVenuesFromText(text) {
     if (addVenue({ name, maps_url: link, address })) { have.add(name.toLowerCase()); n++ }
   }
   return n
+}
+
+/**
+ * Home: the club itself, or the saved venue chosen at the top of the Overview.
+ * Everything that says where a night is when the night says nothing reads this.
+ */
+export function homePlace() {
+  const club = getClub()
+  const id = Number(club?.home_venue_id) || 0
+  const v = id ? one('SELECT * FROM venues WHERE id = ?', id) : null
+  return v ? { name: v.name, address: v.address, maps_url: v.maps_url, venue: v }
+    : { name: club.name, address: club.address, maps_url: club.maps_url, venue: null }
 }
 
 /** Accents and case aside — "m9 - maia" finds "M9 Maia". */

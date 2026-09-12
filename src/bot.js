@@ -1,6 +1,6 @@
 import {
   addSignup, clubLanguage, clubRules, createTournament, currentTournament,
-  findVenue, getClub, listMatches, listSignups, playingTournament, removeSignup,
+  findVenue, getClub, homePlace, listMatches, listSignups, playingTournament, removeSignup,
 } from './db.js'
 import { buildTeams, slots, standings } from './formats/nonstop.js'
 import { clock, dayName, parseWhen, shortDate, timeRange, validateWhen } from './dates.js'
@@ -244,8 +244,9 @@ export function boardMessage(t, prefix = '', lang = clubLanguage()) {
   // A night away from home says where, with that place's own map link if the
   // venue is a saved one; the club's link is only ever the club's.
   const away = t.venue ? findVenue(t.venue) : null
-  lines.push(`📍 ${away ? away.name : (t.venue || club.name)}`)
-  const link = t.venue ? away?.maps_url : club.maps_url
+  const home = homePlace()
+  lines.push(`📍 ${away ? away.name : (t.venue || home.name)}`)
+  const link = t.venue ? away?.maps_url : home.maps_url
   if (link) lines.push(link)
   lines.push('')
   lines.push(`${t.courts} ${s('courtsWord')}`)

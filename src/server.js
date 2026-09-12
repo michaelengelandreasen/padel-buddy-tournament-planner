@@ -6,7 +6,7 @@ import {
   deleteCourt, deleteTournament, playingTournament, setActiveTournament,
   deleteTournamentCourt, deleteVenue, listTournamentCourts, renameCourts, renameTournamentCourt,
   renameTournamentCourts,
-  findVenue, getClub, getTournament, listVenues, updateVenue,
+  findVenue, getClub, getTournament, homePlace, listVenues, updateVenue,
   listCourts, listMatches, listSignups, listTournaments, recordScore, rememberTelegramChat,
   renameCourt, replaceMatches, saveClub, setPartner, telegramChat,
 } from './db.js'
@@ -105,8 +105,16 @@ function view(id) {
 
 const routes = [
   ['GET', /^\/$/, (_m, _r, t) => ({ html: V.overview({
-    club: getClub(), tournaments: listTournaments(), courts: listCourts(),
-    live: groups.live, pinned: activeTournament()?.id || 0, night: playingTournament()?.id || 0, t }) })],
+    club: getClub(), home: homePlace(), venues: listVenues(), tournaments: listTournaments(),
+    courts: listCourts(), live: groups.live, pinned: activeTournament()?.id || 0,
+    night: playingTournament()?.id || 0, t }) })],
+  // The home venue, chosen at the top of the Overview.
+  ['POST', /^\/home$/, async (_m, req) => {
+    const f = await body(req)
+    const id = Number(f.home_venue_id) || 0
+    saveClub({ home_venue_id: id && listVenues().some((v) => v.id === id) ? id : 0 })
+    return { to: '/' }
+  }],
   // Pin (or unpin) the night the bot talks about.
   ['POST', /^\/t\/(\d+)\/activate$/, async (m, req) => {
     const f = await body(req)
@@ -167,11 +175,11 @@ const routes = [
     // with no venue — that is what "at home" is stored as.
     const fold = (x) => String(x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
     const want = fold(q.get('venue'))
-    const club = getClub()
+    const home = homePlace()
     const all = listTournaments()
-    const tournaments = !want ? all : all.filter((x) => (x.venue ? fold(x.venue) : fold(club.name)) === want)
+    const tournaments = !want ? all : all.filter((x) => (x.venue ? fold(x.venue) : fold(home.name)) === want)
     return { html: V.tournamentsPage({ tournaments, venues: listVenues(), t,
-      filter: want ? (all.find((x) => fold(x.venue) === want)?.venue || (want === fold(club.name) ? club.name : q.get('venue'))) : '',
+      filter: want ? (all.find((x) => fold(x.venue) === want)?.venue || (want === fold(home.name) ? home.name : q.get('venue'))) : '',
       notice: q.has('deleted') ? t('deletedTournament') : '' }) }
   }],
   // Gone means gone: sign-ups, courts, schedule, scores and the pinned board's
@@ -258,13 +266,13 @@ const routes = [
       n: q.get('n') || '',
     } : q.get('signed') ? { what: 'board', signed: q.get('signed') } : null
     const pinnedId = activeTournament()?.id || 0
-    const club = getClub()
+    const home = homePlace()
     const away = v.tournament.venue ? findVenue(v.tournament.venue) : null
     return { html: V.tournamentPage({ ...v, flash,
       // Where the night is, as something a phone can open: the saved venue's
-      // map when the night is away, the club's own map when it is at home.
-      place: { name: away ? away.name : (v.tournament.venue || club.name),
-        url: v.tournament.venue ? (away?.maps_url || '') : club.maps_url },
+      // map when the night is away, home's map when it is at home.
+      place: { name: away ? away.name : (v.tournament.venue || home.name),
+        url: v.tournament.venue ? (away?.maps_url || '') : home.maps_url },
       pinned: pinnedId === v.tournament.id, night: playingTournament()?.id === v.tournament.id,
       message: signupMessage(v.tournament, '', t.lang),
       // What the group would see right now, so a host can read it before
@@ -280,10 +288,9 @@ const routes = [
   ['GET', /^\/t\/(\d+)\/tv$/, (m, _r, t) => {
     const v = view(Number(m[1]))
     if (!v) return { html: '<h1>404</h1>', code: 404 }
-    const clubNow = getClub()
     const awayNow = v.tournament.venue ? findVenue(v.tournament.venue) : null
-    return { html: V.tvPage({ ...v, club: clubNow, t,
-      place: awayNow ? awayNow.name : (v.tournament.venue || '') }) }
+    return { html: V.tvPage({ ...v, club: getClub(), t,
+      place: awayNow ? awayNow.name : (v.tournament.venue || homePlace().name) }) }
   }],
 
   ['POST', /^\/t\/(\d+)\/schedule$/, (m, _r, t) => {
