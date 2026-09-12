@@ -240,7 +240,13 @@ const routes = [
       n: q.get('n') || '',
     } : q.get('signed') ? { what: 'board', signed: q.get('signed') } : null
     const pinnedId = activeTournament()?.id || 0
+    const club = getClub()
+    const away = v.tournament.venue ? findVenue(v.tournament.venue) : null
     return { html: V.tournamentPage({ ...v, flash,
+      // Where the night is, as something a phone can open: the saved venue's
+      // map when the night is away, the club's own map when it is at home.
+      place: { name: away ? away.name : (v.tournament.venue || club.name),
+        url: v.tournament.venue ? (away?.maps_url || '') : club.maps_url },
       pinned: pinnedId === v.tournament.id, night: playingTournament()?.id === v.tournament.id,
       message: signupMessage(v.tournament, '', t.lang),
       // What the group would see right now, so a host can read it before
@@ -256,7 +262,10 @@ const routes = [
   ['GET', /^\/t\/(\d+)\/tv$/, (m, _r, t) => {
     const v = view(Number(m[1]))
     if (!v) return { html: '<h1>404</h1>', code: 404 }
-    return { html: V.tvPage({ ...v, club: getClub(), t }) }
+    const clubNow = getClub()
+    const awayNow = v.tournament.venue ? findVenue(v.tournament.venue) : null
+    return { html: V.tvPage({ ...v, club: clubNow, t,
+      place: awayNow ? awayNow.name : (v.tournament.venue || '') }) }
   }],
 
   ['POST', /^\/t\/(\d+)\/schedule$/, (m, _r, t) => {

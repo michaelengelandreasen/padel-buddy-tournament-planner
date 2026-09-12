@@ -321,7 +321,7 @@ nav a.on{color:var(--ink);background:var(--surface-2)}
 nav a.on .i{color:var(--brand)}
 form.lang{display:flex;gap:2px;flex:0 0 auto;margin-left:8px}
 form.lang button{background:transparent;color:var(--muted);border:1px solid transparent;
-  min-height:44px;padding:0 10px;font-size:.82rem;font-weight:800;letter-spacing:.03em}
+  min-height:44px;min-width:44px;padding:0 10px;font-size:.82rem;font-weight:800;letter-spacing:.03em}
 form.lang button.on{color:var(--brand-ink);background:var(--brand)}
 
 .i{width:1.1em;height:1.1em;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:2;
@@ -330,6 +330,8 @@ h3 .i,h2 .i{width:20px;height:20px;color:var(--muted);margin-right:.4em;vertical
 button .i,.btn .i,nav a .i{width:18px;height:18px}
 .meta{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;color:var(--muted);margin:0 0 .5rem}
 .meta>span,.meta>a{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+/* Links in the meta line are tapped on a phone: thumb-sized, whatever their text. */
+.meta>a,.meta a.tap{min-height:44px}
 .meta .i{width:16px;height:16px}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
   padding:20px;margin:16px 0;min-width:0}
@@ -948,7 +950,7 @@ export function flashLine(flash, t) {
 
 export function tournamentPage({
   tournament: tour, teams, waiting, matches, table, message, roundText, tableText = '', scheduleText = '',
-  courts, flash, pinned = false, night = false, t,
+  courts, flash, pinned = false, night = false, place = null, t,
 }) {
   const rounds = roundsOf(matches)
   const now = currentRound(matches)
@@ -1125,7 +1127,9 @@ export function tournamentPage({
     <h1>${esc(tour.level) || esc(t('statusOpen'))} · ${esc(humanWhen(tour, { lang: t.lang }))}</h1>
     <p class="muted">${esc(levelLabel(tour.level, t))}</p>
     <p class="meta">
-      ${tour.venue ? `<span>${ic('pin')}${esc(tour.venue)}</span>` : ''}
+      ${place ? (place.url
+        ? `<a href="${esc(place.url)}" target="_blank" rel="noopener">${ic('pin')}${esc(place.name)}${ic('arrow')}</a>`
+        : `<span>${ic('pin')}${esc(place.name)}</span>`) : ''}
       <span>${ic('court')}${esc(t('courtsN', { n: tour.courts }))}</span>
       <span>${ic('clock')}${esc(t('minutes', { n: tour.duration_min }))}</span>
       <span>${ic('repeat')}${esc(t('minRounds', { n: tour.round_min }))}</span>
@@ -1154,7 +1158,7 @@ export function tournamentPage({
  * it follows the scores: the last result of a round is what moves it on, which
  * is the same signal that sends the round message to the groups.
  */
-export function tvPage({ tournament: tour, club, teams, matches, table, t }) {
+export function tvPage({ tournament: tour, club, teams, matches, table, place = '', t }) {
   const rounds = roundsOf(matches)
   const round = currentRound(matches)
   const plan = rounds.length ? roundPlan({ tournament: tour, matches, teams, round }) : null
@@ -1197,7 +1201,7 @@ h1{font-size:clamp(22px,3.2vw,44px);margin:0;overflow-wrap:anywhere}
 @media (max-width:760px){.tv{grid-template-columns:1fr;gap:18px}body{padding:14px}}
 </style></head><body>
 ${SPRITE}
-<div class="tvhead"><h1>${esc(club.name)} — ${esc(levelShort(tour.level, t))}</h1>
+<div class="tvhead"><h1>${esc(place || club.name)} — ${esc(levelShort(tour.level, t))}</h1>
 <span class="sub">${esc(humanWhen(tour, { lang: t.lang, tbc: '' }))} · ${
   esc(t('minRounds', { n: tour.round_min }))}</span></div>
 <div class="tv">
