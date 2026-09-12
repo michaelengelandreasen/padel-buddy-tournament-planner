@@ -330,6 +330,13 @@ h3 .i,h2 .i{width:20px;height:20px;color:var(--muted);margin-right:.4em;vertical
 button .i,.btn .i,nav a .i{width:18px;height:18px}
 .meta{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;color:var(--muted);margin:0 0 .5rem}
 .meta>span,.meta>a{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+/* The pin opens the map, the name opens the venue's nights: two links, one item. */
+.meta .place{display:inline-flex;align-items:center;gap:2px}
+.meta .pinlink{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;
+  margin-left:-12px;border-radius:999px;color:var(--brand)}
+.meta .pinlink:hover{background:var(--surface-2)}
+.meta .pinlink.off{color:var(--muted)}
+.meta .pinlink .i{width:18px;height:18px}
 /* Links in the meta line are tapped on a phone: thumb-sized, whatever their text. */
 .meta>a,.meta a.tap{min-height:44px}
 .meta .i{width:16px;height:16px}
@@ -825,7 +832,7 @@ export function settings({ club, courts, venues = [], t }) {
     ], 'club')}`, { nav: navFor('/settings', t), t, here: '/settings', tab: 'club' })
 }
 
-export function tournamentsPage({ tournaments, venues = [], form = {}, error = '', imported = null, pasted = '', notice = '', t }) {
+export function tournamentsPage({ tournaments, venues = [], form = {}, error = '', imported = null, pasted = '', notice = '', filter = '', t }) {
   const today = todayISO()
   const cat = form.level_category || 'MX'
   const grade = String(form.level_grade || (imported ? '' : 4))
@@ -850,6 +857,27 @@ export function tournamentsPage({ tournaments, venues = [], form = {}, error = '
       ${imported.players.length ? `<ol class="roster">${imported.players.map((p) =>
         `<li>${esc(p.name)}${p.partner ? ` <span class="muted">&amp; ${esc(p.partner)}</span>` : ''}</li>`).join('')}</ol>` : ''}
     </div>` : ''
+
+  const list = tournaments.map((x) => `<div class="card"><div class="head">
+      <div style="min-width:0"><strong>${esc(x.level) || esc(t('statusOpen'))}</strong>
+        <span class="muted"> · ${esc(levelShort(x.level, t))}</span><br>
+        <span class="muted">${esc(humanWhen(x, { lang: t.lang }))} · ${
+          esc(t('courtsN', { n: x.courts }))}${x.venue && !filter ? ` · ${esc(x.venue)}` : ''}</span></div>
+      <div class="rowact">
+        <a class="btn ghost" href="/t/${x.id}">${esc(t('open'))}${ic('arrow')}</a>
+        <form method="post" action="/t/${x.id}/delete" onsubmit="return confirm(${
+          JSON.stringify(t('deleteConfirm', { name: `${x.level || ''} ${humanWhen(x, { lang: t.lang })}`.trim() })).replace(/"/g, '&quot;')})">
+          <button class="btn danger" aria-label="${esc(t('deleteTournament'))}">${ic('trash')}<span>${esc(t('remove'))}</span></button>
+        </form>
+      </div></div></div>`).join('')
+
+  if (filter) {
+    return page(t('nightsAt', { place: filter }), `
+      <h1>${ic('pin')} ${esc(t('nightsAt', { place: filter }))}</h1>
+      <p class="meta"><a href="/tournaments">${ic('arrow')}${esc(t('allNights'))}</a></p>
+      ${list || `<p class="muted">${esc(t('noNightsAt', { place: filter }))}</p>`}
+    `, { nav: navFor('/tournaments', t), t, here: '/tournaments' })
+  }
 
   return page(t('newTournament'), `
     <h1>${esc(t('newTournament'))}</h1>
@@ -900,18 +928,7 @@ export function tournamentsPage({ tournaments, venues = [], form = {}, error = '
         esc(t('botDoesTheSame', { cmd: '\u0000' })).replace('\u0000',
           `<span class="mono">${esc(cmd)}</span>`)}</p>
     </form>
-    ${tournaments.map((x) => `<div class="card"><div class="head">
-      <div style="min-width:0"><strong>${esc(x.level) || esc(t('statusOpen'))}</strong>
-        <span class="muted"> · ${esc(levelShort(x.level, t))}</span><br>
-        <span class="muted">${esc(humanWhen(x, { lang: t.lang }))} · ${
-          esc(t('courtsN', { n: x.courts }))}</span></div>
-      <div class="rowact">
-        <a class="btn ghost" href="/t/${x.id}">${esc(t('open'))}${ic('arrow')}</a>
-        <form method="post" action="/t/${x.id}/delete" onsubmit="return confirm(${
-          JSON.stringify(t('deleteConfirm', { name: `${x.level || ''} ${humanWhen(x, { lang: t.lang })}`.trim() })).replace(/"/g, '&quot;')})">
-          <button class="btn danger" aria-label="${esc(t('deleteTournament'))}">${ic('trash')}<span>${esc(t('remove'))}</span></button>
-        </form>
-      </div></div></div>`).join('')}
+    ${list}
   `, { nav: navFor('/tournaments', t), script: LEVEL_JS, t, here: '/tournaments' })
 }
 
@@ -1127,9 +1144,9 @@ export function tournamentPage({
     <h1>${esc(tour.level) || esc(t('statusOpen'))} · ${esc(humanWhen(tour, { lang: t.lang }))}</h1>
     <p class="muted">${esc(levelLabel(tour.level, t))}</p>
     <p class="meta">
-      ${place ? (place.url
-        ? `<a href="${esc(place.url)}" target="_blank" rel="noopener">${ic('pin')}${esc(place.name)}${ic('arrow')}</a>`
-        : `<span>${ic('pin')}${esc(place.name)}</span>`) : ''}
+      ${place ? `<span class="place">${place.url
+        ? `<a class="pinlink" href="${esc(place.url)}" target="_blank" rel="noopener" aria-label="${esc(t('openInMaps'))}" title="${esc(t('openInMaps'))}">${ic('pin')}</a>`
+        : `<span class="pinlink off">${ic('pin')}</span>`}<a href="/tournaments?venue=${encodeURIComponent(place.name)}">${esc(place.name)}</a></span>` : ''}
       <span>${ic('court')}${esc(t('courtsN', { n: tour.courts }))}</span>
       <span>${ic('clock')}${esc(t('minutes', { n: tour.duration_min }))}</span>
       <span>${ic('repeat')}${esc(t('minRounds', { n: tour.round_min }))}</span>

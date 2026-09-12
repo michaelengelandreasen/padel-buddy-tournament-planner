@@ -153,9 +153,19 @@ const routes = [
   }],
   ['POST', /^\/courts\/(\d+)\/delete$/, (m) => { deleteCourt(Number(m[1])); return { to: '/settings#courts' } }],
 
-  ['GET', /^\/tournaments$/, (_m, req, t) =>
-    ({ html: V.tournamentsPage({ tournaments: listTournaments(), venues: listVenues(), t,
-      notice: new URL(req.url, 'http://x').searchParams.has('deleted') ? t('deletedTournament') : '' }) })],
+  ['GET', /^\/tournaments$/, (_m, req, t) => {
+    const q = new URL(req.url, 'http://x').searchParams
+    // ?venue= narrows the list to one place. The club's own name means nights
+    // with no venue — that is what "at home" is stored as.
+    const fold = (x) => String(x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+    const want = fold(q.get('venue'))
+    const club = getClub()
+    const all = listTournaments()
+    const tournaments = !want ? all : all.filter((x) => (x.venue ? fold(x.venue) : fold(club.name)) === want)
+    return { html: V.tournamentsPage({ tournaments, venues: listVenues(), t,
+      filter: want ? (all.find((x) => fold(x.venue) === want)?.venue || (want === fold(club.name) ? club.name : q.get('venue'))) : '',
+      notice: q.has('deleted') ? t('deletedTournament') : '' }) }
+  }],
   // Gone means gone: sign-ups, courts, schedule, scores and the pinned board's
   // memory. The page asks first; this is the only thing here with no undo.
   ['POST', /^\/t\/(\d+)\/delete$/, (m) => {
