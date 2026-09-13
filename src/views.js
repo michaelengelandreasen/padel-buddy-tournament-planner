@@ -290,7 +290,11 @@ function pbBoot(){window.pbInit.forEach(function(f){try{f()}catch(e){console.err
     fetch(action,{method:'POST',body:new URLSearchParams(data),credentials:'same-origin',
       headers:{'Accept':'text/html'},redirect:'follow'}).then(function(res){
       var to=new URL(res.url,location.href);
-      if(to.pathname!==location.pathname){location.assign(to.href);return}
+      // Only a redirect elsewhere is a navigation. A page rendered straight
+      // back to the POST (an import readout, a validation error) is this
+      // page's next state, and the address stays where it was.
+      if(res.redirected&&to.pathname!==location.pathname){location.assign(to.href);return}
+      if(!res.redirected)to=new URL(location.href);
       return res.text().then(function(html){
         var doc=new DOMParser().parseFromString(html,'text/html');
         var next=doc.querySelector('.wrap');if(!next)throw new Error('no page');
@@ -315,6 +319,10 @@ function tabbed(tabs, active) {
     role="tabpanel" aria-labelledby="tabbtn-${x.id}">${x.body}</section>`).join('')
   return strip + panels
 }
+
+/** The same mark as the tab icon — a data URI, so no request and no 404. */
+const FAVICON = `<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,${
+  encodeURIComponent(LOGO.replace(' class="mark"', ' xmlns="http://www.w3.org/2000/svg"').replace(' aria-hidden="true"', ''))}">`
 
 /** An icon next to a word. Decorative: the word carries the meaning, the icon speeds it up. */
 const ic = (name, cls = '') => `<svg class="i${cls ? ` ${cls}` : ''}" aria-hidden="true"><use href="#i-${name}"/></svg>`
@@ -718,7 +726,7 @@ export function page(title, body, { nav = '', script = '', t = translator(), her
   return `<!doctype html><html lang="${t.lang}"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="dark">
-<title>${esc(title)}</title><style>${CSS}</style>
+<title>${esc(title)}</title>${FAVICON}<style>${CSS}</style>
 <script>document.documentElement.classList.add('js')</script></head><body${
   tab ? ` data-tab="${esc(tab)}"` : ''}>
 <header class="top"><a class="brand" href="/">${LOGO}
@@ -1246,7 +1254,7 @@ export function tvPage({ tournament: tour, club, teams, matches, table, place = 
   return `<!doctype html><html lang="${t.lang}"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="refresh" content="20">
-<title>${esc(club.name)} — ${esc(t('live'))}</title><style>${CSS}
+<title>${esc(club.name)} — ${esc(t('live'))}</title>${FAVICON}<style>${CSS}
 .court .i{width:1em;height:1em;margin-right:.3em;vertical-align:-.12em}
 .rest .i,.final .i{width:1.1em;height:1.1em;margin-right:.35em}
 .tv h2 .i{width:1em;height:1em}
