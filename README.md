@@ -371,7 +371,10 @@ swap.
 ## Tests
 
 The parsers are the only place where a human's typing becomes a stored value, so
-they are the only place with tests.
+they are the only place with unit tests. `test/e2e/drive.mjs` drives the whole
+console in a real headless Chrome over the DevTools protocol — every page, tab
+and form at phone width, in-place saves included, console errors and failed
+requests collected — creating and deleting its own tournament and clubs.
 
 ```
 TZ=Europe/Lisbon node --test
