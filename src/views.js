@@ -882,7 +882,7 @@ export function settings({ club, courts, venues = [], notice = '', home = 0, t }
     ], 'venues')}`, { nav: navFor('/settings', t), t, here: '/settings', tab: 'venues' })
 }
 
-export function tournamentsPage({ tournaments, venues = [], form = {}, error = '', imported = null, pasted = '', notice = '', filter = '', t }) {
+export function tournamentsPage({ tournaments, venues = [], home = '', form = {}, error = '', imported = null, pasted = '', notice = '', filter = '', t }) {
   const today = todayISO()
   const cat = form.level_category || 'MX'
   const grade = String(form.level_grade || (imported ? '' : 4))
@@ -958,9 +958,14 @@ export function tournamentsPage({ tournaments, venues = [], form = {}, error = '
             value="${esc(form.play_time ?? '19:00')}"></div>
       </div>
       <label for="venue">${esc(t('venue'))}</label>
-      <input id="venue" name="venue" value="${esc(form.venue || '')}" maxlength="80" list="venues"
-        placeholder="${esc(t('venueHelp'))}" autocomplete="off">
-      <datalist id="venues">${venues.map((x) => `<option value="${esc(x.name)}">`).join('')}</datalist>
+      <select id="venue" name="venue">
+        <option value=""${form.venue ? '' : ' selected'}>${esc(t('homeClubOption', { name: home }))}</option>
+        ${venues.filter((x) => x.name !== home).map((x) => `<option value="${esc(x.name)}"${
+          form.venue === x.name ? ' selected' : ''}>${esc(x.name)}</option>`).join('')}
+        ${form.venue && form.venue !== home && !venues.some((x) => x.name === form.venue)
+          ? `<option value="${esc(form.venue)}" selected>${esc(form.venue)}</option>` : ''}
+      </select>
+      <p class="hint">${esc(t('venueHelp'))} <a href="/settings#venues">${esc(t('manageClubs'))}</a></p>
       <div class="row">
         <div><label for="courts">${esc(t('courts'))}</label>
           <input id="courts" name="courts" type="number" min="1" max="20"

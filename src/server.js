@@ -180,7 +180,7 @@ const routes = [
     const home = homePlace()
     const all = listTournaments()
     const tournaments = !want ? all : all.filter((x) => (x.venue ? fold(x.venue) : fold(home.name)) === want)
-    return { html: V.tournamentsPage({ tournaments, venues: listVenues(), t,
+    return { html: V.tournamentsPage({ tournaments, venues: listVenues(), home: homePlace().name, t,
       filter: want ? (all.find((x) => fold(x.venue) === want)?.venue || (want === fold(home.name) ? home.name : q.get('venue'))) : '',
       notice: q.has('deleted') ? t('deletedTournament') : '' }) }
   }],
@@ -205,7 +205,7 @@ const routes = [
       courts: read.courts, duration_min: read.duration_min, round_min: 12,
       roster: JSON.stringify(read.players.map(({ name, partner }) => ({ name, partner }))),
     }
-    return { html: V.tournamentsPage({ tournaments: listTournaments(), venues: listVenues(), form,
+    return { html: V.tournamentsPage({ tournaments: listTournaments(), venues: listVenues(), home: homePlace().name, form,
       imported: read, pasted: f.text, t }) }
   }],
 
@@ -215,7 +215,7 @@ const routes = [
     // is about anything else that can POST here. On a failure the page comes
     // back with the reason and what was typed, not a redirect that eats both.
     const bad = (error) => ({
-      html: V.tournamentsPage({ tournaments: listTournaments(), venues: listVenues(), form: f, error, t }),
+      html: V.tournamentsPage({ tournaments: listTournaments(), venues: listVenues(), home: homePlace().name, form: f, error, t }),
       code: 400,
     })
     const lang = t.lang
