@@ -876,6 +876,8 @@ export function settings({ club, courts, venues = [], notice = '', home = 0, t }
       <textarea id="rules_en" name="rules_en" style="min-height:96px">${esc(club.rules_en)}</textarea>
       <label for="rules_pt">${esc(t('inPortuguese'))}</label>
       <textarea id="rules_pt" name="rules_pt" style="min-height:96px">${esc(club.rules_pt)}</textarea>
+      <label for="rules_uk">${esc(t('inUkrainian'))}</label>
+      <textarea id="rules_uk" name="rules_uk" style="min-height:96px">${esc(club.rules_uk || '')}</textarea>
       <input type="hidden" name="tab" value="policy">
       <div class="actions"><button>${ic('check')}${esc(t('save'))}</button></div>
     </form>`

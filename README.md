@@ -176,8 +176,8 @@ first once scores have been entered, since they go with the old schedule.
 
 ## Language
 
-English or Portuguese, chosen with the `EN`/`PT` toggle in the header or in
-Settings. It is one setting on the club row, not a per-visitor cookie: it drives
+English, Portuguese or Ukrainian, chosen with the `EN`/`PT`/`UK` toggle in the
+header or in Settings. It is one setting on the club row, not a per-visitor cookie: it drives
 the console *and* the messages the same button sends to the group, and those two
 must never disagree. Unknown values fall back to English, and a missing string
 renders its own key rather than a blank.

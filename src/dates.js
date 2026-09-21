@@ -28,6 +28,13 @@ const DAYS_PT_LONG = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira'
   'quinta-feira', 'sexta-feira', 'sábado']
 const MONTHS_PT_LONG = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho',
   'agosto', 'setembro', 'outubro', 'novembro', 'dezembro']
+// Ukrainian, for the third language the group runs in. Months in the genitive,
+// which is how a date is read out: 5 вересня. The matcher uses the same stems.
+const DAYS_UK = ['неділя', 'понеділок', 'вівторок', 'середа', 'четвер', 'п’ятниця', 'субота']
+const MONTHS_UK = ['січня', 'лютого', 'березня', 'квітня', 'травня', 'червня', 'липня',
+  'серпня', 'вересня', 'жовтня', 'листопада', 'грудня']
+// A plain apostrophe is what a phone keyboard produces for п'ятниця.
+const uk = (w) => w.replace(/’/g, "'")
 
 const pad = (n) => String(n).padStart(2, '0')
 
@@ -77,16 +84,27 @@ export function parseWhen(input, { now = new Date(), lang } = {}) {
   } else if (hhmm) {
     time = `${pad(Number(hhmm[1]))}:${hhmm[2]}`
     s = (s.slice(0, hhmm.index) + ' ' + s.slice(hhmm.index + hhmm[0].length)).trim()
+  } else {
+    // "19h" on its own: a whole hour, the way Portuguese writes one.
+    const bare = s.match(/(^|\s)([01]?\d|2[0-3])h(?=\s|$)/)
+    if (bare) {
+      time = `${pad(Number(bare[2]))}:00`
+      s = (s.slice(0, bare.index) + ' ' + s.slice(bare.index + bare[0].length)).trim()
+    }
   }
-  s = s.replace(/\bat\b|\bàs\b|\bas\b/g, ' ').replace(/\s+/g, ' ').trim()
+  // "at", "às", and the Ukrainian "о" — dropped by whitespace, not \b, which in
+  // JavaScript knows only ASCII letters and never sees a Cyrillic word end.
+  s = s.replace(/(^|\s)(at|às|as|о)(?=\s|$)/gu, ' ').replace(/’/g, "'").replace(/\s+/g, ' ').trim()
   // Accents off, so "terça" and "terca" are the same word to the matcher below.
   s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
 
   // "next friday" means the one after this week's; "this friday"/"on friday"
   // mean the same as the bare weekday.
   let strictlyNext = false
-  const lead = s.match(/^(next|this|on|proxima|proximo)\s+/)
-  if (lead) { strictlyNext = lead[1] === 'next'; s = s.slice(lead[0].length).trim() }
+  // "next friday", "у п'ятницю", "наступної п'ятниці": the lead word says
+  // which one; the Ukrainian case endings are covered by matching stems.
+  const lead = s.match(/^(next|this|on|proxima|proximo|у|в|о|цієї|цього|наступн\S*)\s+/u)
+  if (lead) { strictlyNext = lead[1] === 'next' || lead[1].startsWith('наступн'); s = s.slice(lead[0].length).trim() }
 
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const out = (dt) => ({ ok: true, date: todayISO(dt), time })
@@ -106,9 +124,9 @@ export function parseWhen(input, { now = new Date(), lang } = {}) {
   // A bare weekday: the next one, today included — a Friday night tournament
   // gets announced on the Friday more often than not.
   const dayOf = (text) => {
-    const hit = (list, i) => new RegExp(`^${list[i].slice(0, 5)}`).test(text) ||
-      new RegExp(`^${list[i].slice(0, 3)}\\w*$`).test(text)
-    return DAYS.findIndex((_, i) => hit(DAYS, i) || hit(DAYS_PT, i))
+    const hit = (list, i) => new RegExp(`^${list[i].slice(0, 5)}`, 'u').test(text) ||
+      new RegExp(`^${list[i].slice(0, 3)}[\\p{L}]*$`, 'u').test(text)
+    return DAYS.findIndex((_, i) => hit(DAYS, i) || hit(DAYS_PT, i) || hit(DAYS_UK.map(uk), i))
   }
 
   // "Friday 5 Sep" — once a real date follows, the weekday is decoration, and
@@ -131,11 +149,11 @@ export function parseWhen(input, { now = new Date(), lang } = {}) {
   }
 
   // 5 sep / sep 5 / 5 september 2026
-  const words = s.match(/^(?:(\d{1,2})\s+)?([a-zç]{3,})(?:\s+(\d{1,2}))?(?:\s+(\d{4}))?$/)
+  const words = s.match(/^(?:(\d{1,2})\s+)?([\p{L}]{3,})(?:\s+(\d{1,2}))?(?:\s+(\d{4}))?$/u)
   if (words) {
     const stem = words[2].slice(0, 3)
     const mo = MONTHS.findIndex((m, i) =>
-      m.startsWith(stem) || MONTHS_PT[i].startsWith(stem))
+      m.startsWith(stem) || MONTHS_PT[i].startsWith(stem) || MONTHS_UK[i].startsWith(stem))
     const d = Number(words[1] || words[3])
     if (mo >= 0 && d) {
       return resolve(d, mo + 1, words[4] ? Number(words[4]) : null, today, time, raw, lang)
@@ -190,6 +208,9 @@ export function humanDate(date, { now = new Date(), lang } = {}) {
     const ptYear = year ? ` de ${dt.getFullYear()}` : ''
     return `${cap(DAYS_PT_LONG[dt.getDay()])}, ${dt.getDate()} de ${MONTHS_PT_LONG[dt.getMonth()]}${ptYear}`
   }
+  if (lang === 'uk') {
+    return `${cap(DAYS_UK[dt.getDay()])}, ${dt.getDate()} ${MONTHS_UK[dt.getMonth()]}${year}`
+  }
   return `${cap(DAYS[dt.getDay()])} ${dt.getDate()} ${cap(MONTHS[dt.getMonth()])}${year}`
 }
 
@@ -197,7 +218,7 @@ export function humanDate(date, { now = new Date(), lang } = {}) {
 export function dayName(date, { lang } = {}) {
   const dt = toDate(date)
   if (!dt) return ''
-  return cap(lang === 'pt' ? DAYS_PT_LONG[dt.getDay()] : DAYS[dt.getDay()])
+  return cap(lang === 'pt' ? DAYS_PT_LONG[dt.getDay()] : lang === 'uk' ? DAYS_UK[dt.getDay()] : DAYS[dt.getDay()])
 }
 
 /** `2026-09-05` → `05/09/2026`, day first, the way the group writes it. */
@@ -224,7 +245,9 @@ export function addMinutes(time, mins) {
  */
 const clockFmt = (lang) => (lang === 'pt'
   ? (hh, mm) => `${hh}h${mm ? pad(mm) : ''}`
-  : (hh, mm) => `${((hh + 11) % 12) + 1}${mm ? `:${pad(mm)}` : ''}${hh < 12 ? 'AM' : 'PM'}`)
+  : lang === 'uk'
+    ? (hh, mm) => `${pad(hh)}:${pad(mm)}`
+    : (hh, mm) => `${((hh + 11) % 12) + 1}${mm ? `:${pad(mm)}` : ''}${hh < 12 ? 'AM' : 'PM'}`)
 
 /** One time, in the club's own convention: `11AM` / `11h`, `11:24AM` / `11h24`. */
 export function clock(time, { lang } = {}) {

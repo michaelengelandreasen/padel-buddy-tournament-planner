@@ -35,6 +35,7 @@ db.exec(`
     -- switching the club over doesn't silently drop the club's own wording.
     rules_en  TEXT NOT NULL DEFAULT '',
     rules_pt  TEXT NOT NULL DEFAULT '',
+    rules_uk  TEXT NOT NULL DEFAULT '',
     -- Which Telegram group the bot lives in. Learned from the first command it
     -- sees there rather than configured, because no club captain should have to
     -- find out what a numeric chat id is.
@@ -148,7 +149,7 @@ function seedTournamentCourts(tid, count) {
  */
 function migrate() {
   const clubCols = db.prepare('PRAGMA table_info(club)').all().map((c) => c.name)
-  for (const [col, def] of [['language', "'en'"], ['rules_en', "''"], ['rules_pt', "''"],
+  for (const [col, def] of [['language', "'en'"], ['rules_en', "''"], ['rules_pt', "''"], ['rules_uk', "''"],
     ['telegram_chat_id', "''"], ['active_tournament_id', '0'], ['home_venue_id', '0']]) {
     if (!clubCols.includes(col)) {
       db.exec(`ALTER TABLE club ADD COLUMN ${col} TEXT NOT NULL DEFAULT ${def}`)
@@ -156,7 +157,7 @@ function migrate() {
   }
   // A club that never wrote its own policy gets the standard one, in both
   // languages, rather than an empty block under every board.
-  for (const [col, lang] of [['rules_en', 'en'], ['rules_pt', 'pt']]) {
+  for (const [col, lang] of [['rules_en', 'en'], ['rules_pt', 'pt'], ['rules_uk', 'uk']]) {
     db.exec(`UPDATE club SET ${col} = '${
       translator(lang)('dropoutDefault').replace(/'/g, "''")}' WHERE ${col} = ''`)
   }
@@ -234,7 +235,7 @@ export function clubLanguage() {
 
 /** Only the keys given are written, so the language form can't blank the address. */
 export function saveClub(patch) {
-  const allowed = ['name', 'address', 'maps_url', 'language', 'rules_en', 'rules_pt',
+  const allowed = ['name', 'address', 'maps_url', 'language', 'rules_en', 'rules_pt', 'rules_uk',
     'telegram_chat_id', 'home_venue_id']
   const keys = allowed.filter((k) => patch[k] !== undefined)
   if (!keys.length) return getClub()
@@ -248,7 +249,7 @@ export function saveClub(patch) {
 /** The drop-out policy in the club's current language, blank if it cleared it. */
 export function clubRules(lang = clubLanguage()) {
   const club = getClub()
-  return (lang === 'pt' ? club.rules_pt : club.rules_en).trim()
+  return ({ pt: club.rules_pt, uk: club.rules_uk }[lang] ?? club.rules_en).trim()
 }
 
 /**

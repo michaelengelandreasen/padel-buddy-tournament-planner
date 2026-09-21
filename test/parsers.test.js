@@ -11,6 +11,7 @@ import {
 } from '../src/levels.js'
 import {
   parseWhen, validateWhen, humanWhen, isISODate, dayName, shortDate, timeRange,
+  humanDate,
 } from '../src/dates.js'
 import { translator, LANGUAGES, isLanguage } from '../src/i18n.js'
 import { buildTeams, capacity, slots } from '../src/formats/nonstop.js'
@@ -178,7 +179,7 @@ test('i18n: the two languages are genuinely different, not silent fallbacks', ()
 
 test('i18n: an unknown language falls back rather than blanking the page', () => {
   assert.equal(isLanguage('de'), false)
-  assert.equal(LANGUAGES.length, 2)
+  assert.equal(LANGUAGES.length, 3)
   const t = translator('de')
   assert.equal(t.lang, 'en')
   assert.equal(t('whosIn'), "Who's in?")
@@ -403,4 +404,19 @@ test('night: on court now beats everything; else the next up; else the last one'
   assert.equal(at('2026-09-14T12:00:00'), 14)   // Monday: Friday is next
   assert.equal(at('2026-09-20T12:00:00'), 14)   // after everything: the most recent
   assert.equal(pickNight([], new Date()), null)
+})
+
+// ---- Ukrainian ----
+
+test('uk: dates and clocks read in Ukrainian, and the parser takes Cyrillic days and months', () => {
+  assert.equal(humanDate('2026-09-13', { lang: 'uk', now: new Date('2026-09-01') }), 'Неділя, 13 вересня')
+  assert.equal(dayName('2026-09-18', { lang: 'uk' }), 'П’ятниця')
+  assert.equal(timeRange('09:30', 120, { lang: 'uk' }), '09:30-11:30')
+  const now = new Date('2026-09-12T10:00:00')
+  assert.equal(parseWhen('5 вересня 19:00', { now }).date, '2026-09-05' < '2026-09-12' ? '2027-09-05' : '2026-09-05')
+  assert.equal(parseWhen('20 вер', { now }).date, '2026-09-20')
+  assert.equal(parseWhen("п'ятниця о 20:30", { now }).time, '20:30')
+  assert.equal(parseWhen('субота', { now }).date, '2026-09-12')
+  assert.equal(translator('uk')('whosIn'), 'Хто грає?')
+  assert.equal(translator('uk')('missingKeyXYZ'), 'missingKeyXYZ')
 })
