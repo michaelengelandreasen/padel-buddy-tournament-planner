@@ -5,11 +5,21 @@
 //   chrome --headless=new --remote-debugging-port=9333 --remote-allow-origins='*' about:blank &
 //   node test/e2e/drive.mjs            # needs Node 22+ (global WebSocket, fetch)
 //
-// BASE and BASIC_AUTH default to the VPN URL and the club login; override with env.
+// BASE, BASIC_AUTH and CDP default to the VPN URL, the club login and a local
+// Chrome; override with env. `node --test` picks this file up with everything
+// else, so with no browser to drive it reports a skip rather than a failure —
+// a missing Chrome is not a broken console.
 import { readFileSync } from 'node:fs'
 const base = process.env.BASE || 'https://padel-tournament-planner.mikehome.users.ctx7.dev'
 const auth = 'Basic ' + Buffer.from(process.env.BASIC_AUTH || 'padel:buddy').toString('base64')
-const ver = await (await fetch('http://127.0.0.1:9333/json/new?about:blank', { method: 'PUT' })).json()
+const cdp = process.env.CDP || 'http://127.0.0.1:9333'
+let ver
+try {
+  ver = await (await fetch(`${cdp}/json/new?about:blank`, { method: 'PUT' })).json()
+} catch (err) {
+  console.log(`skipped — no browser on ${cdp} (${err.cause?.code || err.message})`)
+  process.exit(0)
+}
 const ws = new WebSocket(ver.webSocketDebuggerUrl)
 await new Promise((r) => { ws.onopen = r })
 let id = 0; const pending = new Map(); const errors = []; const failed = []

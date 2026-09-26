@@ -133,7 +133,8 @@ var tabs=[].slice.call(document.querySelectorAll('.tabs [role=tab]'));if(!tabs.l
 function show(id,push){tabs.forEach(function(b){var on=b.dataset.tab===id;b.setAttribute('aria-selected',on?'true':'false');
 b.tabIndex=on?0:-1;var p=document.getElementById('tab-'+b.dataset.tab);if(p)p.classList.toggle('on',on)});
 if(push)history.replaceState(null,'','#'+id)}
-tabs.forEach(function(b){b.addEventListener('click',function(){show(b.dataset.tab,true)});
+tabs.forEach(function(b){if(!pbOnce(b,'tab'))return;
+b.addEventListener('click',function(){show(b.dataset.tab,true)});
 b.addEventListener('keydown',function(e){if(e.key!=='ArrowRight'&&e.key!=='ArrowLeft')return;e.preventDefault();
 var i=tabs.indexOf(b),n=tabs[(i+(e.key==='ArrowRight'?1:tabs.length-1))%tabs.length];n.focus();show(n.dataset.tab,true)})});
 function fromHash(){var h=location.hash.slice(1);return tabs.some(function(b){return b.dataset.tab===h})?h:''}
@@ -149,6 +150,7 @@ if(!window.__pbHash){window.__pbHash=1;window.addEventListener('hashchange',func
  */
 const PAIRS_JS = `pbInit.push(function(){
 var board=document.getElementById('pairs');if(!board)return;
+if(!pbOnce(board,'pairs'))return;
 var form=board.closest('form'),field=form.querySelector('[name=seats]');
 var seatsOf=function(){return [].slice.call(board.querySelectorAll('.seat'))};
 var tray=board.querySelector('.tray');
@@ -226,6 +228,7 @@ form.addEventListener('submit',function(){
  */
 const COPY_JS = `pbInit.push(function(){
 document.querySelectorAll('[data-copy]').forEach(function(b){
+  if(!pbOnce(b,'copy'))return;
   b.addEventListener('click',function(){
     var el=document.querySelector(b.dataset.copy);if(!el)return;var text=el.textContent;
     var done=function(){var was=b.innerHTML;b.classList.add('done');b.querySelector('span').textContent=b.dataset.done;
@@ -245,7 +248,7 @@ document.querySelectorAll('[data-copy]').forEach(function(b){
  */
 const courtList = (courts, base, t, { fixed = false } = {}) => `
   <form class="courtlist" method="post" action="${base}/save">
-    ${courts.map((c) => `<div class="courtrow">
+    ${courts.map((c) => `<div class="courtrow" data-key="court-${c.id}">
       ${ic('court')}
       <input name="label${c.id}" value="${esc(c.label)}" maxlength="40" required aria-label="${esc(t('courtName'))}">
       <button class="btn save" name="only" value="${c.id}">${ic('check')}${esc(t('save'))}</button>
@@ -265,28 +268,135 @@ const copyBtn = (id, t) => `<button type="button" class="btn ghost" data-copy="#
   ic('board')}<span>${esc(t('copy'))}</span></button>`
 
 /**
- * Saves without a page load.
+ * Saves that leave the page where it is.
  *
- * Every POST form on the page is fetched instead of navigated: the server
- * answers as it always did — a redirect to the page it just changed — and the
- * content of that page replaces this one's, tab kept, scroll kept, URL updated.
- * A redirect to a *different* page (create, delete) is a real navigation and
- * is followed as one. Anything unexpected falls back to a plain submit, so the
- * server routes remain the one source of truth and scripting off still works.
+ * Every POST form is fetched rather than navigated, and the answer is *morphed*
+ * into the live DOM rather than replacing it. The server is untouched: it still
+ * replies with a redirect back to the page it just changed, and that page is
+ * still the whole truth. What changed is that a node whose markup did not
+ * change is not touched at all — so the box the host is typing in keeps its
+ * focus and its caret, nothing repaints, and the scroll is never "restored"
+ * because it never moved.
+ *
+ * Replacing the page wholesale is what made saving a score jump: fifteen match
+ * blocks were destroyed and rebuilt on every press, focus fell back to the
+ * document, and the status line arriving at the top of the card pushed the
+ * court the host was reading fifty pixels down the screen.
+ *
+ * Two things still move the page on their own. Content appearing above the fold
+ * shifts everything below it, so the element nearest the top of the viewport is
+ * measured before and after and the scroll corrected by the difference. And a
+ * redirect to a *different* page (create, delete) is a real navigation, so it is
+ * followed as one. Anything unexpected falls back to a plain submit, so
+ * scripting off still works and the server routes stay the one source of truth.
  */
 const AJAX_JS = `window.pbInit=window.pbInit||[];
 function pbBoot(){window.pbInit.forEach(function(f){try{f()}catch(e){console.error(e)}})}
+// Bind once per node. A morphed page keeps its nodes, so an init that already
+// ran on an element must not run again and listen to it twice.
+function pbOnce(el,key){var k='__pb_'+key;if(el[k])return false;el[k]=1;return true}
 (function(){
+  // The two regions the server re-renders. The header is in because the
+  // language toggle lives there and switching language rewrites the nav — left
+  // out, that one form was the only control on the site still reloading.
+  var ROOTS=['header.top','.wrap'];
   var wrap=document.querySelector('.wrap');if(!wrap)return;
+  var inRoots=function(el){return ROOTS.some(function(sel){
+    var r=document.querySelector(sel);return r&&r.contains(el)})};
+
+  // ---- morphing -----------------------------------------------------------
+  // A key makes a node recognisable across a render: an id where there is one,
+  // an explicit data-key on repeated rows. Keyed children are matched by key
+  // and moved; the rest are matched by position and tag.
+  var keyOf=function(n){return n.nodeType===1?(n.id||n.getAttribute('data-key')||''):''};
+  var alike=function(a,b){return a.nodeType===b.nodeType&&(a.nodeType!==1||a.tagName===b.tagName)};
+  var isField=function(n){return /^(INPUT|TEXTAREA|SELECT)$/.test(n.tagName)};
+
+  function morphAttrs(cur,next){
+    var i,a,na=next.attributes,ca=cur.attributes;
+    for(i=na.length-1;i>=0;i--){a=na[i];if(cur.getAttribute(a.name)!==a.value)cur.setAttribute(a.name,a.value)}
+    for(i=ca.length-1;i>=0;i--){a=ca[i];if(!next.hasAttribute(a.name))cur.removeAttribute(a.name)}
+  }
+  function morphField(cur,next){
+    // What the host is typing is theirs until they leave the box. The server
+    // echoes the value it stored, which mid-keystroke is the one before this.
+    if(cur===document.activeElement)return;
+    if(cur.type==='checkbox'||cur.type==='radio'){cur.checked=next.hasAttribute('checked');return}
+    if(cur.tagName==='SELECT'){morphChildren(cur,next);if(cur.value!==next.value)cur.value=next.value;return}
+    var v=next.getAttribute('value')||'';
+    if(cur.value!==v)cur.value=v;
+  }
+  function morph(cur,next){
+    if(cur.nodeType!==1){if(cur.nodeValue!==next.nodeValue)cur.nodeValue=next.nodeValue;return}
+    morphAttrs(cur,next);
+    if(isField(cur))return morphField(cur,next);
+    morphChildren(cur,next);
+  }
+  function morphChildren(cur,next){
+    var keyed=Object.create(null),n,k;
+    for(n=cur.firstChild;n;n=n.nextSibling){k=keyOf(n);if(k)keyed[k]=n}
+    var at=cur.firstChild;
+    for(var want=next.firstChild;want;want=want.nextSibling){
+      k=keyOf(want);
+      var use=k?(keyed[k]||null):(at&&!keyOf(at)&&alike(at,want)?at:null);
+      if(!use){cur.insertBefore(document.importNode(want,true),at);continue}
+      if(k)delete keyed[k];
+      if(use===at)at=at.nextSibling;else cur.insertBefore(use,at);
+      if(alike(use,want))morph(use,want);
+      else use.replaceWith(document.importNode(want,true));
+    }
+    // Whatever the answer did not ask for is gone. Anything still unconsumed
+    // sits at or after the cursor, including keys the new page dropped.
+    while(at){var nx=at.nextSibling;cur.removeChild(at);at=nx}
+  }
+
+  // ---- holding the viewport still ----------------------------------------
+  // The element nearest the top of the viewport, and where it sits. After the
+  // patch the page is scrolled so that it sits there still.
+  function anchor(){
+    // At the top of the page there is nothing to hold: a status line arriving
+    // should settle in where the host can read it, not be scrolled past.
+    if(scrollY<=4)return null;
+    var els=wrap.querySelectorAll('[id]'),best=null,bestAt=Infinity;
+    for(var i=0;i<els.length;i++){
+      var r=els[i].getBoundingClientRect();
+      if(!r.width&&!r.height)continue;
+      if(r.bottom<0||r.top>innerHeight)continue;
+      var d=Math.abs(r.top);
+      if(d<bestAt){bestAt=d;best=els[i]}
+    }
+    return best?{id:best.id,top:best.getBoundingClientRect().top}:null
+  }
+  function hold(a){
+    if(!a)return;
+    var el=document.getElementById(a.id);if(!el)return;
+    var d=el.getBoundingClientRect().top-a.top;
+    if(d)scrollBy(0,d);
+  }
+
+  // A press that changes nothing visible still needs an answer.
+  function tick(btn){
+    if(!btn||!btn.isConnected)return;
+    btn.classList.add('done');
+    setTimeout(function(){btn.classList.remove('done')},1200);
+  }
+
+  // Presses overlap — a host taps Save on one court while the last one is still
+  // in the air. Every press reaches the server; only the newest answer paints,
+  // because an older one would paint the page as it was before the last save.
+  var seq=0;
   document.addEventListener('submit',function(e){
     var form=e.target;if(!(form instanceof HTMLFormElement)||e.defaultPrevented)return;
-    if((form.method||'get').toLowerCase()!=='post'||!wrap.contains(form))return;
+    if((form.method||'get').toLowerCase()!=='post'||!inRoots(form))return;
     if(!window.fetch||!window.DOMParser)return;
     e.preventDefault();
     var btn=e.submitter,action=(btn&&btn.getAttribute('formaction'))||form.getAttribute('action')||location.pathname;
     var data=btn?new FormData(form,btn):new FormData(form);
-    if(btn){btn.disabled=true;btn.classList.add('busy')}
-    var y=scrollY;
+    var mine=++seq;
+    form.setAttribute('aria-busy','true');
+    // Not disabled: disabling the pressed button moves focus off it, and on a
+    // phone that closes the keyboard the host is typing the next score with.
+    if(btn)btn.classList.add('busy');
     fetch(action,{method:'POST',body:new URLSearchParams(data),credentials:'same-origin',
       headers:{'Accept':'text/html'},redirect:'follow'}).then(function(res){
       var to=new URL(res.url,location.href);
@@ -296,16 +406,28 @@ function pbBoot(){window.pbInit.forEach(function(f){try{f()}catch(e){console.err
       if(res.redirected&&to.pathname!==location.pathname){location.assign(to.href);return}
       if(!res.redirected)to=new URL(location.href);
       return res.text().then(function(html){
+        if(mine!==seq)return;
         var doc=new DOMParser().parseFromString(html,'text/html');
-        var next=doc.querySelector('.wrap');if(!next)throw new Error('no page');
-        wrap.innerHTML=next.innerHTML;
+        if(!doc.querySelector('.wrap'))throw new Error('no page');
+        var a=anchor();
+        ROOTS.forEach(function(sel){
+          var cur=document.querySelector(sel),nx=doc.querySelector(sel);
+          if(cur&&nx)morph(cur,nx);
+        });
         document.title=doc.title;
+        document.documentElement.lang=doc.documentElement.lang;
         var tab=doc.body.getAttribute('data-tab');if(tab)document.body.setAttribute('data-tab',tab);
         history.replaceState(null,'',to.pathname+to.search+(to.hash||location.hash));
         pbBoot();
-        scrollTo(0,y);
+        hold(a);
+        form.removeAttribute('aria-busy');
+        if(btn){btn.classList.remove('busy');tick(btn)}
       })
-    }).catch(function(err){console.error(err);if(btn){btn.disabled=false;btn.classList.remove('busy')}form.submit()});
+    }).catch(function(err){
+      console.error(err);
+      form.removeAttribute('aria-busy');if(btn)btn.classList.remove('busy');
+      if(mine===seq)form.submit();
+    });
   });
 })();`
 
@@ -757,7 +879,7 @@ const wrapTable = (inner, cls = '') =>
  * so every box on the page can also be saved at once from the bar underneath.
  * Each name is the input's own <label>, so the accessible name is the team.
  */
-const matchBlock = (m, t) => `<div class="match">
+const matchBlock = (m, t) => `<div class="match" id="match-${m.id}">
   <div class="court">${ic('court')} ${esc(courtName(m.court, t))}</div>
   <div class="sides">
     ${[['a', m.team_a, m.score_a], ['b', m.team_b, m.score_b]].map(([side, team, score]) => `
@@ -836,7 +958,7 @@ export function settings({ club, courts, venues = [], notice = '', home = 0, t }
     <div class="card">
       <h3>${ic('pin')}${esc(t('venues'))}</h3>
       <p class="muted">${esc(t('venuesHelp'))}</p>
-      <div class="venuelist">${venues.map((x) => `<form class="venue" method="post" action="/venues/${x.id}">
+      <div class="venuelist">${venues.map((x) => `<form class="venue" data-key="venue-${x.id}" method="post" action="/venues/${x.id}">
         ${x.id === home ? `<span class="pill on">${ic('home')} ${esc(t('homeBadge'))}</span>` : ''}
         ${venueFields(x, `v${x.id}`)}
         <div class="actions">
@@ -1170,7 +1292,7 @@ export function tournamentPage({
     <form class="card" method="post" action="/t/${tour.id}/scores">
       <h3>${ic('list')}${esc(t('schedule'))}</h3>
       ${flashFor('scores')}
-      ${rounds.map((r) => `<div class="roundhead">
+      ${rounds.map((r) => `<div class="roundhead" id="round-${r}">
         <h4>${esc(t('roundN', { n: r }))}${r === now && !allDone ? ` <span class="pill on">${esc(t('nowShort'))}</span>` : ''}</h4>
         <button type="submit" class="link" formaction="/t/${tour.id}/post" name="round" value="${r}"
           formnovalidate>${esc(t('postRound', { n: r }))}</button>
@@ -1185,7 +1307,7 @@ export function tournamentPage({
     <div class="card"><h3>${ic('trophy')}${esc(t('standings'))}</h3>
       ${wrapTable(`<thead><tr><th>#</th><th>${esc(t('team'))}</th>${th('played', 'P')}${th('won', 'W')}${
         th('points', 'Pts')}${th('against', 'Ag')}</tr></thead>
-      <tbody>${table.map((r, i) => `<tr class="${i < 3 ? 'top' : ''}"><td class="pos">${i + 1}</td>
+      <tbody>${table.map((r, i) => `<tr class="${i < 3 ? 'top' : ''}" data-key="${esc(r.team)}"><td class="pos">${i + 1}</td>
         <td class="team">${esc(r.team)}</td>
         <td class="num">${r.played}</td>
         <td class="num">${r.won}</td>

@@ -148,10 +148,20 @@ const routes = [
   ['POST', /^\/language$/, async (_m, req) => {
     const f = await body(req)
     if (isLanguage(f.language)) saveClub({ language: f.language })
-    // Back to the page the toggle was pressed on — but only ever to a path on
-    // this site, never to whatever a form field happens to say.
-    const back = /^\/(?!\/)[\w/-]*$/.test(f.back || '') ? f.back : '/'
-    return { to: back }
+    // Back to the page the toggle was actually pressed on. The form's own
+    // `back` only knows which *section* the header is highlighting, so from a
+    // night it said /tournaments and switching language threw the host back to
+    // the list. The referer knows the page. Either way only a path on this
+    // site is ever followed, never whatever a form field happens to say.
+    const safe = (p) => (/^\/(?!\/)[\w/-]*$/.test(p) ? p : '')
+    let back = ''
+    if (req.headers.referer) {
+      try {
+        const ref = new URL(req.headers.referer)
+        if (ref.host === req.headers.host) back = safe(ref.pathname) && ref.pathname + ref.search
+      } catch { back = '' }
+    }
+    return { to: back || safe(f.back || '') || '/' }
   }],
   ['POST', /^\/courts$/, async (_m, req) => {
     const f = await body(req)
