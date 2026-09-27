@@ -22,6 +22,15 @@ export const isLanguage = (code) => LANGUAGES.some((l) => l.code === code)
 export const DEFAULT_LANGUAGE = 'en'
 
 const EN = {
+  // The tablet on the clubhouse wall.
+  tvWhere: 'Where you play',
+  tvPair: 'Pair',
+  tvNext: 'Next',
+  tvRound: 'R{n}',
+  tvPts: 'Pts',
+  tvLeading: 'Leading',
+  tvFinal: 'Final standings',
+  tvFullscreen: 'Tap for full screen',
   appName: 'Padel Tournament Planner',
 
   navOverview: 'Overview',
@@ -335,6 +344,14 @@ const EN = {
 }
 
 const PT = {
+  tvWhere: 'Onde jogas',
+  tvPair: 'Dupla',
+  tvNext: 'Próxima',
+  tvRound: 'R{n}',
+  tvPts: 'Pts',
+  tvLeading: 'Na frente',
+  tvFinal: 'Classificação final',
+  tvFullscreen: 'Toca para ecrã inteiro',
   appName: 'Organizador de Torneios de Padel',
 
   navOverview: 'Resumo',
@@ -641,6 +658,14 @@ const PT = {
 
 
 const UK = {
+  tvWhere: 'Де ви граєте',
+  tvPair: 'Пара',
+  tvNext: 'Далі',
+  tvRound: 'Р{n}',
+  tvPts: 'Оч',
+  tvLeading: 'Лідери',
+  tvFinal: 'Підсумкова таблиця',
+  tvFullscreen: 'Торкніться для повного екрана',
   appName: 'Планувальник турнірів з паделу',
 
   navOverview: 'Огляд',

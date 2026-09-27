@@ -1352,88 +1352,266 @@ export function tournamentPage({
     ], active)}`, { nav: navFor('/tournaments', t), t, here: '/tournaments', tab: active })
 }
 
-/** Full-screen, high-contrast, self-refreshing — this one is read from ten metres. */
 /**
- * The clubhouse screen: the round being played, court by court, where every
- * pair goes next, and the table.
+ * The clubhouse tablet: every pair, every round, which court — on one screen.
  *
- * Read from four metres away between points, so the court name is the biggest
- * thing on the line and nothing needs a second glance. It refreshes itself, and
- * it follows the scores: the last result of a round is what moves it on, which
- * is the same signal that sends the round message to the groups.
+ * It stands by the courts for the whole night, and the one question it answers
+ * is "where do I go next". So the heart of it is a grid: a row per pair, in
+ * alphabetical order because that is how you look for your own name, and a
+ * column per round holding the court. The round being played is filled, the
+ * next one outlined, the ones already played dimmed — you find your row and
+ * read across. Beside it, who is on which court right now and who is leading.
+ *
+ * It never scrolls. Type sizes come from the night itself: the server passes the
+ * number of rows and columns, and CSS divides the screen by them, so six pairs
+ * are read from across the room and sixteen still fit an iPad without a second
+ * page. It refreshes itself in place — no white flash every twenty seconds —
+ * keeps the screen awake, and goes full screen on the first tap.
  */
+/** Longest pair name the wall prints in full; past it, surnames become initials. */
+const TV_NAME = 22
+
 export function tvPage({ tournament: tour, club, teams, matches, table, place = '', t }) {
   const rounds = roundsOf(matches)
+  const allDone = rounds.length > 0 && rounds.every((r) => roundComplete(matches, r))
   const round = currentRound(matches)
+  const next = !allDone && rounds.includes(round + 1) ? round + 1 : 0
   const plan = rounds.length ? roundPlan({ tournament: tour, matches, teams, round }) : null
-  const last = round === rounds[rounds.length - 1]
   const from = plan ? clock(plan.start, { lang: t.lang }) : ''
   const to = plan ? clock(plan.end, { lang: t.lang }) : ''
-  const nextCourts = plan && !last ? courtsByTeam(matches, round + 1) : null
-  const goes = nextCourts ? teams.map((x) => ({ name: x.name, court: nextCourts.get(x.name) || '' }))
-    .sort((a, b) => Number(!a.court) - Number(!b.court)
-      || String(a.court).localeCompare(String(b.court), undefined, { numeric: true })
-      || a.name.localeCompare(b.name)) : []
+  const scored = matches.some((m) => m.score_a != null)
+
+  // Pair → court, per round. A missing entry is a pair sitting that round out.
+  const where = new Map(rounds.map((r) => [r, courtsByTeam(matches, r)]))
+  const points = new Map(table.map((r) => [r.team, r.points]))
+  const pairs = teams.map((x) => x.name)
+    .sort((a, b) => a.localeCompare(b, t.lang, { sensitivity: 'base' }))
+
+  // A pair as the wall shows it. A long name keeps each first name and drops
+  // the surnames to an initial — "Inês F. & Eduardo C." is still recognisable
+  // from across the court, "Inês Figueiredo & Edua…" loses the partner.
+  const shown = new Map(teams.map(({ name }) => [name, name.length <= TV_NAME ? name
+    : name.split(/\s*&\s*/).map((p) => {
+      const w = p.trim().split(/\s+/)
+      return w.length > 1 ? `${w[0]} ${w[w.length - 1][0]}.` : p.trim()
+    }).join(' & ')]))
+  const label = (name) => shown.get(name) || name
+  const nameEm = Math.min(13, Math.max(7, ...[...shown.values()].map((n) => n.length * 0.56)))
+
+  // How much there is to fit, in em. The grid is a name column, a narrow
+  // column per round (a court is one or two characters), wider ones for now and
+  // next, and the points; the side is two lines per court plus its headings.
+  const courts = plan ? plan.games.length : 0
+  const loud = rounds.filter((r) => (r === round && !allDone) || r === next).length
+  // Heights are in em as rendered: a grid row is 2em with its padding and the
+  // larger now/next digits, the heading 1.7; a court on the side is two lines,
+  // 2.95em; a table line 1.75.
+  const gridCols = nameEm + 0.6 + (rounds.length - loud) * 1.9 + loud * 2.8 + (scored ? 2.6 : 0)
+  const gridEm = 1.7 + pairs.length * 2
+  const courtsEm = plan && !allDone ? 1.6 + courts * 2.95 + (plan.resting.length ? 1.5 : 0) : 0
+  const leadEm = allDone ? 1.6 + table.length * 1.75 : scored ? 1.6 + 3 * 1.75 : 0
+  // Stacked in one column beside the grid, or side by side under it.
+  const sideEm = courtsEm + leadEm + (courtsEm && leadEm ? 0.6 : 0)
+  const sidePortraitEm = Math.max(courtsEm, leadEm, 1)
+
+  const cell = (r, name) => {
+    const court = where.get(r)?.get(name)
+    const cls = [r === round && !allDone ? 'now' : r === next ? 'next' : r < round || allDone ? 'past' : '']
+    if (!court) return `<td class="${cls} rest" title="${esc(t('sittingOut'))}">${ic('coffee')}</td>`
+    return `<td class="${cls}">${esc(court)}</td>`
+  }
+  const head = (r) => `<th class="${r === round && !allDone ? 'now' : r === next ? 'next' : r < round || allDone ? 'past' : ''}">${
+    r === round && !allDone ? esc(t('nowShort')) : r === next ? esc(t('tvNext')) : esc(t('tvRound', { n: r }))}</th>`
+
+  // Widths live on <col>, in the table's own em. On a <th> they would be in the
+  // heading's smaller em, and the digits underneath would spill past them.
+  const kind = (r) => (r === round && !allDone ? 'now' : r === next ? 'next' : '')
+  const grid = rounds.length ? `<table class="where">
+      <colgroup><col class="who" style="width:${(nameEm + 0.6).toFixed(1)}em">${rounds.map((r) => `<col class="${kind(r) ? 'loud' : 'r'}">`).join('')}${
+        scored ? '<col class="pts">' : ''}</colgroup>
+      <thead><tr><th class="who">${esc(t('tvPair'))}</th>${rounds.map(head).join('')}${
+        scored ? `<th class="pts">${esc(t('tvPts'))}</th>` : ''}</tr></thead>
+      <tbody>${pairs.map((name) => `<tr><td class="who" title="${esc(name)}">${esc(label(name))}</td>${
+        rounds.map((r) => cell(r, name)).join('')}${
+        scored ? `<td class="pts">${points.get(name) ?? 0}</td>` : ''}</tr>`).join('')}</tbody>
+    </table>` : `<p class="muted big">${esc(t('notDrawn'))}</p>`
+
+  const onCourt = plan && !allDone ? `
+    <h2>${ic('court')}${esc(t('roundOfN', { n: round, total: rounds.length }))}${
+      from && to ? `<span class="when">${esc(from)} → ${esc(to)}</span>` : ''}</h2>
+    <ul class="games">${plan.games.map((m) => `<li>
+      <span class="c">${esc(m.court)}</span>
+      <span class="a">${esc(label(m.team_a))}</span><span class="b"><em>${esc(t('vsShort'))}</em> ${esc(label(m.team_b))}</span>
+    </li>`).join('')}</ul>
+    ${plan.resting.length ? `<p class="resting">${ic('coffee')}${esc(plan.resting.map(label).join(', '))}</p>` : ''}` : ''
+
+  const leaders = allDone
+    ? `<h2>${ic('trophy')}${esc(t('tvFinal'))}</h2><ol class="table">${table.map((r, i) => `<li class="${i < 3 ? 'top' : ''}">
+        <span class="p">${i + 1}</span><span class="n">${esc(label(r.team))}</span><span class="s">${r.points}</span></li>`).join('')}</ol>`
+    : scored ? `<h2>${ic('trophy')}${esc(t('tvLeading'))}</h2><ol class="table">${table.slice(0, 3).map((r, i) => `<li class="top">
+        <span class="p">${i + 1}</span><span class="n">${esc(label(r.team))}</span><span class="s">${r.points}</span></li>`).join('')}</ol>`
+      : ''
+
+  const body = `<header class="tvhead">
+    <h1>${esc(place || club.name)} <span>· ${esc(levelShort(tour.level, t))}</span></h1>
+    <span class="sub">${esc(humanWhen(tour, { lang: t.lang, tbc: '' }))} · ${esc(t('minRounds', { n: tour.round_min }))}</span>
+    <span class="clock" id="clock"></span>
+  </header>
+  <main class="tv" style="--gw:${gridCols.toFixed(1)};--gh:${gridEm.toFixed(1)};--sh:${
+    Math.max(sideEm, 1).toFixed(1)};--shp:${sidePortraitEm.toFixed(1)};--ghf:${gridEm.toFixed(1)}fr;--shf:${
+    (sidePortraitEm + 0.5).toFixed(1)}fr">
+    <section class="left">${grid}</section>
+    <section class="side"><div class="in">${onCourt ? `<div>${onCourt}</div>` : ''}${leaders ? `<div>${leaders}</div>` : ''}</div></section>
+  </main>`
 
   return `<!doctype html><html lang="${t.lang}"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="refresh" content="20">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<noscript><meta http-equiv="refresh" content="20"></noscript>
 <title>${esc(club.name)} — ${esc(t('live'))}</title>${FAVICON}<style>${CSS}
-.court .i{width:1em;height:1em;margin-right:.3em;vertical-align:-.12em}
-.rest .i,.final .i{width:1.1em;height:1.1em;margin-right:.35em}
-.tv h2 .i{width:1em;height:1em}
-body{padding:2.5vh 3vw;min-height:100vh}
-.tvhead{display:flex;flex-wrap:wrap;align-items:baseline;gap:.4em 1.2em;margin-bottom:2vh}
-h1{font-size:clamp(22px,3.2vw,44px);margin:0;overflow-wrap:anywhere}
-.sub{font-size:clamp(13px,1.4vw,22px);color:var(--muted)}
-.tv{display:grid;grid-template-columns:1.25fr 1fr;gap:2.5vw;align-items:start}
-.tv h2{display:flex;flex-wrap:wrap;align-items:center;gap:.3em .6em;
-  font-size:clamp(16px,1.8vw,28px);margin:0 0 .5em}
-.tv h2 .i{margin:0}
-.tv h2 .when{color:var(--muted);font-weight:600;font-size:.72em;font-variant-numeric:tabular-nums}
-.tv table{font-size:clamp(14px,1.7vw,26px);margin:0}
-.tv td{padding:.45em .6em;border-bottom:1px solid var(--line)}
-.court{font-weight:800;color:var(--accent);white-space:nowrap;width:1%}
-.vs{color:var(--muted);font-size:.8em;text-align:center;width:1%;padding:0 .2em}
-.pos{font-weight:800;color:var(--brand);width:2ch;font-variant-numeric:tabular-nums}
-.rest{color:var(--muted);font-size:clamp(13px,1.4vw,22px);margin:.6em 0 0;padding:0 .6em}
-.next{margin-top:2.2vh}
-.next td.court{color:var(--ink)}
-.next tr.off td{color:var(--muted)}
-.final{color:var(--muted);font-size:clamp(14px,1.5vw,24px);margin-top:2vh;padding:0 .6em}
-/* A phone held up in the clubhouse gets the same board, one panel under the other. */
-@media (max-width:760px){.tv{grid-template-columns:1fr;gap:18px}body{padding:14px}}
+html,body{height:100%}
+body{margin:0;padding:1.6vh 2vw;overflow:hidden;display:flex;flex-direction:column;gap:1.4vh;
+  font-variant-numeric:tabular-nums}
+.tvhead{display:flex;align-items:baseline;gap:.3em 1.2em;flex-wrap:wrap;
+  font-size:clamp(13px,min(1.7vw,2.6vh),26px)}
+.tvhead h1{font-size:1.9em;margin:0;line-height:1.1;overflow-wrap:anywhere}
+.tvhead h1 span{color:var(--muted);font-weight:600}
+.tvhead .sub{color:var(--muted)}
+.tvhead .clock{margin-left:auto;font-weight:800;font-size:1.5em}
+.tv{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,2.3fr) minmax(0,1fr);gap:2vw}
+/*
+ * Each panel is a size container, and the type inside it is whichever is
+ * tighter: its width divided by the em the night needs across (--gw, --sw), or
+ * its height divided by the rows (--gr, --sr). The server counts; CSS divides.
+ */
+.tv section{min-height:0;min-width:0;container-type:size;overflow:hidden}
+
+/*
+ * The grid is sized from the night: --gr rows and --gw em of width must fit the
+ * space it has, so the type is whichever of the two is tighter. The height
+ * budget is the viewport minus the header; 1.85em is one row.
+ */
+table.where{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;margin:0;
+  font-size:max(11px,min(calc(100cqw / var(--gw)),calc(100cqh / var(--gh)),44px))}
+table.where th,table.where td{padding:.26em .2em;text-align:center;line-height:1.25;
+  border-bottom:1px solid var(--line);white-space:nowrap}
+table.where th{font-size:.62em;color:var(--muted);letter-spacing:.04em;text-transform:uppercase;
+  font-weight:800;border-bottom:2px solid var(--line)}
+table.where .who{text-align:left;overflow:hidden;text-overflow:ellipsis;font-weight:600;padding-left:.3em}
+table.where col.r{width:1.9em}
+table.where col.loud{width:2.8em}
+table.where col.pts{width:2.6em}
+table.where .pts{font-weight:800;color:var(--brand)}
+table.where th,table.where td{overflow:hidden}
+table.where td.now,table.where td.next{font-size:1.12em}
+table.where th.now,table.where th.next{font-size:.7em;letter-spacing:.02em}
+table.where td{font-weight:700}
+table.where .past{color:var(--muted);opacity:.45;font-weight:500}
+table.where td.now{background:var(--brand);color:var(--brand-ink);font-weight:900}
+table.where th.now{background:var(--brand);color:var(--brand-ink);border-radius:.4em .4em 0 0}
+table.where td.next,table.where th.next{box-shadow:inset 2px 0 var(--accent),inset -2px 0 var(--accent);color:var(--accent);font-weight:900}
+table.where th.next{box-shadow:inset 2px 0 var(--accent),inset -2px 0 var(--accent),inset 0 2px var(--accent);border-radius:.4em .4em 0 0}
+table.where tbody tr:last-child td.next{box-shadow:inset 2px 0 var(--accent),inset -2px 0 var(--accent),inset 0 -2px var(--accent)}
+table.where td.rest .i{width:.9em;height:.9em;opacity:.55;vertical-align:-.1em}
+table.where td.now.rest .i{opacity:.9}
+table.where tbody tr:nth-child(even) td.who{background:color-mix(in oklab,var(--surface) 55%,transparent)}
+.big{font-size:clamp(18px,3vw,40px)}
+
+/* The side has its own budget: two lines a court, three leaders, headings. */
+.side>.in{font-size:max(11px,min(calc(100cqw / 16),calc(100cqh / var(--sh)),34px));
+  display:flex;flex-direction:column;gap:.5em}
+.side h2{display:flex;flex-wrap:wrap;align-items:center;gap:.2em .5em;font-size:1em;margin:0}
+.side h2 .i{width:1em;height:1em;margin:0}
+.side h2 .when{color:var(--muted);font-weight:600;font-size:.8em}
+ul.games,ol.table{list-style:none;margin:0;padding:0}
+ul.games li{display:grid;grid-template-columns:2.4em minmax(0,1fr);column-gap:.5em;
+  padding:.2em 0;border-bottom:1px solid var(--line)}
+ul.games .c{grid-row:span 2;align-self:center;font-weight:900;color:var(--accent);font-size:1.25em;text-align:center}
+ul.games .a,ul.games .b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3}
+ul.games em{font-style:normal;color:var(--muted);font-size:.75em;margin-right:.2em}
+.resting{margin:0;color:var(--muted);font-size:.85em}
+.resting .i{width:1em;height:1em;margin-right:.3em;vertical-align:-.12em}
+ol.table li{display:grid;grid-template-columns:1.6em minmax(0,1fr) auto;gap:.5em;align-items:baseline;
+  padding:.15em 0;border-bottom:1px solid var(--line)}
+ol.table .p{font-weight:900;color:var(--brand)}
+ol.table .n{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ol.table .s{font-weight:800}
+.hint{position:fixed;right:2vw;bottom:1.5vh;margin:0;font-size:12px;color:var(--muted);opacity:.7}
+:fullscreen .hint{display:none}
+
+/* Portrait: the grid on top, the courts and leaders underneath. */
+@media (orientation:portrait) and (min-width:600px){
+  /* Rows shared in proportion to what each needs, so neither starves the other. */
+  .tv{grid-template-columns:1fr;grid-template-rows:minmax(0,var(--ghf)) minmax(0,var(--shf));gap:1.6vh}
+  /* Two columns underneath — courts, then leaders — so each needs half the rows. */
+  .side>.in{font-size:max(11px,min(calc(50cqw / 16),calc(100cqh / var(--shp)),34px));
+    display:grid;grid-template-columns:1fr 1fr;grid-auto-flow:dense;align-content:start;column-gap:3vw}
+}
+/* A phone held up in the clubhouse: normal type, and scrolling is fine. */
+@media (max-width:599px){
+  body{overflow:auto;height:auto;padding:12px}
+  .tv{grid-template-columns:1fr;gap:18px}
+  .tv section{container-type:normal;overflow:visible}
+  table.where,.side>.in{font-size:15px}
+  .tv .left{overflow-x:auto}
+  table.where{min-width:calc(var(--gw) * 1em)}
+}
 </style></head><body>
 ${SPRITE}
-<div class="tvhead"><h1>${esc(place || club.name)} — ${esc(levelShort(tour.level, t))}</h1>
-<span class="sub">${esc(humanWhen(tour, { lang: t.lang, tbc: '' }))} · ${
-  esc(t('minRounds', { n: tour.round_min }))}</span></div>
-<div class="tv">
-  <div>
-    <h2>${plan ? esc(t('roundOfN', { n: round, total: rounds.length })) : esc(t('nowOnCourt'))}${
-      from && to ? `<span class="when">${esc(from)} → ${esc(to)}</span>` : ''}</h2>
-    <div class="tablewrap"><table>
-    ${plan ? plan.games.map((m) => `<tr>
-      <td class="court">${ic('court')}${esc(courtName(m.court, t))}</td><td>${esc(m.team_a)}</td>
-      <td class="vs">${esc(t('vsShort'))}</td><td>${esc(m.team_b)}</td></tr>`).join('')
-      : `<tr><td class="muted">${esc(t('notDrawn'))}</td></tr>`}
-    </table></div>
-    ${plan && plan.resting.length
-      ? `<p class="rest">${ic('coffee')}${esc(t('sittingOut'))}: ${esc(plan.resting.join(', '))}</p>` : ''}
-    ${goes.length ? `<div class="next">
-      <h2>${ic('compass')}${esc(t('nextRoundAt', { n: round + 1, at: to || '—' }))}</h2>
-      <div class="tablewrap"><table>
-      ${goes.map((g) => `<tr class="${g.court ? '' : 'off'}">
-        <td class="court">${g.court ? ic('court') : ic('coffee')}${esc(g.court ? courtName(g.court, t) : t('sittingOut'))}</td><td>${esc(g.name)}</td></tr>`).join('')}
-      </table></div></div>` : ''}
-    ${plan && last ? `<p class="final">${ic('trophy')}${esc(t('lastRoundNote'))}</p>` : ''}
-  </div>
-  <div><h2>${ic('trophy')}${esc(t('standings'))}</h2><div class="tablewrap"><table>
-    ${table.slice(0, 12).map((r, i) => `<tr><td class="pos">${i + 1}</td><td>${esc(r.team)}</td>
-      <td class="num"><strong>${r.points}</strong></td></tr>`).join('')
-      || `<tr><td class="muted">${esc(t('noResults'))}</td></tr>`}
-  </table></div></div>
-</div></body></html>`
+<div id="tv-root" style="display:contents">${body}</div>
+<p class="hint">${esc(t('tvFullscreen'))}</p>
+<script>
+(function(){
+  var lang=document.documentElement.lang;
+  function tick(){var el=document.getElementById('clock');if(!el)return;
+    el.textContent=new Date().toLocaleTimeString(lang,{hour:'2-digit',minute:'2-digit'})}
+  tick();setInterval(tick,10000);
+
+  // The CSS sizes the type from counts the server estimated; this makes it
+  // true. Any panel whose content still spills its box steps its type down
+  // until it doesn't — an estimate is never allowed to hide the last pair.
+  function fit(){
+    if(innerWidth<600)return;
+    document.querySelectorAll('.tv section').forEach(function(sec){
+      var el=sec.querySelector('table.where,.in');if(!el)return;
+      el.style.fontSize='';
+      var f=parseFloat(getComputedStyle(el).fontSize);
+      for(var i=0;i<30&&f>11;i++){
+        var r=el.getBoundingClientRect();
+        if(r.height<=sec.clientHeight+1&&el.scrollWidth<=sec.clientWidth+1)break;
+        f*=.96;el.style.fontSize=f+'px';
+      }
+    });
+  }
+  fit();addEventListener('resize',fit);
+  if(document.fonts&&document.fonts.ready)document.fonts.ready.then(fit);
+
+  // Refresh in place: fetch the page, swap the content, keep the clock going.
+  // A meta refresh blanks the screen every twenty seconds; this doesn't.
+  setInterval(function(){
+    fetch(location.href,{credentials:'same-origin',cache:'no-store'}).then(function(r){
+      if(!r.ok)throw 0;return r.text()}).then(function(html){
+      var doc=new DOMParser().parseFromString(html,'text/html');
+      var next=doc.getElementById('tv-root');if(!next)return;
+      var cur=document.getElementById('tv-root');
+      if(cur.innerHTML!==next.innerHTML){cur.innerHTML=next.innerHTML;tick();fit()}
+    }).catch(function(){});
+  },15000);
+
+  // A tablet left by the courts goes to sleep in two minutes unless told not to.
+  var lock=null;
+  function awake(){if(!('wakeLock' in navigator)||document.visibilityState!=='visible')return;
+    navigator.wakeLock.request('screen').then(function(l){lock=l}).catch(function(){})}
+  awake();document.addEventListener('visibilitychange',awake);
+  document.addEventListener('click',function(){
+    awake();
+    var d=document.documentElement;
+    if(!document.fullscreenElement&&d.requestFullscreen)d.requestFullscreen().catch(function(){});
+  });
+})();
+</script>
+</body></html>`
 }
 
 /**
