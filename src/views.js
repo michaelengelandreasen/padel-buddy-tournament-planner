@@ -385,13 +385,25 @@ function pbOnce(el,key){var k='__pb_'+key;if(el[k])return false;el[k]=1;return t
   // in the air. Every press reaches the server; only the newest answer paints,
   // because an older one would paint the page as it was before the last save.
   var seq=0;
+  // Which button was pressed. SubmitEvent.submitter is Chrome 81 / Firefox 75;
+  // a Galaxy Tab 2 runs Chrome 71 or Firefox 68, where it is missing and every
+  // per-match Save saved every box, and "Post round" or "Remove" did a save.
+  var pressed=null;
+  document.addEventListener('click',function(e){
+    var b=e.target.closest&&e.target.closest('button,input[type=submit]');
+    pressed=b&&b.form&&(b.type||'submit')==='submit'?b:null;
+  },true);
   document.addEventListener('submit',function(e){
     var form=e.target;if(!(form instanceof HTMLFormElement)||e.defaultPrevented)return;
     if((form.method||'get').toLowerCase()!=='post'||!inRoots(form))return;
     if(!window.fetch||!window.DOMParser)return;
     e.preventDefault();
-    var btn=e.submitter,action=(btn&&btn.getAttribute('formaction'))||form.getAttribute('action')||location.pathname;
-    var data=btn?new FormData(form,btn):new FormData(form);
+    var btn=e.submitter||(pressed&&pressed.form===form?pressed:null);pressed=null;
+    var action=(btn&&btn.getAttribute('formaction'))||form.getAttribute('action')||location.pathname;
+    // The pressed button's own name=value, added by hand: FormData's second
+    // argument is newer still (Chrome 112), and older engines ignore it.
+    var data=new FormData(form);
+    if(btn&&btn.name)data.append(btn.name,btn.value);
     var mine=++seq;
     form.setAttribute('aria-busy','true');
     // Not disabled: disabling the pressed button moves focus off it, and on a
@@ -1437,7 +1449,7 @@ export function tvPage({ tournament: tour, club, teams, matches, table, place = 
     </table>` : `<p class="muted big">${esc(t('notDrawn'))}</p>`
 
   const onCourt = plan && !allDone ? `
-    <h2>${ic('court')}${esc(t('roundOfN', { n: round, total: rounds.length }))}${
+    <h2>${ic('court')}<span class="t">${esc(t('roundOfN', { n: round, total: rounds.length }))}</span>${
       from && to ? `<span class="when">${esc(from)} → ${esc(to)}</span>` : ''}</h2>
     <ul class="games">${plan.games.map((m) => `<li>
       <span class="c">${esc(m.court)}</span>
@@ -1455,6 +1467,7 @@ export function tvPage({ tournament: tour, club, teams, matches, table, place = 
   const body = `<header class="tvhead">
     <h1>${esc(place || club.name)} <span>· ${esc(levelShort(tour.level, t))}</span></h1>
     <span class="sub">${esc(humanWhen(tour, { lang: t.lang, tbc: '' }))} · ${esc(t('minRounds', { n: tour.round_min }))}</span>
+    <span class="hint" id="hint">${esc(t('tvFullscreen'))}</span>
     <span class="clock" id="clock"></span>
   </header>
   <main class="tv" style="--gw:${gridCols.toFixed(1)};--gh:${gridEm.toFixed(1)};--sh:${
@@ -1473,19 +1486,36 @@ export function tvPage({ tournament: tour, club, teams, matches, table, place = 
 html,body{height:100%}
 body{margin:0;padding:1.6vh 2vw;overflow:hidden;display:flex;flex-direction:column;gap:1.4vh;
   font-variant-numeric:tabular-nums}
-.tvhead{display:flex;align-items:baseline;gap:.3em 1.2em;flex-wrap:wrap;
+/*
+ * Spacing is margins, not flex gap: a Galaxy Tab 2 tops out at Chrome 71, which
+ * ignores gap in flex layouts — "Round 4 of 12" and "7:36PM" ran together into
+ * "Round 4 of 127:36PM". Same for every flex row on this page.
+ */
+/*
+ * One line, always: a second header line on a 7-inch screen with the browser
+ * toolbar showing is a tenth of the height the grid needed. When it is tight
+ * the date gives way first, then the club name; the clock never does.
+ */
+.tvhead{display:flex;align-items:baseline;flex-wrap:nowrap;white-space:nowrap;font-size:18px;
   font-size:clamp(13px,min(1.7vw,2.6vh),26px)}
-.tvhead h1{font-size:1.9em;margin:0;line-height:1.1;overflow-wrap:anywhere}
+.tvhead h1{font-size:1.9em;margin:0 .6em 0 0;line-height:1.1;flex:0 1 auto;min-width:0;
+  overflow:hidden;text-overflow:ellipsis}
 .tvhead h1 span{color:var(--muted);font-weight:600}
-.tvhead .sub{color:var(--muted)}
-.tvhead .clock{margin-left:auto;font-weight:800;font-size:1.5em}
-.tv{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,2.3fr) minmax(0,1fr);gap:2vw}
+.tvhead .sub{color:var(--muted);flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.tvhead .hint{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:.75em;
+  color:var(--muted);margin:0 1em;opacity:.8}
+.tvhead .clock{flex:0 0 auto;font-weight:800;font-size:1.5em}
+:fullscreen .tvhead .hint{display:none}
+:-webkit-full-screen .tvhead .hint{display:none}
+.tv{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,2.3fr) minmax(0,1fr);
+  grid-template-rows:minmax(0,1fr);grid-column-gap:2vw;grid-row-gap:1.6vh}
 /*
  * Each panel is a size container, and the type inside it is whichever is
  * tighter: its width divided by the em the night needs across (--gw, --sw), or
  * its height divided by the rows (--gr, --sr). The server counts; CSS divides.
  */
 .tv section{min-height:0;min-width:0;container-type:size;overflow:hidden}
+.tv section.tight{overflow-y:auto}
 
 /*
  * The grid is sized from the night: --gr rows and --gw em of width must fit the
@@ -1519,37 +1549,39 @@ table.where tbody tr:nth-child(even) td.who{background:color-mix(in oklab,var(--
 .big{font-size:clamp(18px,3vw,40px)}
 
 /* The side has its own budget: two lines a court, three leaders, headings. */
-.side>.in{font-size:max(11px,min(calc(100cqw / 16),calc(100cqh / var(--sh)),34px));
-  display:flex;flex-direction:column;gap:.5em}
-.side h2{display:flex;flex-wrap:wrap;align-items:center;gap:.2em .5em;font-size:1em;margin:0}
-.side h2 .i{width:1em;height:1em;margin:0}
-.side h2 .when{color:var(--muted);font-weight:600;font-size:.8em}
+.side>.in{font-size:max(11px,min(calc(100cqw / 16),calc(100cqh / var(--sh)),34px))}
+.side>.in>div+div{margin-top:.5em}
+.side h2{font-size:1em;margin:0 0 .15em;line-height:1.3}
+.side h2 .i{width:1em;height:1em;margin:0 .35em 0 0;vertical-align:-.12em}
+.side h2 .t{white-space:nowrap}
+.side h2 .when{color:var(--muted);font-weight:600;font-size:.8em;margin-left:.5em;white-space:nowrap}
 ul.games,ol.table{list-style:none;margin:0;padding:0}
-ul.games li{display:grid;grid-template-columns:2.4em minmax(0,1fr);column-gap:.5em;
+ul.games li{display:grid;grid-template-columns:2.4em minmax(0,1fr);grid-column-gap:.5em;
   padding:.2em 0;border-bottom:1px solid var(--line)}
 ul.games .c{grid-row:span 2;align-self:center;font-weight:900;color:var(--accent);font-size:1.25em;text-align:center}
 ul.games .a,ul.games .b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3}
 ul.games em{font-style:normal;color:var(--muted);font-size:.75em;margin-right:.2em}
 .resting{margin:0;color:var(--muted);font-size:.85em}
 .resting .i{width:1em;height:1em;margin-right:.3em;vertical-align:-.12em}
-ol.table li{display:grid;grid-template-columns:1.6em minmax(0,1fr) auto;gap:.5em;align-items:baseline;
+ol.table li{display:grid;grid-template-columns:1.6em minmax(0,1fr) auto;grid-column-gap:.5em;align-items:baseline;
   padding:.15em 0;border-bottom:1px solid var(--line)}
 ol.table .p{font-weight:900;color:var(--brand)}
 ol.table .n{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 ol.table .s{font-weight:800}
-.hint{position:fixed;right:2vw;bottom:1.5vh;margin:0;font-size:12px;color:var(--muted);opacity:.7}
-:fullscreen .hint{display:none}
 
 /* Portrait: the grid on top, the courts and leaders underneath. */
 @media (orientation:portrait) and (min-width:600px){
   /* Rows shared in proportion to what each needs, so neither starves the other. */
-  .tv{grid-template-columns:1fr;grid-template-rows:minmax(0,var(--ghf)) minmax(0,var(--shf));gap:1.6vh}
+  .tv{grid-template-columns:1fr;grid-template-rows:minmax(0,var(--ghf)) minmax(0,var(--shf))}
   /* Two columns underneath — courts, then leaders — so each needs half the rows. */
   .side>.in{font-size:max(11px,min(calc(50cqw / 16),calc(100cqh / var(--shp)),34px));
-    display:grid;grid-template-columns:1fr 1fr;grid-auto-flow:dense;align-content:start;column-gap:3vw}
+    display:grid;grid-template-columns:1fr 1fr;align-content:start;grid-column-gap:3vw}
+  .side>.in>div+div{margin-top:0}
 }
 /* A phone held up in the clubhouse: normal type, and scrolling is fine. */
 @media (max-width:599px){
+  .tvhead{flex-wrap:wrap;white-space:normal}
+  .tvhead .sub{flex-basis:100%;order:3}
   body{overflow:auto;height:auto;padding:12px}
   .tv{grid-template-columns:1fr;gap:18px}
   .tv section{container-type:normal;overflow:visible}
@@ -1560,7 +1592,6 @@ ol.table .s{font-weight:800}
 </style></head><body>
 ${SPRITE}
 <div id="tv-root" style="display:contents">${body}</div>
-<p class="hint">${esc(t('tvFullscreen'))}</p>
 <script>
 (function(){
   var lang=document.documentElement.lang;
@@ -1568,23 +1599,44 @@ ${SPRITE}
     el.textContent=new Date().toLocaleTimeString(lang,{hour:'2-digit',minute:'2-digit'})}
   tick();setInterval(tick,10000);
 
-  // The CSS sizes the type from counts the server estimated; this makes it
-  // true. Any panel whose content still spills its box steps its type down
-  // until it doesn't — an estimate is never allowed to hide the last pair.
+  // Every panel gets the largest type at which its content fits its box —
+  // found by bisection, so it grows as readily as it shrinks. Modern CSS gives
+  // a close first guess; this is what makes it true, and it is the only sizing
+  // an older tablet gets: Chrome 71 on a Galaxy Tab 2 drops min(), max() and
+  // container units entirely and would otherwise sit at 16px on any night.
+  // Whether a name is cut off, from the text's own width in its own font.
+  // Neither engine the Tab 2 can run reports an ellipsised box honestly —
+  // Firefox 68's scrollWidth and Range both give the visible width — so the
+  // text is measured on a canvas, which knows nothing about the clipping.
+  var cv=document.createElement('canvas').getContext('2d');
+  function cut(n){var cs=getComputedStyle(n);
+    cv.font=cs.fontStyle+' '+cs.fontWeight+' '+cs.fontSize+' '+cs.fontFamily;
+    var room=n.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight);
+    return cv.measureText(n.textContent).width>room+.5}
   function fit(){
     if(innerWidth<600)return;
-    document.querySelectorAll('.tv section').forEach(function(sec){
-      var el=sec.querySelector('table.where,.in');if(!el)return;
-      el.style.fontSize='';
-      var f=parseFloat(getComputedStyle(el).fontSize);
-      for(var i=0;i<30&&f>11;i++){
-        var r=el.getBoundingClientRect();
-        if(r.height<=sec.clientHeight+1&&el.scrollWidth<=sec.clientWidth+1)break;
-        f*=.96;el.style.fontSize=f+'px';
-      }
-    });
+    var secs=document.querySelectorAll('.tv section');
+    for(var s=0;s<secs.length;s++){
+      var sec=secs[s],el=sec.querySelector('table.where,.in');if(!el)continue;
+      // A name cut off with an ellipsis doesn't fit either: someone looking
+      // for their pair has to be able to read it.
+      var names=el.querySelectorAll('td.who,.a,.b,.n');
+      var fits=function(f){el.style.fontSize=f+'px';var r=el.getBoundingClientRect();
+        if(r.height>sec.clientHeight||r.width>sec.clientWidth+.5||el.scrollWidth>sec.clientWidth)return false;
+        for(var k=0;k<names.length;k++)if(cut(names[k]))return false;
+        return true};
+      var lo=11,hi=el.tagName==='TABLE'?44:34;
+      sec.className=sec.className.replace(/ ?tight/g,'');
+      if(fits(hi))continue;
+      for(var i=0;i<9;i++){var mid=(lo+hi)/2;if(fits(mid))lo=mid;else hi=mid}
+      // Too much night for this screen even at the smallest readable size:
+      // the panel scrolls rather than silently dropping the last pairs.
+      if(!fits(lo))sec.className+=' tight';
+    }
   }
   fit();addEventListener('resize',fit);
+  // The hint is for whoever sets the tablet up; after that it is only in the way.
+  setTimeout(function(){var h=document.getElementById('hint');if(h){h.style.display='none';fit()}},20000);
   if(document.fonts&&document.fonts.ready)document.fonts.ready.then(fit);
 
   // Refresh in place: fetch the page, swap the content, keep the clock going.
@@ -1607,7 +1659,9 @@ ${SPRITE}
   document.addEventListener('click',function(){
     awake();
     var d=document.documentElement;
-    if(!document.fullscreenElement&&d.requestFullscreen)d.requestFullscreen().catch(function(){});
+    if(document.fullscreenElement||document.webkitFullscreenElement)return;
+    var go=d.requestFullscreen||d.webkitRequestFullscreen;
+    if(go){try{var p=go.call(d);if(p&&p.catch)p.catch(function(){})}catch(e){}}
   });
 })();
 </script>

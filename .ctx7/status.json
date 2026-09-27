@@ -92,6 +92,10 @@
   ],
   "activity": [
     {
+      "at": "2026-09-27T08:37:28.957Z",
+      "text": "Tested the tablet view on a Samsung Galaxy Tab 2 in real Chrome 71 and Firefox 68 at every Tab 2 viewport: fixed text that never grew in old engines, run-together labels, a header that wrapped, names cut unseen; per-match Save misfired on old engines (fixed). test/tab2/run.sh re-runs it."
+    },
+    {
       "at": "2026-09-27T07:47:43.295Z",
       "text": "Tablet view rebuilt as a fit-to-screen grid: a row per pair, a column per round, court in each cell; now/next columns highlighted. 16 pairs x 12 rounds x 8 courts fits an iPad in both orientations; refreshes in place, keeps the screen awake."
     },
@@ -133,9 +137,9 @@
     }
   ],
   "status": "active",
-  "headline": "Clubhouse tablet: every pair, every round, one screen",
-  "summary": "The TV view is now a grid — a row per pair (alphabetical, to find your name), a column per round holding the court, the round being played filled, the next outlined. Beside it: who is on which court now, and the leaders; the final standings once the night ends. Type is sized from the night so it nev",
-  "next": "Put it on the club's tablet for a real night and check it from across the court",
+  "headline": "Clubhouse tablet verified on a Galaxy Tab 2",
+  "summary": "The tablet view now sizes itself in the page (largest text that fits, by bisection), so a 2018 browser gets the same result as a new one: all 26 Galaxy Tab 2 cases fit in real Chrome 71 and Firefox 68, with no clipping and no cut names; the club's 6-pair night reads at 25px on the 7-inch and 31px on",
+  "next": "Install Firefox on the club's Tab 2, open /t/<id>/tv, tap for full screen; or switch Cloudflare's edge CA to Google Trust Services so Chrome works too",
   "url": "https://padel-tournament-planner.mikehome.users.ctx7.dev",
-  "updated": "2026-09-27T07:47:43.333Z"
+  "updated": "2026-09-27T08:37:28.996Z"
 }

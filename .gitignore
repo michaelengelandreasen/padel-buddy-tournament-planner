@@ -3,3 +3,4 @@ data/
 android/app/build/
 android/.gradle/
 android/.kotlin/
+.cache/

@@ -1,0 +1,15 @@
+[
+  ["{6}", 1024, 471, "7in land, browser, 6p"],
+  ["{12}", 1024, 471, "7in land, browser, 12p"],
+  ["{16}", 1024, 471, "7in land, browser, 16p"],
+  ["{6}", 1024, 552, "7in land, fullscreen, 6p"],
+  ["{16}", 1024, 552, "7in land, fullscreen, 16p"],
+  ["{6}", 600, 895, "7in portrait, 6p"],
+  ["{16}", 600, 895, "7in portrait, 16p"],
+  ["{6}", 1280, 696, "10in land, browser, 6p"],
+  ["{12}", 1280, 696, "10in land, browser, 12p"],
+  ["{16}", 1280, 696, "10in land, browser, 16p"],
+  ["{16}", 1280, 752, "10in land, fullscreen, 16p"],
+  ["{6}", 800, 1176, "10in portrait, 6p"],
+  ["{16}", 800, 1176, "10in portrait, 16p"]
+]

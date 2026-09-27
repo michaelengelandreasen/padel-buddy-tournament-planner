@@ -357,6 +357,47 @@ on the host (unlike the broker) does not stamp it and the project vanishes.
 `TZ=Europe/Lisbon` in compose, because "has this date already been played" is a
 question about an evening in Matosinhos, not about UTC.
 
+## The clubhouse tablet
+
+`/t/<id>/tv` is what stands by the courts all night. It answers one question —
+which court do I go to next — with a grid: a row per pair, alphabetical, and a
+column per round holding the court; the round being played is filled, the next
+one outlined, the ones played dimmed. Beside it, who is on court now and the
+leaders; once every score is in, the final table.
+
+It never scrolls and never cuts a name off. Every panel gets the largest text
+at which its content fits, found by bisection in the page itself — so it works
+the same in a 2018 browser as today's. A long pair name drops surnames to an
+initial ("Inês F. & Eduardo C.") rather than losing the partner. It refreshes
+in place every 15 s, keeps the screen awake, and goes full screen on the first
+tap.
+
+### On a Samsung Galaxy Tab 2 (or any Android 4 tablet)
+
+Tested in the real browsers such a tablet can run — Chrome 71 and Firefox
+68 ESR — at the 7″ (1024×600) and 10.1″ (1280×800) screens, both orientations,
+toolbar showing and full screen, with 6, 12 and 16 pairs: everything fits.
+The club's 6-pair night reads at 25 px on the 7″ and 31 px on the 10.1″.
+
+**Use Firefox, not Chrome, on the tablet.** Both addresses are signed through
+*ISRG Root X1*, which Android only trusts from 7.1.1; the old cross-signed
+root that covered Android 4 expired in 2021. Chrome on Android 4 uses the
+system's certificates and shows "Your connection is not private". Firefox
+carries its own, and Firefox 68 — the last for Android 4, still offered by the
+Play Store to those devices — opens the public address fine (verified against
+the live certificate). To make Chrome work too, switch the zone's edge
+certificate authority in Cloudflare (SSL/TLS → Edge Certificates → Certificate
+Authority) to Google Trust Services, whose root is cross-signed by GlobalSign's
+1998 root that Android 4 does trust — untested here, so check on the tablet.
+
+To re-check after changing the tablet page — downloads the two browsers once
+(~180 MB, into `.cache/`, not committed), builds its own throwaway nights in a
+copy of the database, and removes it all afterwards:
+
+```
+test/tab2/run.sh
+```
+
 ## Saving without a page load
 
 Every POST form on a page is fetched instead of navigated: the server answers
