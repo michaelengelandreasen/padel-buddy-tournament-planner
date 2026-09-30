@@ -524,10 +524,17 @@ nav a{display:inline-flex;align-items:center;gap:7px;min-height:44px;padding:0 1
 nav a:hover{color:var(--ink)}
 nav a.on{color:var(--ink);background:var(--surface-2)}
 nav a.on .i{color:var(--brand)}
-form.lang{display:flex;gap:2px;flex:0 0 auto;margin-left:8px}
-form.lang button{background:transparent;color:var(--muted);border:1px solid transparent;
-  min-height:44px;min-width:44px;padding:0 10px;font-size:.82rem;font-weight:800;letter-spacing:.03em}
-form.lang button.on{color:var(--brand-ink);background:var(--brand)}
+form.lang{display:flex;align-items:center;flex:0 0 auto;margin:0 0 0 8px}
+form.lang label{position:relative;display:flex;align-items:center;margin:0;color:var(--muted)}
+form.lang label>.i{position:absolute;left:10px;width:16px;height:16px;pointer-events:none}
+form.lang select{width:auto;min-height:40px;padding:6px 32px 6px 32px;font-size:.85rem;font-weight:700;
+  border-radius:999px;background-color:var(--surface-2)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+/* On a phone the nav lives at the bottom, so the header is brand + language on
+   one line: the "Tournaments" subtitle gives way before the dropdown does. */
+@media (max-width:720px){header.top{flex-wrap:nowrap}header.top .brand{flex:1 1 0}}
+@media (max-width:480px){header.top .brand small{display:none}
+  form.lang select{padding-right:26px;max-width:8.5rem}}
 
 .i{width:1.1em;height:1.1em;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:2;
   stroke-linecap:round;stroke-linejoin:round;vertical-align:-.18em}
@@ -895,11 +902,17 @@ pbInit.push(function(){
  * changes mid-task. It POSTs — switching language rewrites the club row, and a
  * link that mutates state is a link a crawler or a prefetch can pull.
  */
+/**
+ * The language switch: one compact dropdown, each language named in itself.
+ * It switches as it changes (a full load — the header's own words change too);
+ * without scripting, the button beside it does the same.
+ */
 const langToggle = (lang, here) => `<form class="lang" method="post" action="/language">${
-  here ? `<input type="hidden" name="back" value="${esc(here)}">` : ''}${
-  LANGUAGES.map((l) => `<button name="language" value="${l.code}"
-    class="${l.code === lang ? 'on' : ''}" aria-label="${esc(l.label)}"
-    ${l.code === lang ? 'aria-current="true"' : ''}>${l.short}</button>`).join('')}</form>`
+  here ? `<input type="hidden" name="back" value="${esc(here)}">` : ''}
+  <label>${ic('globe')}<span class="sr">Language</span>
+  <select name="language" onchange="this.form.submit()" aria-label="Language / Idioma / Мова">${
+    LANGUAGES.map((l) => `<option value="${l.code}"${l.code === lang ? ' selected' : ''}>${esc(l.label)}</option>`).join('')}
+  </select></label><noscript><button class="btn ghost">OK</button></noscript></form>`
 
 export function page(title, body, { nav = '', script = '', t = translator(), here = '', tab = '' } = {}) {
   return `<!doctype html><html lang="${t.lang}"><head><meta charset="utf-8">
