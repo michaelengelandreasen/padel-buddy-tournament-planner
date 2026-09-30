@@ -171,7 +171,7 @@ export function handle(text, { waId = '', isHost = true, lang = clubLanguage() }
     return say(roundMessage(t, n, lang), { reason: `round ${n}` })
   }
 
-  if (cmd === 'next' || cmd === 'seguir') {
+  if (cmd === 'next' || cmd === 'seguir' || cmd === 'siguiente') {
     const t = tonight()
     if (!t) return say(s('noTournamentOpenShort'))
     const matches = listMatches(t.id)
@@ -180,7 +180,7 @@ export function handle(text, { waId = '', isHost = true, lang = clubLanguage() }
     return say(roundMessage(t, n, lang), { reason: `round ${n}` })
   }
 
-  if (cmd === 'where' || cmd === 'onde') {
+  if (cmd === 'where' || cmd === 'onde' || cmd === 'donde') {
     const t = tonight()
     if (!t) return say(s('noTournamentOpenShort'))
     if (!rest) return say(s('whoAreYou', { cmd: '`!where Mike`' }))
@@ -193,7 +193,7 @@ export function handle(text, { waId = '', isHost = true, lang = clubLanguage() }
     return say(scheduleMessage(t, lang), { reason: 'schedule' })
   }
 
-  if (cmd === 'table' || cmd === 'standings' || cmd === 'tabela') {
+  if (cmd === 'table' || cmd === 'standings' || cmd === 'tabela' || cmd === 'tabla') {
     const t = tonight()
     if (!t) return say(s('noTournamentOpenShort'))
     return say(standingsMessage(t, lang), { reason: 'standings' })

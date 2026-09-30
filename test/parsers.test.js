@@ -179,7 +179,7 @@ test('i18n: the two languages are genuinely different, not silent fallbacks', ()
 
 test('i18n: an unknown language falls back rather than blanking the page', () => {
   assert.equal(isLanguage('de'), false)
-  assert.equal(LANGUAGES.length, 3)
+  assert.equal(LANGUAGES.length, 4)
   const t = translator('de')
   assert.equal(t.lang, 'en')
   assert.equal(t('whosIn'), "Who's in?")
@@ -419,4 +419,17 @@ test('uk: dates and clocks read in Ukrainian, and the parser takes Cyrillic days
   assert.equal(parseWhen('субота', { now }).date, '2026-09-12')
   assert.equal(translator('uk')('whosIn'), 'Хто грає?')
   assert.equal(translator('uk')('missingKeyXYZ'), 'missingKeyXYZ')
+})
+
+// ---- Spanish ----
+test('es: dates and clocks read in Spanish, and the parser takes Spanish days and months', () => {
+  assert.equal(humanDate('2026-09-13', { lang: 'es', now: new Date('2026-09-01') }), 'Domingo, 13 de septiembre')
+  assert.equal(dayName('2026-09-16', { lang: 'es' }), 'Miércoles')
+  assert.equal(timeRange('09:30', 120, { lang: 'es' }), '09:30-11:30')
+  const now = new Date('2026-09-12T10:00:00')
+  assert.equal(parseWhen('20 septiembre', { now }).date, '2026-09-20')
+  assert.equal(parseWhen('viernes a las 20:30', { now }).date, '2026-09-18')
+  assert.equal(parseWhen('viernes a las 20:30', { now }).time, '20:30')
+  assert.equal(parseWhen('miércoles', { now }).date, '2026-09-16')
+  assert.equal(translator('es')('whosIn'), '¿Quién se apunta?')
 })

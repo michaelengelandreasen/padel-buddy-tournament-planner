@@ -36,6 +36,7 @@ db.exec(`
     rules_en  TEXT NOT NULL DEFAULT '',
     rules_pt  TEXT NOT NULL DEFAULT '',
     rules_uk  TEXT NOT NULL DEFAULT '',
+    rules_es  TEXT NOT NULL DEFAULT '',
     -- Which Telegram group the bot lives in. Learned from the first command it
     -- sees there rather than configured, because no club captain should have to
     -- find out what a numeric chat id is.
@@ -94,6 +95,28 @@ db.exec(`
     UNIQUE (tournament_id, name)
   );
 
+  -- Everyone who has ever signed up, kept across nights: who they are and how
+  -- good they are right now. A signup is still just a name; it finds its
+  -- player by that name, case aside.
+  CREATE TABLE IF NOT EXISTS players (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    name       TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    gender     TEXT NOT NULL DEFAULT '',      -- M | F | ''
+    grade      INTEGER NOT NULL DEFAULT 0,    -- 1 (competition) … 7 (beginner), 0 = not rated yet
+    notes      TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  -- Every level a player has been given, oldest first. The current one is on
+  -- the player row; this is how it got there.
+  CREATE TABLE IF NOT EXISTS player_levels (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    player_id INTEGER NOT NULL,
+    grade     INTEGER NOT NULL,
+    note      TEXT NOT NULL DEFAULT '',
+    at        TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
   -- Messages this bot has already posted, so it can edit them instead of
   -- posting again. The sign-up board is one pinned message that keeps changing;
   -- without this it would be twenty near-identical messages in a row.
@@ -149,7 +172,7 @@ function seedTournamentCourts(tid, count) {
  */
 function migrate() {
   const clubCols = db.prepare('PRAGMA table_info(club)').all().map((c) => c.name)
-  for (const [col, def] of [['language', "'en'"], ['rules_en', "''"], ['rules_pt', "''"], ['rules_uk', "''"],
+  for (const [col, def] of [['language', "'en'"], ['rules_en', "''"], ['rules_pt', "''"], ['rules_uk', "''"], ['rules_es', "''"],
     ['telegram_chat_id', "''"], ['active_tournament_id', '0'], ['home_venue_id', '0']]) {
     if (!clubCols.includes(col)) {
       db.exec(`ALTER TABLE club ADD COLUMN ${col} TEXT NOT NULL DEFAULT ${def}`)
@@ -157,7 +180,7 @@ function migrate() {
   }
   // A club that never wrote its own policy gets the standard one, in both
   // languages, rather than an empty block under every board.
-  for (const [col, lang] of [['rules_en', 'en'], ['rules_pt', 'pt'], ['rules_uk', 'uk']]) {
+  for (const [col, lang] of [['rules_en', 'en'], ['rules_pt', 'pt'], ['rules_uk', 'uk'], ['rules_es', 'es']]) {
     db.exec(`UPDATE club SET ${col} = '${
       translator(lang)('dropoutDefault').replace(/'/g, "''")}' WHERE ${col} = ''`)
   }
@@ -197,6 +220,11 @@ function migrate() {
     }
   }
 
+  // Players from before there was a register: one per name ever signed up,
+  // with whatever gender was given.
+  db.exec(`INSERT OR IGNORE INTO players (name, gender)
+    SELECT name, MAX(gender) FROM signups GROUP BY name COLLATE NOCASE`)
+
   // Tournaments from before courts were per night get theirs from the club's
   // list, the way a new one would.
   for (const t of db.prepare('SELECT id, courts FROM tournaments').all()) {
@@ -235,7 +263,7 @@ export function clubLanguage() {
 
 /** Only the keys given are written, so the language form can't blank the address. */
 export function saveClub(patch) {
-  const allowed = ['name', 'address', 'maps_url', 'language', 'rules_en', 'rules_pt', 'rules_uk',
+  const allowed = ['name', 'address', 'maps_url', 'language', 'rules_en', 'rules_pt', 'rules_uk', 'rules_es',
     'telegram_chat_id', 'home_venue_id']
   const keys = allowed.filter((k) => patch[k] !== undefined)
   if (!keys.length) return getClub()
@@ -249,7 +277,7 @@ export function saveClub(patch) {
 /** The drop-out policy in the club's current language, blank if it cleared it. */
 export function clubRules(lang = clubLanguage()) {
   const club = getClub()
-  return ({ pt: club.rules_pt, uk: club.rules_uk }[lang] ?? club.rules_en).trim()
+  return ({ pt: club.rules_pt, uk: club.rules_uk, es: club.rules_es }[lang] ?? club.rules_en).trim()
 }
 
 /**
@@ -489,10 +517,33 @@ export function createTournament(t) {
   return getTournament(id)
 }
 
+/**
+ * A night's sign-ups, each carrying what the register knows about its player:
+ * the level, and the gender when the sign-up itself did not say — an imported
+ * roster is sixteen bare names, and the register is where they get filled in.
+ */
 export const listSignups = (tid) =>
-  all('SELECT * FROM signups WHERE tournament_id = ? ORDER BY id', tid)
+  all(`SELECT s.id, s.tournament_id, s.name, s.partner, s.wa_id, s.created_at,
+         CASE WHEN s.gender != '' THEN s.gender ELSE COALESCE(p.gender, '') END AS gender,
+         COALESCE(p.grade, 0) AS grade, p.id AS player_id
+       FROM signups s LEFT JOIN players p ON p.name = s.name COLLATE NOCASE
+       WHERE s.tournament_id = ? ORDER BY s.id`, tid)
+
+/** Make sure a name is in the register; a gender given now fills a blank one. */
+export function ensurePlayer(name, gender = '') {
+  const n = String(name || '').replace(/\s+/g, ' ').trim().slice(0, 80)
+  if (!n) return null
+  run('INSERT OR IGNORE INTO players (name, gender) VALUES (?, ?)', n, gender || '')
+  if (gender === 'M' || gender === 'F') {
+    run("UPDATE players SET gender = ? WHERE name = ? COLLATE NOCASE AND gender = ''", gender, n)
+  }
+  return one('SELECT * FROM players WHERE name = ? COLLATE NOCASE', n)
+}
 
 export function addSignup(tid, { name, gender, partner, wa_id }) {
+  // The register's spelling wins, so "ana" and "Ana" are one sign-up, not two.
+  const known = ensurePlayer(name, gender)
+  if (known) name = known.name
   run(`INSERT INTO signups (tournament_id, name, gender, partner, wa_id)
        VALUES (?, ?, ?, ?, ?)
        ON CONFLICT (tournament_id, name) DO UPDATE SET
@@ -529,4 +580,106 @@ export function replaceMatches(tid, matches) {
 export function recordScore(matchId, a, b) {
   run('UPDATE matches SET score_a = ?, score_b = ? WHERE id = ?', a, b, matchId)
   return one('SELECT * FROM matches WHERE id = ?', matchId)
+}
+
+// ---- the player register ----
+
+const cleanGrade = (g) => {
+  const n = Number.parseInt(g, 10)
+  return Number.isInteger(n) && n >= 1 && n <= 7 ? n : 0
+}
+
+/**
+ * Everyone, with what the list needs at a glance: current level, the level
+ * before it (for the trend), when it last changed, and how many nights played.
+ */
+export const listPlayers = () => all(`
+  SELECT p.*,
+    (SELECT at FROM player_levels l WHERE l.player_id = p.id ORDER BY l.id DESC LIMIT 1) AS changed_at,
+    (SELECT grade FROM player_levels l WHERE l.player_id = p.id ORDER BY l.id DESC LIMIT 1 OFFSET 1) AS prev_grade,
+    (SELECT COUNT(DISTINCT tournament_id) FROM signups s WHERE s.name = p.name COLLATE NOCASE) AS nights
+  FROM players p ORDER BY p.name COLLATE NOCASE`)
+
+/** One player, their level history (newest first) and the nights they played. */
+export function getPlayer(id) {
+  const p = one('SELECT * FROM players WHERE id = ?', id)
+  if (!p) return null
+  p.history = all('SELECT * FROM player_levels WHERE player_id = ? ORDER BY id DESC', id)
+  p.nights = all(`SELECT t.* FROM tournaments t WHERE t.id IN
+    (SELECT tournament_id FROM signups WHERE name = ? COLLATE NOCASE)
+    ORDER BY t.play_date DESC, t.id DESC`, p.name)
+  return p
+}
+
+/**
+ * Give a player a level. A change is recorded, with the date and an optional
+ * note — "won three nights running", "back from injury" — so the level has a
+ * story rather than just a number. Setting the same level again changes nothing.
+ */
+export function setPlayerLevel(id, grade, note = '') {
+  const p = one('SELECT * FROM players WHERE id = ?', id)
+  const g = cleanGrade(grade)
+  if (!p || g === p.grade) return false
+  run('UPDATE players SET grade = ? WHERE id = ?', g, id)
+  run('INSERT INTO player_levels (player_id, grade, note) VALUES (?, ?, ?)', id, g,
+    String(note || '').trim().slice(0, 200))
+  return true
+}
+
+/**
+ * Name, gender and notes. A rename follows the player through their history:
+ * sign-ups, partners, and the pair names already written into schedules.
+ */
+export function updatePlayer(id, { name, gender, notes }) {
+  const p = one('SELECT * FROM players WHERE id = ?', id)
+  if (!p) return null
+  const next = String(name ?? p.name).replace(/\s+/g, ' ').trim().slice(0, 80) || p.name
+  if (next.toLowerCase() !== p.name.toLowerCase()
+    && one('SELECT id FROM players WHERE name = ? COLLATE NOCASE', next)) return { taken: true }
+  const g = gender === 'M' || gender === 'F' ? gender : gender === '' ? '' : p.gender
+  run('UPDATE players SET name = ?, gender = ?, notes = ? WHERE id = ?',
+    next, g, String(notes ?? p.notes).slice(0, 500), id)
+  if (next !== p.name) {
+    run('UPDATE OR IGNORE signups SET name = ? WHERE name = ? COLLATE NOCASE', next, p.name)
+    run('UPDATE signups SET partner = ? WHERE partner = ? COLLATE NOCASE', next, p.name)
+    const rename = (team) => team.split(' & ').map((x) => (x.toLowerCase() === p.name.toLowerCase() ? next : x)).join(' & ')
+    for (const m of all('SELECT id, team_a, team_b FROM matches')) {
+      const a = rename(m.team_a), b = rename(m.team_b)
+      if (a !== m.team_a || b !== m.team_b) run('UPDATE matches SET team_a = ?, team_b = ? WHERE id = ?', a, b, m.id)
+    }
+  }
+  return one('SELECT * FROM players WHERE id = ?', id)
+}
+
+/** Several levels at once from the list: `{id: grade}`. Returns how many changed. */
+export function setPlayerLevels(grades, note = '') {
+  let n = 0
+  for (const [id, g] of Object.entries(grades)) if (setPlayerLevel(Number(id), g, note)) n++
+  return n
+}
+
+/**
+ * Players from pasted lines: `Name`, `Name | F`, `Name | M | 4`. A known name
+ * gets the gender or level it was missing; nothing already set is overwritten.
+ */
+export function addPlayersFromText(text) {
+  let n = 0
+  for (const raw of String(text || '').split('\n')) {
+    const [name, ...rest] = raw.split('|').map((x) => x.trim())
+    if (!name) continue
+    const gender = (rest.find((x) => /^[mf]$/i.test(x)) || '').toUpperCase()
+    const grade = cleanGrade(rest.find((x) => /^\d$/.test(x)))
+    const existed = one('SELECT id FROM players WHERE name = ? COLLATE NOCASE', name)
+    const p = ensurePlayer(name, gender)
+    if (!p) continue
+    if (grade && !p.grade) setPlayerLevel(p.id, grade)
+    if (!existed) n++
+  }
+  return n
+}
+
+/** Out of the register. Past sign-ups keep the name; they just stop finding a player. */
+export function deletePlayer(id) {
+  run('DELETE FROM player_levels WHERE player_id = ?', id)
+  run('DELETE FROM players WHERE id = ?', id)
 }

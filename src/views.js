@@ -13,7 +13,7 @@
  */
 
 import { categories, grades, isMixedLevel, levelLabel, levelShort, parseLevel } from './levels.js'
-import { clock, humanWhen, todayISO } from './dates.js'
+import { clock, humanWhen, todayISO, humanDate } from './dates.js'
 import { courtName, courtsByTeam, currentRound, roundComplete, roundPlan, roundsOf } from './rounds.js'
 import { LANGUAGES, translator } from './i18n.js'
 
@@ -39,6 +39,11 @@ const ICONS = {
   chat: '<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>',
   court: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M12 5v14"/>'
     + '<path d="M2 12h4M18 12h4"/>',
+  user: '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+  up: '<path d="M22 7 13.5 15.5 8.5 10.5 2 17"/><path d="M16 7h6v6"/>',
+  down: '<path d="M22 17 13.5 8.5 8.5 13.5 2 7"/><path d="M16 17h6v-6"/>',
+  scale: '<path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/>'
+    + '<path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/>',
   users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>'
     + '<path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
   clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
@@ -215,6 +220,23 @@ function deal(all){
   pool.forEach(function(c){tray.appendChild(c)});select(null)}
 form.querySelector('[data-act=rest]').addEventListener('click',function(){deal(false)});
 form.querySelector('[data-act=all]').addEventListener('click',function(){deal(true)});
+// Level-balanced: best with weakest, so every pair adds up to about the same.
+// On a mixed level with genders known, the best woman goes with the weakest man.
+function balance(){
+  var seats=seatsOf(),all=chipsIn(board),g=function(c){return +c.dataset.grade||4};
+  var byBest=function(a,b){return g(a)-g(b)},pairs=[];
+  var mixed=board.querySelector('.pairs').dataset.mixed;
+  var F=all.filter(function(c){return c.dataset.gender==='F'}).sort(byBest);
+  var M=all.filter(function(c){return c.dataset.gender==='M'}).sort(byBest).reverse();
+  var rest=all;
+  if(mixed&&F.length&&M.length){while(F.length&&M.length)pairs.push([F.shift(),M.shift()]);rest=F.concat(M.reverse(),all.filter(function(c){return c.dataset.gender!=='F'&&c.dataset.gender!=='M'}))}
+  else rest=all.slice();
+  rest.sort(byBest);while(rest.length>1)pairs.push([rest.shift(),rest.pop()]);
+  seats.forEach(function(s){chipsIn(s).forEach(function(c){tray.appendChild(c)})});
+  var ps=[].slice.call(board.querySelectorAll('.pair'));
+  pairs.forEach(function(p,i){if(!ps[i])return;var st=ps[i].querySelectorAll('.seat');st[0].appendChild(p[0]);st[1].appendChild(p[1])});
+  select(null)}
+var bal=form.querySelector('[data-act=balance]');if(bal)bal.addEventListener('click',balance);
 form.addEventListener('submit',function(){
   var pairs=[],ps=[].slice.call(board.querySelectorAll('.pair'));
   ps.forEach(function(p){pairs.push(chipsIn(p).map(function(c){return c.dataset.name}))});
@@ -759,6 +781,28 @@ table.standings th .short{display:none}
 .chip:hover{border-color:var(--muted);filter:none}
 .chip .name{min-width:0;overflow:hidden;text-overflow:ellipsis}
 /* The handle: the one thing that says "this moves" before anyone tries. */
+/* The player's level on their chip: small, tabular, quiet until it matters. */
+.chip .lv{margin-left:auto;flex:0 0 auto;min-width:1.6em;text-align:center;font-size:.72rem;font-weight:800;
+  padding:1px 6px;border-radius:999px;background:var(--surface-2);color:var(--muted);font-variant-numeric:tabular-nums}
+/* The register: one row per player, the level control on the right. */
+.plist{display:flex;flex-direction:column;margin-top:6px}
+.prow{display:flex;align-items:center;gap:10px 14px;padding:10px 2px;border-bottom:1px solid var(--line)}
+.prow:last-child{border-bottom:0}
+.prow .who{flex:1 1 auto;min-width:0}
+.prow .who a{font-weight:700;color:var(--ink);text-decoration:none;overflow-wrap:anywhere}
+.prow .who a:hover{text-decoration:underline;text-underline-offset:3px}
+.prow .sub{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;color:var(--muted);font-size:.82rem;margin-top:2px}
+.prow select{flex:0 0 auto;width:auto;max-width:52%;min-width:9.5rem}
+.trend{display:inline-flex;align-items:center;gap:3px}
+.trend .i{width:15px;height:15px}
+.trend.up{color:var(--brand)} .trend.down{color:var(--warn)}
+.search{margin:4px 0 8px}
+.history{list-style:none;margin:6px 0 0;padding:0}
+.history li{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;padding:10px 0;border-bottom:1px solid var(--line)}
+.history li:last-child{border-bottom:0}
+.history .when{color:var(--muted);font-size:.85rem;min-width:9ch;font-variant-numeric:tabular-nums}
+.history .hnote{flex:1 1 100%;color:var(--muted);font-size:.9rem}
+@media (max-width:480px){.prow{flex-wrap:wrap}.prow select{max-width:100%;flex:1 1 100%}}
 .chip .grip{width:18px;height:18px;flex:0 0 auto;color:var(--muted);margin-left:-4px;fill:currentColor;stroke:none;opacity:.9}
 .chip:hover .grip,.chip.sel .grip{color:var(--brand)}
 .chip .g{flex:0 0 auto;font-size:.7rem;font-weight:800;padding:1px 6px;border-radius:999px;
@@ -790,11 +834,12 @@ table.standings th .short{display:none}
   .wrap{padding:16px 14px calc(72px + env(safe-area-inset-bottom))}
   header.top{padding:8px 12px}
   nav{position:fixed;left:0;right:0;bottom:0;z-index:6;margin:0;width:auto;gap:0;
-    display:grid;grid-template-columns:repeat(4,1fr);overflow:visible;
+    display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);overflow:visible;
     background:var(--surface);border-top:1px solid var(--line);
     padding:6px 6px calc(6px + env(safe-area-inset-bottom))}
-  nav a{flex-direction:column;justify-content:center;gap:3px;min-height:52px;padding:4px 2px;
-    border-radius:10px;font-size:.68rem;font-weight:700;letter-spacing:.01em}
+  nav a{flex-direction:column;justify-content:center;gap:3px;min-height:52px;padding:4px 1px;
+    border-radius:10px;font-size:.64rem;font-weight:700;letter-spacing:0;min-width:0}
+  nav a span{max-width:100%;overflow:hidden;text-overflow:ellipsis}
   nav a .i{width:22px;height:22px}
   nav a.on{background:transparent;color:var(--brand)}
   .card{padding:16px}
@@ -871,7 +916,7 @@ ${SPRITE}
 }
 
 const navFor = (here, t) => [['/', 'navOverview', 'home'], ['/tournaments', 'navTournaments', 'trophy'],
-  ['/settings', 'navSettings', 'sliders'], ['/groups', 'navGroups', 'chats']]
+  ['/players', 'navPlayers', 'user'], ['/settings', 'navSettings', 'sliders'], ['/groups', 'navGroups', 'chats']]
   .map(([h, key, icon]) => `<a class="${here === h ? 'on' : ''}" href="${h}"${
     here === h ? ' aria-current="page"' : ''}>${ic(icon)}<span>${esc(t(key))}</span></a>`).join('')
 
@@ -1012,6 +1057,8 @@ export function settings({ club, courts, venues = [], notice = '', home = 0, t }
       <textarea id="rules_pt" name="rules_pt" style="min-height:96px">${esc(club.rules_pt)}</textarea>
       <label for="rules_uk">${esc(t('inUkrainian'))}</label>
       <textarea id="rules_uk" name="rules_uk" style="min-height:96px">${esc(club.rules_uk || '')}</textarea>
+      <label for="rules_es">${esc(t('inSpanish'))}</label>
+      <textarea id="rules_es" name="rules_es" style="min-height:96px">${esc(club.rules_es || '')}</textarea>
       <input type="hidden" name="tab" value="policy">
       <div class="actions"><button>${ic('check')}${esc(t('save'))}</button></div>
     </form>`
@@ -1201,9 +1248,10 @@ export function tournamentPage({
 
   // Before the draw the Teams tab is the pairs board; after it, the list. A
   // seat per two players, one extra for an odd count so nobody is off the board.
-  const chip = (p) => `<button type="button" class="chip" data-name="${esc(p.name)}" draggable="false">${
-    ic('grip', 'grip')}${
-    p.gender === 'F' || p.gender === 'M' ? `<span class="g ${p.gender}">${p.gender}</span>` : ''}<span class="name">${esc(p.name)}</span></button>`
+  const chip = (p) => `<button type="button" class="chip" data-name="${esc(p.name)}" data-gender="${esc(p.gender || '')}"
+    data-grade="${p.grade || ''}" draggable="false">${ic('grip', 'grip')}${
+    p.gender === 'F' || p.gender === 'M' ? `<span class="g ${p.gender}">${p.gender}</span>` : ''}<span class="name">${esc(p.name)}</span>${
+    p.grade ? `<span class="lv" title="${esc(`${t('skillLevel')}: ${p.grade} — ${t(`grade${p.grade}`)}`)}">${p.grade}</span>` : ''}</button>`
   const everyone = teams.flatMap((x) => x.players).concat(waiting)
   const seatCount = Math.max(teams.length, Math.ceil(everyone.length / 2))
   const mixedNote = offLevel.length ? `<p class="err">${ic('alert')} ${esc(t('mixedWarning', {
@@ -1220,7 +1268,7 @@ export function tournamentPage({
       ${flashFor('pairs')}
       ${mixedNote}
       <div id="pairs">
-        <div class="pairs">${Array.from({ length: seatCount }, (_, i) => `<div class="pair">
+        <div class="pairs" data-mixed="${isMixedLevel(tour.level) ? 1 : ''}">${Array.from({ length: seatCount }, (_, i) => `<div class="pair">
           <span class="num">${i + 1}</span>
           ${[0, 1].map((k) => `<div class="seat" aria-label="${esc(t('seatEmpty'))}">${
             teams[i] && teams[i].players[k] ? chip(teams[i].players[k]) : ''}</div>`).join('')}
@@ -1233,6 +1281,7 @@ export function tournamentPage({
         <button>${ic(matches.length ? 'shuffle' : 'check')}${esc(matches.length ? t('saveAndRedraw') : t('save'))}</button>
         <button type="button" class="btn ghost" data-act="rest">${ic('shuffle')}${esc(t('pairUpRest'))}</button>
         <button type="button" class="btn ghost" data-act="all">${ic('repeat')}${esc(t('reshuffleAll'))}</button>
+        <button type="button" class="btn ghost" data-act="balance" title="${esc(t('balanceHelp'))}">${ic('scale')}${esc(t('balanceByLevel'))}</button>
       </div>
     </form>`
 
@@ -1713,6 +1762,122 @@ export function groupsPage({ groups, chat, log, t }) {
         </div>`).join('')
         : `<p class="muted">${esc(t('nothingWaiting'))}</p>`}
     </div>`, { nav: navFor('/groups', t), t, here: '/groups' })
+}
+
+
+/** A level as people say it: "4 — Upper intermediate", or a dash when unrated. */
+const levelName = (g, t) => (g ? `${g} — ${t(`grade${g}`)}` : t('levelUnset'))
+const levelOptions = (g, t) => `<option value="0"${g ? '' : ' selected'}>${esc(t('levelUnset'))}</option>${
+  grades(t).map((x) => `<option value="${x.grade}"${x.grade === g ? ' selected' : ''}>${esc(levelName(x.grade, t))}</option>`).join('')}`
+const nights = (n, t) => t(n === 1 ? 'nightsPlayed1' : 'nightsPlayed', { n })
+/** The date part of a stored timestamp, read in the club's language. */
+const onDay = (at, t) => (at ? humanDate(String(at).slice(0, 10), { lang: t.lang }) : '')
+/** Up is better: a lower grade number is a stronger player. */
+const trend = (g, prev, t) => (!g || !prev || g === prev ? ''
+  : g < prev ? `<span class="trend up" title="${esc(t('levelUp'))}">${ic('up')}${esc(t('levelUp'))}</span>`
+    : `<span class="trend down" title="${esc(t('levelDown'))}">${ic('down')}${esc(t('levelDown'))}</span>`)
+
+/** Filter the register as you type — no request, just rows hidden. */
+const PLAYERS_JS = `pbInit.push(function(){
+  var q=document.getElementById('psearch');if(!q)return;
+  var norm=function(x){return x.normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase()};
+  q.addEventListener('input',function(){var v=norm(q.value.trim());
+    document.querySelectorAll('.prow').forEach(function(r){r.hidden=v&&norm(r.dataset.name).indexOf(v)<0})});
+});`
+
+/**
+ * The player register: everyone who has signed up, and how good they are now.
+ *
+ * Levels are the same 1–7 ladder the nights use. Changing one here records the
+ * change with its date, so a player's page tells the story of their game. The
+ * whole list is one form — change several levels after a night, Save all once.
+ */
+export function playersPage({ players, notice = '', t }) {
+  const rows = players.map((p) => `<div class="prow" data-name="${esc(p.name)}">
+      <div class="who"><a href="/players/${p.id}">${esc(p.name)}</a>
+        <div class="sub">${p.gender === 'M' || p.gender === 'F' ? `<span class="pill">${esc(t(p.gender === 'F' ? 'genderF' : 'genderM'))}</span>` : ''}
+          ${trend(p.grade, p.prev_grade, t)}
+          ${p.changed_at ? `<span>${esc(t('since', { when: onDay(p.changed_at, t) }))}</span>` : ''}
+          <span>${esc(nights(p.nights, t))}</span></div></div>
+      <select name="grade${p.id}" aria-label="${esc(t('skillLevel'))} — ${esc(p.name)}">${levelOptions(p.grade, t)}</select>
+    </div>`).join('')
+
+  return page(t('players'), `
+    <h1>${esc(t('players'))}</h1>
+    <p class="muted">${esc(t('playersHelp'))}</p>
+    ${notice ? `<div class="flash" role="status"><strong>${esc(notice)}</strong></div>` : ''}
+    <form class="card" method="post" action="/players/levels">
+      <h3>${ic('user')}${esc(t('players'))} <span class="pill">${players.length}</span></h3>
+      ${players.length ? `<input id="psearch" class="search" type="search" placeholder="${esc(t('searchPlayers'))}" aria-label="${esc(t('searchPlayers'))}" autocomplete="off">
+      <div class="plist">${rows}</div>
+      <label for="pnote">${esc(t('levelNote'))}</label>
+      <input id="pnote" name="note" maxlength="200" placeholder="${esc(t('levelNotePlaceholder'))}">
+      <div class="savebar"><button>${ic('check')}${esc(t('saveAll'))}</button></div>`
+        : `<p class="muted">${esc(t('noPlayersYet'))}</p>`}
+    </form>
+    <form class="card" method="post" action="/players/bulk">
+      <h3>${ic('plus')}${esc(t('addPlayers'))}</h3>
+      <p class="muted">${esc(t('addPlayersHelp'))}</p>
+      <textarea name="text" rows="5" required placeholder="Rui Basto | M | 4&#10;Rita | F&#10;Carla Guerra | F | 5"></textarea>
+      <div class="actions"><button>${ic('plus')}${esc(t('add'))}</button></div>
+    </form>`, { nav: navFor('/players', t), t, here: '/players', script: PLAYERS_JS })
+}
+
+/** One player: their level and its history, who they are, the nights they played. */
+export function playerPage({ player: p, notice = '', t }) {
+  const hist = p.history.map((h, i) => {
+    const prev = p.history[i + 1]?.grade
+    return `<li><span class="when">${esc(onDay(h.at, t))}</span>
+      <strong>${esc(levelName(h.grade, t))}</strong>${trend(h.grade, prev, t)}
+      ${h.note ? `<span class="hnote">${esc(h.note)}</span>` : ''}</li>`
+  }).join('')
+  return page(p.name, `
+    <p class="meta"><a href="/players">${ic('arrow')}${esc(t('allPlayers'))}</a></p>
+    <h1>${esc(p.name)}</h1>
+    <p class="meta">
+      <span class="pill on">${esc(levelName(p.grade, t))}</span>
+      ${p.gender === 'M' || p.gender === 'F' ? `<span>${esc(t(p.gender === 'F' ? 'genderF' : 'genderM'))}</span>` : ''}
+      <span>${ic('trophy')}${esc(nights(p.nights.length, t))}</span></p>
+    ${notice ? `<div class="flash" role="status"><strong>${esc(notice)}</strong></div>` : ''}
+    <div class="grid">
+      <form class="card" method="post" action="/players/${p.id}/level">
+        <h3>${ic('up')}${esc(t('adjustLevel'))}</h3>
+        <label for="plevel">${esc(t('skillLevel'))}</label>
+        <select id="plevel" name="grade">${levelOptions(p.grade, t)}</select>
+        <label for="pnote1">${esc(t('levelNote'))}</label>
+        <input id="pnote1" name="note" maxlength="200" placeholder="${esc(t('levelNotePlaceholder'))}">
+        <div class="actions"><button>${ic('check')}${esc(t('save'))}</button></div>
+      </form>
+      <div class="card"><h3>${ic('list')}${esc(t('levelHistory'))}</h3>
+        ${hist ? `<ol class="history">${hist}</ol>` : `<p class="muted">${esc(t('noLevelYet'))}</p>`}
+      </div>
+    </div>
+    <form class="card" method="post" action="/players/${p.id}">
+      <h3>${ic('user')}${esc(t('playerDetails'))}</h3>
+      <div class="row">
+        <div><label for="pname">${esc(t('playerName'))}</label>
+          <input id="pname" name="name" value="${esc(p.name)}" maxlength="80" required></div>
+        <div><label for="pgender">${esc(t('gender'))}</label>
+          <select id="pgender" name="gender">
+            <option value=""${p.gender ? '' : ' selected'}>—</option>
+            <option value="F"${p.gender === 'F' ? ' selected' : ''}>${esc(t('genderF'))}</option>
+            <option value="M"${p.gender === 'M' ? ' selected' : ''}>${esc(t('genderM'))}</option>
+          </select></div>
+      </div>
+      <label for="pnotes">${esc(t('playerNotes'))}</label>
+      <textarea id="pnotes" name="notes" rows="3" maxlength="500">${esc(p.notes)}</textarea>
+      <div class="actions">
+        <button>${ic('check')}${esc(t('save'))}</button>
+        <button class="btn danger" formaction="/players/${p.id}/delete" formnovalidate
+          onclick="return confirm(${JSON.stringify(t('deletePlayerConfirm', { name: p.name })).replace(/"/g, '&quot;')})">${ic('trash')}${esc(t('remove'))}</button>
+      </div>
+    </form>
+    <div class="card"><h3>${ic('calendar')}${esc(t('nightsTitle'))}</h3>
+      ${p.nights.length ? `<div class="plist">${p.nights.map((x) => `<div class="prow"><div class="who">
+        <a href="/t/${x.id}">${esc(x.level || '')} · ${esc(humanWhen(x, { lang: t.lang }))}</a>
+        ${x.venue ? `<div class="sub">${esc(x.venue)}</div>` : ''}</div></div>`).join('')}</div>`
+        : `<p class="muted">${esc(t('noNightsYet'))}</p>`}
+    </div>`, { nav: navFor('/players', t), t, here: '/players' })
 }
 
 export const _internal = { esc, parseLevel, statusLabel }

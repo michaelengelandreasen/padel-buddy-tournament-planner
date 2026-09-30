@@ -9,6 +9,7 @@ import {
   findVenue, getClub, getTournament, homePlace, listVenues, updateVenue,
   listCourts, listMatches, listSignups, listTournaments, recordScore, rememberTelegramChat,
   renameCourt, replaceMatches, saveClub, setPartner, telegramChat,
+  addPlayersFromText, deletePlayer, getPlayer, listPlayers, setPlayerLevel, setPlayerLevels, updatePlayer,
 } from './db.js'
 import { buildTeams, schedule, standings } from './formats/nonstop.js'
 import { handle, roundMessage, scheduleMessage, signupMessage, standingsMessage } from './bot.js'
@@ -108,6 +109,45 @@ const routes = [
     club: getClub(), home: homePlace(), venues: listVenues(), tournaments: listTournaments(),
     courts: listCourts(), live: groups.live, pinned: activeTournament()?.id || 0,
     night: playingTournament()?.id || 0, t }) })],
+  // ---- the player register ----
+  ['GET', /^\/players$/, (_m, req, t) => {
+    const q = new URL(req.url, 'http://x').searchParams
+    const notice = q.has('saved') ? t('savedLevels', { n: Number(q.get('saved')) || 0 })
+      : q.has('added') ? t('addedPlayers', { n: Number(q.get('added')) || 0 })
+        : q.has('deleted') ? t('deletedPlayer') : ''
+    return { html: V.playersPage({ players: listPlayers(), notice, t }) }
+  }],
+  ['POST', /^\/players\/levels$/, async (_m, req) => {
+    const f = await body(req)
+    const grades = {}
+    for (const [k, v] of Object.entries(f)) { const m = /^grade(\d+)$/.exec(k); if (m) grades[m[1]] = v }
+    return { to: `/players?saved=${setPlayerLevels(grades, f.note)}` }
+  }],
+  ['POST', /^\/players\/bulk$/, async (_m, req) => {
+    const f = await body(req)
+    return { to: `/players?added=${addPlayersFromText(f.text)}` }
+  }],
+  ['GET', /^\/players\/(\d+)$/, (m, req, t) => {
+    const player = getPlayer(Number(m[1]))
+    if (!player) return { html: V.page('404', `<h1>404</h1><p><a href="/players">${t('allPlayers')}</a></p>`, { t }), code: 404 }
+    const q = new URL(req.url, 'http://x').searchParams
+    const notice = q.has('level') ? t('levelSaved') : q.has('saved') ? t('playerSaved')
+      : q.has('taken') ? t('nameTaken') : ''
+    return { html: V.playerPage({ player, notice, t }) }
+  }],
+  ['POST', /^\/players\/(\d+)\/level$/, async (m, req) => {
+    const f = await body(req)
+    setPlayerLevel(Number(m[1]), f.grade, f.note)
+    return { to: `/players/${m[1]}?level=1` }
+  }],
+  ['POST', /^\/players\/(\d+)$/, async (m, req) => {
+    const f = await body(req)
+    const r = updatePlayer(Number(m[1]), f)
+    return { to: `/players/${m[1]}?${r?.taken ? 'taken' : 'saved'}=1` }
+  }],
+  ['POST', /^\/players\/(\d+)\/delete$/, (m) => { deletePlayer(Number(m[1])); return { to: '/players?deleted=1' } }],
+  ['GET', /^\/api\/players$/, () => ({ json: listPlayers() })],
+
   // The home venue, chosen at the top of the Overview.
   ['POST', /^\/home$/, async (_m, req) => {
     const f = await body(req)

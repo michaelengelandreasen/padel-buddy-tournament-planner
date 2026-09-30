@@ -35,6 +35,12 @@ const MONTHS_UK = ['січня', 'лютого', 'березня', 'квітня
   'серпня', 'вересня', 'жовтня', 'листопада', 'грудня']
 // A plain apostrophe is what a phone keyboard produces for п'ятниця.
 const uk = (w) => w.replace(/’/g, "'")
+// Spanish, the fourth language. Accent-stripped for the matcher, like Portuguese;
+// written out properly for display.
+const DAYS_ES = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado']
+const MONTHS_ES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio',
+  'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
+const DAYS_ES_LONG = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado']
 
 const pad = (n) => String(n).padStart(2, '0')
 
@@ -94,7 +100,7 @@ export function parseWhen(input, { now = new Date(), lang } = {}) {
   }
   // "at", "às", and the Ukrainian "о" — dropped by whitespace, not \b, which in
   // JavaScript knows only ASCII letters and never sees a Cyrillic word end.
-  s = s.replace(/(^|\s)(at|às|as|о)(?=\s|$)/gu, ' ').replace(/’/g, "'").replace(/\s+/g, ' ').trim()
+  s = s.replace(/(^|\s)(at|às|as|a las|a la|о)(?=\s|$)/gu, ' ').replace(/’/g, "'").replace(/\s+/g, ' ').trim()
   // Accents off, so "terça" and "terca" are the same word to the matcher below.
   s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
 
@@ -126,7 +132,7 @@ export function parseWhen(input, { now = new Date(), lang } = {}) {
   const dayOf = (text) => {
     const hit = (list, i) => new RegExp(`^${list[i].slice(0, 5)}`, 'u').test(text) ||
       new RegExp(`^${list[i].slice(0, 3)}[\\p{L}]*$`, 'u').test(text)
-    return DAYS.findIndex((_, i) => hit(DAYS, i) || hit(DAYS_PT, i) || hit(DAYS_UK.map(uk), i))
+    return DAYS.findIndex((_, i) => hit(DAYS, i) || hit(DAYS_PT, i) || hit(DAYS_ES, i) || hit(DAYS_UK.map(uk), i))
   }
 
   // "Friday 5 Sep" — once a real date follows, the weekday is decoration, and
@@ -153,7 +159,8 @@ export function parseWhen(input, { now = new Date(), lang } = {}) {
   if (words) {
     const stem = words[2].slice(0, 3)
     const mo = MONTHS.findIndex((m, i) =>
-      m.startsWith(stem) || MONTHS_PT[i].startsWith(stem) || MONTHS_UK[i].startsWith(stem))
+      m.startsWith(stem) || MONTHS_PT[i].startsWith(stem) || MONTHS_ES[i].startsWith(stem)
+      || MONTHS_UK[i].startsWith(stem))
     const d = Number(words[1] || words[3])
     if (mo >= 0 && d) {
       return resolve(d, mo + 1, words[4] ? Number(words[4]) : null, today, time, raw, lang)
@@ -211,6 +218,10 @@ export function humanDate(date, { now = new Date(), lang } = {}) {
   if (lang === 'uk') {
     return `${cap(DAYS_UK[dt.getDay()])}, ${dt.getDate()} ${MONTHS_UK[dt.getMonth()]}${year}`
   }
+  if (lang === 'es') {
+    const esYear = year ? ` de ${dt.getFullYear()}` : ''
+    return `${cap(DAYS_ES_LONG[dt.getDay()])}, ${dt.getDate()} de ${MONTHS_ES[dt.getMonth()]}${esYear}`
+  }
   return `${cap(DAYS[dt.getDay()])} ${dt.getDate()} ${cap(MONTHS[dt.getMonth()])}${year}`
 }
 
@@ -218,7 +229,8 @@ export function humanDate(date, { now = new Date(), lang } = {}) {
 export function dayName(date, { lang } = {}) {
   const dt = toDate(date)
   if (!dt) return ''
-  return cap(lang === 'pt' ? DAYS_PT_LONG[dt.getDay()] : lang === 'uk' ? DAYS_UK[dt.getDay()] : DAYS[dt.getDay()])
+  const names = { pt: DAYS_PT_LONG, uk: DAYS_UK, es: DAYS_ES_LONG }[lang] || DAYS
+  return cap(names[dt.getDay()])
 }
 
 /** `2026-09-05` → `05/09/2026`, day first, the way the group writes it. */
@@ -245,7 +257,7 @@ export function addMinutes(time, mins) {
  */
 const clockFmt = (lang) => (lang === 'pt'
   ? (hh, mm) => `${hh}h${mm ? pad(mm) : ''}`
-  : lang === 'uk'
+  : lang === 'uk' || lang === 'es'
     ? (hh, mm) => `${pad(hh)}:${pad(mm)}`
     : (hh, mm) => `${((hh + 11) % 12) + 1}${mm ? `:${pad(mm)}` : ''}${hh < 12 ? 'AM' : 'PM'}`)
 

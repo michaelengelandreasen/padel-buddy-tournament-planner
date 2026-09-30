@@ -161,6 +161,21 @@ accents and case aside, longest saved name winning). In a tournament's header
 the small pin opens the club on Google Maps and the name opens every night
 played there (`/tournaments?venue=…`).
 
+## Players and their levels
+
+**Players** keeps everyone who has ever signed up — one entry per name, case
+aside, filled in automatically from sign-ups and imports, or added by pasting
+lines (`Rita | F | 5`). Each player has a gender and a level on the same 1–7
+ladder the nights use. Change levels in the list (several at once, one note,
+*Save all*) or on a player's page; every change is kept with its date and note,
+so the page shows how the player's game has moved, with the nights they played.
+
+Nights use the register: a sign-up borrows the player's gender when it did not
+give one (an imported roster finally knows who is who on a mixed night), chips
+on the pairs board show the level, and **Balance by level** pairs the strongest
+with the weakest — on a mixed night, the best woman with the weakest man — so
+every pair adds up to about the same. Unrated players count as a 4.
+
 ## Pairs
 
 Before the draw, the Teams tab is a pairs board: numbered seats, two to a pair,
@@ -176,8 +191,8 @@ first once scores have been entered, since they go with the old schedule.
 
 ## Language
 
-English, Portuguese or Ukrainian, chosen with the `EN`/`PT`/`UK` toggle in the
-header or in Settings. It is one setting on the club row, not a per-visitor cookie: it drives
+English, Portuguese, Ukrainian or Spanish, chosen with the `EN`/`PT`/`UK`/`ES`
+toggle in the header or in Settings. It is one setting on the club row, not a per-visitor cookie: it drives
 the console *and* the messages the same button sends to the group, and those two
 must never disagree. Unknown values fall back to English, and a missing string
 renders its own key rather than a blank.
