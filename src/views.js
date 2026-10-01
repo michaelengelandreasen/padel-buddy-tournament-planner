@@ -540,6 +540,9 @@ const CSS = `
 body{margin:0;background:var(--bg);color:var(--ink);overflow-x:hidden;
   font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 a{color:var(--brand);text-underline-offset:3px} h1,h2,h3{line-height:1.2;margin:0 0 .5rem}
+/* One heading per level: page (h1), card (h2), group inside a card (h3). The card
+   step is a quarter above body text so a card's title reads as its title. */
+.wrap h2{font-size:1.25rem} .wrap h3{font-size:1rem}
 /* An action that happens to be a link still needs a thumb-sized box around it. */
 a.tap{display:inline-flex;align-items:center;min-height:44px;font-weight:600}
 h1{font-size:clamp(1.4rem,5vw,2rem);overflow-wrap:anywhere}
@@ -575,7 +578,7 @@ form.lang select{width:auto;min-height:40px;padding:6px 32px 6px 32px;font-size:
 
 .i{width:1.1em;height:1.1em;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:2;
   stroke-linecap:round;stroke-linejoin:round;vertical-align:-.18em}
-h3 .i,h2 .i{width:20px;height:20px;color:var(--muted);margin-right:.4em;vertical-align:-.22em}
+h2 .i,h3 .i{width:20px;height:20px;color:var(--muted);margin-right:.4em;vertical-align:-.22em}
 button .i,.btn .i,nav a .i{width:18px;height:18px}
 .meta{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;color:var(--muted);margin:0 0 .5rem}
 .meta>span,.meta>a{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
@@ -751,7 +754,7 @@ pre.msg{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--surface-2);
 /* A round's heading and its "post to the groups" button share a line, and wrap
    onto two on a phone rather than squeezing the button into an unreadable box. */
 .roundhead{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:22px 0 4px}
-.roundhead h4{margin:0;flex:1 1 auto;font-size:1rem}
+.roundhead h3{margin:0;flex:1 1 auto;font-size:1rem}
 .roundhead form{flex:0 0 auto}
 .roundhead button{white-space:nowrap}
 .head{display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:space-between}
@@ -777,7 +780,7 @@ pre.msg{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--surface-2);
 .panel>.card:first-child{margin-top:10px}
 /* One bar for all the scores, kept in reach at the bottom of the rounds panel. */
 .savebar{position:sticky;bottom:12px;display:flex;justify-content:flex-end;gap:10px;margin-top:14px;
-  padding:10px;border-radius:12px;background:var(--surface);border:1px solid var(--line);
+  padding:10px;border-radius:12px;background:var(--surface-2);
   box-shadow:0 8px 24px -8px rgba(0,0,0,.6);z-index:2}
 @media (max-width:720px){.savebar{bottom:calc(72px + env(safe-area-inset-bottom))}
   .savebar button{flex:1 1 auto}}
@@ -815,11 +818,11 @@ form.venue{padding:12px 14px;border:1px solid var(--line);border-radius:12px;bac
 form.venue .pill .i{width:14px;height:14px;vertical-align:-2px}
 form.venue .actions{margin-top:12px}
 form.venue.add{margin-top:16px;background:transparent;border-style:dashed}
-form.venue h4{margin:0}
+form.venue h3{margin:0}
 /* A card that folds: its heading is the summary, the arrow turns when open. */
 details.fold summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;min-height:44px;margin:-4px 0}
 details.fold summary::-webkit-details-marker{display:none}
-details.fold summary h3{margin:0;flex:1 1 auto}
+details.fold summary h2{margin:0;flex:1 1 auto}
 details.fold summary>.i{color:var(--muted);transition:transform .15s ease-out}
 details.fold[open] summary>.i{transform:rotate(90deg)}
 details.fold[open] summary{margin-bottom:8px}
@@ -920,11 +923,11 @@ table.standings th .short{display:none}
   .wrap{padding:16px 14px calc(72px + env(safe-area-inset-bottom))}
   header.top{padding:8px 12px}
   nav{position:fixed;left:0;right:0;bottom:0;z-index:6;margin:0;width:auto;gap:0;
-    display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);overflow:visible;
+    display:grid;grid-auto-flow:column;grid-auto-columns:auto;justify-content:space-around;overflow:visible;
     background:var(--surface);border-top:1px solid var(--line);
-    padding:6px 6px calc(6px + env(safe-area-inset-bottom))}
-  nav a{flex-direction:column;justify-content:center;gap:3px;min-height:52px;padding:4px 1px;
-    border-radius:10px;font-size:.64rem;font-weight:700;letter-spacing:0;min-width:0}
+    padding:6px 2px calc(6px + env(safe-area-inset-bottom))}
+  nav a{flex-direction:column;justify-content:center;gap:3px;min-height:52px;min-width:52px;padding:4px 4px;
+    border-radius:10px;font-size:11px;font-weight:700;letter-spacing:-.01em;min-width:0}
   nav a span{max-width:100%;overflow:hidden;text-overflow:ellipsis}
   nav a .i{width:22px;height:22px}
   nav a.on{background:transparent;color:var(--brand)}
@@ -1074,15 +1077,15 @@ export function overview({ club, home = null, venues = [], tournaments, courts, 
       <noscript><button class="btn ghost">${ic('check')}${esc(t('save'))}</button></noscript>
     </form>` : ''}
     <div class="grid">
-      <div class="card"><h3>${ic('court')}${esc(t('courts'))}</h3>
+      <div class="card"><h2>${ic('court')}${esc(t('courts'))}</h2>
         <p class="muted">${courts.length ? courts.map((c) => esc(courtName(c.label, t))).join(' · ') : esc(t('noneYet'))}</p>
         <div class="actions"><a class="btn ghost" href="/settings">${ic('sliders')}${esc(t('manageCourts'))}</a></div></div>
-      <div class="card"><h3>${ic('chats')}${esc(t('navGroups'))}</h3>
+      <div class="card"><h2>${ic('chats')}${esc(t('navGroups'))}</h2>
         <p><span class="pill ${live ? 'on' : ''}">${esc(live ? t('live') : t('draftMode'))}</span></p>
         <p class="muted">${esc(live ? t('postingToGroup') : t('draftExplain'))}</p>
         <div class="actions"><a class="btn ghost" href="/groups">${esc(t('open'))}${ic('arrow')}</a></div></div>
     </div>
-    <div class="card"><h3>${ic('trophy')}${esc(t('tournaments'))}</h3>
+    <div class="card"><h2>${ic('trophy')}${esc(t('tournaments'))}</h2>
       ${tournaments.length ? wrapTable(`<thead><tr><th>${esc(t('when'))}</th><th>${esc(t('level'))}</th>
         <th class="num">${esc(t('courts'))}</th><th>${esc(t('status'))}</th><th></th><th></th></tr></thead><tbody>
       ${tournaments.map((x) => `<tr>
@@ -1105,7 +1108,7 @@ export function overview({ club, home = null, venues = [], tournaments, courts, 
 export function settings({ club, courts, venues = [], notice = '', home = 0, t }) {
   const courtsPanel = `
     <div class="card">
-      <h3>${ic('court')}${esc(t('courts'))}</h3>
+      <h2>${ic('court')}${esc(t('courts'))}</h2>
       <p class="muted">${esc(t('courtsHelp'))} ${esc(t('courtsDefaultsHelp'))}</p>
       ${courtList(courts, '/courts', t)}
     </div>`
@@ -1120,7 +1123,7 @@ export function settings({ club, courts, venues = [], notice = '', home = 0, t }
     <input id="${prefix}addr" name="address" value="${esc(x.address || '')}" maxlength="160">`
   const venuesPanel = `
     <div class="card">
-      <h3>${ic('pin')}${esc(t('venues'))}</h3>
+      <h2>${ic('pin')}${esc(t('venues'))}</h2>
       <p class="muted">${esc(t('venuesHelp'))}</p>
       <div class="venuelist">${venues.map((x) => `<form class="venue" data-key="venue-${x.id}" method="post" action="/venues/${x.id}">
         ${x.id === home ? `<span class="pill on">${ic('home')} ${esc(t('homeBadge'))}</span>` : ''}
@@ -1133,12 +1136,12 @@ export function settings({ club, courts, venues = [], notice = '', home = 0, t }
       </form>`).join('') || `<p class="muted">${esc(t('noVenuesYet'))}</p>`}</div>
       ${notice ? `<div class="flash" role="status"><strong>${esc(notice)}</strong></div>` : ''}
       <form class="venue add" method="post" action="/venues">
-        <h4>${esc(t('addVenue'))}</h4>
+        <h3>${esc(t('addVenue'))}</h3>
         ${venueFields({}, 'vnew')}
         <div class="actions"><button>${ic('plus')}${esc(t('add'))}</button></div>
       </form>
       <form class="venue add" method="post" action="/venues/bulk">
-        <h4>${esc(t('addVenues'))}</h4>
+        <h3>${esc(t('addVenues'))}</h3>
         <p class="muted">${esc(t('addVenuesHelp'))}</p>
         <textarea name="text" rows="5" required placeholder="M9 | https://maps.app.goo.gl/…&#10;Padel Norte&#10;Clube de Ténis do Porto | https://maps.app.goo.gl/…"></textarea>
         <div class="actions"><button>${ic('plus')}${esc(t('add'))}</button></div>
@@ -1146,7 +1149,7 @@ export function settings({ club, courts, venues = [], notice = '', home = 0, t }
     </div>`
   const langForm = `
     <form class="card" method="post" action="/settings">
-      <h3>${ic('globe')}${esc(t('language'))}</h3>
+      <h2>${ic('globe')}${esc(t('language'))}</h2>
       <p class="muted">${esc(t('languageHelp'))}</p>
       <label for="lang">${esc(t('language'))}</label>
       <select id="lang" name="language">${LANGUAGES.map((l) => `<option value="${l.code}"
@@ -1156,7 +1159,7 @@ export function settings({ club, courts, venues = [], notice = '', home = 0, t }
     </form>`
   const policyForm = `
     <form class="card" method="post" action="/settings">
-      <h3>${ic('doc')}${esc(t('dropoutPolicy'))}</h3>
+      <h2>${ic('doc')}${esc(t('dropoutPolicy'))}</h2>
       <p class="muted">${esc(t('dropoutPolicyHelp'))}</p>
       <label for="rules_en">${esc(t('inEnglish'))}</label>
       <textarea id="rules_en" name="rules_en" style="min-height:96px">${esc(club.rules_en)}</textarea>
@@ -1189,7 +1192,7 @@ export function tournamentsPage({ tournaments, venues = [], home = '', form = {}
   const gradeOpts = (grade ? '' : `<option value="" data-label="" data-blurb="" selected disabled>—</option>`)
     + grades(t).map((g) => `<option value="${g.grade}" data-label="${esc(g.label)}"
     data-blurb="${esc(g.blurb)}" ${String(g.grade) === grade ? 'selected' : ''}
-    >${g.grade} — ${esc(g.label)}</option>`).join('')
+    >${g.grade} · ${esc(g.label)}</option>`).join('')
   const cmd = '!tournament non-stop level MX-4 date 2026-09-05 11:00 courts 3 duration 120'
 
   // What the import understood, shown beside the fields it filled in so the
@@ -1231,7 +1234,7 @@ export function tournamentsPage({ tournaments, venues = [], home = '', form = {}
     <h1>${esc(t('newTournament'))}</h1>
     ${notice ? `<div class="flash" role="status"><strong>${esc(notice)}</strong></div>` : ''}
     <form class="card" method="post" action="/tournaments/import">
-      <h3>${ic('chat')}${esc(t('importTitle'))}</h3>
+      <h2>${ic('chat')}${esc(t('importTitle'))}</h2>
       <p class="muted">${esc(t('importHelp'))}</p>
       <textarea name="text" rows="8" placeholder="${esc(t('importPlaceholder'))}" required>${esc(pasted)}</textarea>
       <div class="actions"><button class="${imported ? 'btn ghost' : ''}">${ic('board')}${esc(t('importRead'))}</button></div>
@@ -1338,7 +1341,7 @@ export function tournamentPage({
   const active = !matches.length ? 'board' : allDone ? 'table' : 'rounds'
 
   const board = `
-    <div class="card"><h3>${ic('board')}${esc(t('signupBoard'))}</h3>
+    <div class="card"><h2>${ic('board')}${esc(t('signupBoard'))}</h2>
       ${flashFor('board')}
       <pre class="msg" id="msg-board">${esc(message)}</pre>
       <div class="actions">
@@ -1358,7 +1361,7 @@ export function tournamentPage({
   const chip = (p) => `<button type="button" class="chip" data-name="${esc(p.name)}" data-gender="${esc(p.gender || '')}"
     data-grade="${p.grade || ''}" draggable="false">${ic('grip', 'grip')}${
     p.gender === 'F' || p.gender === 'M' ? `<span class="g ${p.gender}">${p.gender}</span>` : ''}<span class="name">${esc(p.name)}</span>${
-    p.grade ? `<span class="lv" title="${esc(`${t('skillLevel')}: ${p.grade} — ${t(`grade${p.grade}`)}`)}">${p.grade}</span>` : ''}</button>`
+    p.grade ? `<span class="lv" title="${esc(`${t('skillLevel')}: ${p.grade} · ${t(`grade${p.grade}`)}`)}">${p.grade}</span>` : ''}</button>`
   const everyone = teams.flatMap((x) => x.players).concat(waiting)
   const seatCount = Math.max(teams.length, Math.ceil(everyone.length / 2))
   const mixedNote = offLevel.length ? `<p class="err">${ic('alert')} ${esc(t('mixedWarning', {
@@ -1370,7 +1373,7 @@ export function tournamentPage({
   const pairsBoard = `
     <form class="card" method="post" action="/t/${tour.id}/pairs"${matches.length && scored
       ? ` onsubmit="return confirm(${JSON.stringify(t('pairsRedrawConfirm')).replace(/"/g, '&quot;')})"` : ''}>
-      <h3>${ic('users')}${esc(t('pairsTitle'))} <span class="pill on">${esc(t('importPairs', { n: teams.length }))}</span></h3>
+      <h2>${ic('users')}${esc(t('pairsTitle'))} <span class="pill on">${esc(t('importPairs', { n: teams.length }))}</span></h2>
       <p class="muted">${esc(t('pairsHelp'))}${matches.length ? ` ${esc(t('pairsLocked'))}` : ''}</p>
       ${flashFor('pairs')}
       ${mixedNote}
@@ -1393,12 +1396,12 @@ export function tournamentPage({
     </form>`
 
   const teamsPanel = pairsBoard + (teams.length ? `
-    <div class="card"><h3>${ic('users')}${esc(t('teams'))} (${teams.length})</h3>
+    <div class="card"><h2>${ic('users')}${esc(t('teams'))} (${teams.length})</h2>
       ${wrapTable(`<tbody>${teams.map((x, i) => `<tr><td class="pos">${i + 1}</td>
         <td class="lead">${esc(x.name)}</td>
         <td>${x.mixed ? `<span class="pill on">${esc(t('mixed'))}</span>` : ''}</td></tr>`).join('')
         || `<tr><td class="muted">${esc(t('nobodyYet'))}</td></tr>`}</tbody>`, 'stack')}
-      ${waiting.length ? `<h3 style="margin-top:16px">${ic('hourglass')}${esc(t('waiting'))} (${waiting.length})</h3>
+      ${waiting.length ? `<h2 style="margin-top:16px">${ic('hourglass')}${esc(t('waiting'))} (${waiting.length})</h2>
         ${wrapTable(`<tbody>${waiting.map((p) => `<tr><td class="lead">${esc(p.name)}</td>
           <td class="muted full">${esc(p.partner ? t('waitingOn', { name: p.partner })
             : t('noPartner'))}</td></tr>`).join('')}</tbody>`, 'stack')}` : ''}
@@ -1418,22 +1421,22 @@ export function tournamentPage({
       <p class="muted">${esc(t('courtsNightHelp'))}${matches.length ? ` ${esc(t('courtsNightLocked'))}` : ''}</p>
       ${courtList(nightCourts, `/t/${tour.id}/courts`, t, { fixed: matches.length > 0 })}`
   const courtsCard = matches.length ? `
-    <details class="card fold"><summary><h3>${ic('court')}${esc(t('courtsNight'))} <span class="pill">${courts.length}</span></h3>${ic('arrow')}</summary>
+    <details class="card fold"><summary><h2>${ic('court')}${esc(t('courtsNight'))} <span class="pill">${courts.length}</span></h2>${ic('arrow')}</summary>
       ${courtsBody}
     </details>` : `
-    <div class="card"><h3>${ic('court')}${esc(t('courtsNight'))} <span class="pill">${courts.length}</span></h3>
+    <div class="card"><h2>${ic('court')}${esc(t('courtsNight'))} <span class="pill">${courts.length}</span></h2>
       ${courtsBody}
     </div>`
   const roundsPanel = !matches.length ? `
-    <div class="card"><h3>${ic('list')}${esc(t('schedule'))}</h3>
+    <div class="card"><h2>${ic('list')}${esc(t('schedule'))}</h2>
       <p class="muted">${esc(t('noSchedule'))}</p>
       <form method="post" action="/t/${tour.id}/schedule"><div class="actions">
         <button ${teams.length < 2 ? 'disabled' : ''}>${ic('shuffle')}${esc(t('drawSchedule'))}</button></div></form>
       ${teams.length < 2 ? `<p class="hint">${esc(t('needTwoPairs'))}</p>` : ''}
     </div>${courtsCard}` : `
     ${courtsCard}
-    <div class="card"><h3>${ic('compass')}${esc(t('roundTitle'))} <span class="pill on">${
-      esc(t('roundN', { n: now }))}</span></h3>
+    <div class="card"><h2>${ic('compass')}${esc(t('roundTitle'))} <span class="pill on">${
+      esc(t('roundN', { n: now }))}</span></h2>
       <p class="muted">${esc(t('roundHelp'))}</p>
       ${flashFor(`round-${now}`)}
       <div class="actions" style="margin-top:8px">
@@ -1445,7 +1448,7 @@ export function tournamentPage({
       <details class="preview"><summary>${ic('arrow')}${esc(t('preview'))}</summary>
         <pre class="msg" id="msg-round">${esc(roundText)}</pre></details>
     </div>
-    ${scheduleText ? `<div class="card"><h3>${ic('calendar')}${esc(t('allRounds'))}</h3>
+    ${scheduleText ? `<div class="card"><h2>${ic('calendar')}${esc(t('allRounds'))}</h2>
       <p class="muted">${esc(t('allRoundsHelp'))}</p>
       ${flashFor('schedule')}
       <div class="actions" style="margin-top:8px">
@@ -1458,10 +1461,10 @@ export function tournamentPage({
         <pre class="msg" id="msg-schedule">${esc(scheduleText)}</pre></details>
     </div>` : ''}
     <form class="card" method="post" action="/t/${tour.id}/scores">
-      <h3>${ic('list')}${esc(t('schedule'))}</h3>
+      <h2>${ic('list')}${esc(t('schedule'))}</h2>
       ${flashFor('scores')}
       ${rounds.map((r) => `<div class="roundhead" id="round-${r}">
-        <h4>${esc(t('roundN', { n: r }))}${r === now && !allDone ? ` <span class="pill on">${esc(t('nowShort'))}</span>` : ''}</h4>
+        <h3>${esc(t('roundN', { n: r }))}${r === now && !allDone ? ` <span class="pill on">${esc(t('nowShort'))}</span>` : ''}</h3>
         <button type="submit" class="link" formaction="/t/${tour.id}/post" name="round" value="${r}"
           formnovalidate>${esc(t('postRound', { n: r }))}</button>
       </div>${matches.filter((m) => m.round === r).map((m) => matchBlock(m, t, { just: flash?.hl === String(m.id) })).join('')}`).join('')}
@@ -1472,7 +1475,7 @@ export function tournamentPage({
   // four short numbers fit beside a name. Headings abbreviate below 480px.
   const th = (key, short) => `<th class="num"><span class="long">${esc(t(key))}</span><span class="short">${esc(short)}</span></th>`
   const tablePanel = `
-    <div class="card"><h3>${ic('trophy')}${esc(t('standings'))}</h3>
+    <div class="card"><h2>${ic('trophy')}${esc(t('standings'))}</h2>
       ${wrapTable(`<thead><tr><th>#</th><th>${esc(t('team'))}</th>${th('played', 'P')}${th('won', 'W')}${
         th('points', 'Pts')}${th('against', 'Ag')}</tr></thead>
       <tbody>${table.map((r, i) => `<tr class="${i < 3 ? 'top' : ''}" data-key="${esc(r.team)}"><td class="pos">${i + 1}</td>
@@ -1483,7 +1486,7 @@ export function tournamentPage({
         <td class="num muted">${r.against}</td></tr>`).join('')
         || `<tr><td class="muted" colspan="6">${esc(t('noResults'))}</td></tr>`}</tbody>`, 'standings')}
     </div>
-    ${tableText ? `<div class="card"><h3>${ic('chat')}${esc(t('shareTable'))}</h3>
+    ${tableText ? `<div class="card"><h2>${ic('chat')}${esc(t('shareTable'))}</h2>
       <p class="muted">${esc(t('shareTableHelp'))}</p>
       ${flashFor('table')}
       <pre class="msg" id="msg-table">${esc(tableText)}</pre>
@@ -1682,7 +1685,7 @@ table.where{width:100%;border-collapse:separate;border-spacing:0;table-layout:fi
   font-size:max(11px,min(calc(100cqw / var(--gw)),calc(100cqh / var(--gh)),44px))}
 table.where th,table.where td{padding:.26em .2em;text-align:center;line-height:1.25;
   border-bottom:1px solid var(--line);white-space:nowrap}
-table.where th{font-size:.62em;color:var(--muted);letter-spacing:.04em;text-transform:uppercase;
+table.where th{font-size:max(11px,.62em);color:var(--muted);letter-spacing:.04em;text-transform:uppercase;
   font-weight:800;border-bottom:2px solid var(--line)}
 table.where .who{text-align:left;overflow:hidden;text-overflow:ellipsis;font-weight:600;padding-left:.3em}
 table.where col.r{width:1.9em}
@@ -1691,7 +1694,7 @@ table.where col.pts{width:2.6em}
 table.where .pts{font-weight:800;color:var(--brand)}
 table.where th,table.where td{overflow:hidden}
 table.where td.now,table.where td.next{font-size:1.12em}
-table.where th.now,table.where th.next{font-size:.7em;letter-spacing:.02em}
+table.where th.now,table.where th.next{font-size:max(11px,.7em);letter-spacing:.02em}
 table.where td{font-weight:700}
 table.where .past{color:var(--muted);opacity:.45;font-weight:500}
 table.where td.now{background:var(--brand);color:var(--brand-ink);font-weight:900}
@@ -1840,18 +1843,18 @@ export function groupsPage({ groups, chat, log, t }) {
     <h1>${esc(t('groups'))}</h1>
 
     <div class="grid">
-      <div class="card"><h3>${ic('send')}${esc(t('telegramGroup'))}
-        <span class="pill ${tg && chat ? 'on' : ''}">${esc(tgPill)}</span></h3>
+      <div class="card"><h2>${ic('send')}${esc(t('telegramGroup'))}
+        <span class="pill ${tg && chat ? 'on' : ''}">${esc(tgPill)}</span></h2>
         <p class="muted">${esc(tgState)}</p>
         <p class="note">${esc(t('telegramHelp'))}</p>
       </div>
-      <div class="card"><h3>${ic('chat')}${esc(t('whatsappGroup'))}
-        <span class="pill">${esc(t('draftMode'))}</span></h3>
+      <div class="card"><h2>${ic('chat')}${esc(t('whatsappGroup'))}
+        <span class="pill">${esc(t('draftMode'))}</span></h2>
         <p class="note">${esc(t('draftNote'))}</p>
       </div>
     </div>
 
-    <div class="card"><h3>${ic('terminal')}${esc(t('tryCommand'))}</h3>
+    <div class="card"><h2>${ic('terminal')}${esc(t('tryCommand'))}</h2>
       <form method="post" action="/groups/simulate">
         <label for="watext">${esc(t('message'))}</label>
         <input id="watext" name="text" class="mono" placeholder="!where Mike" required>
@@ -1859,9 +1862,9 @@ export function groupsPage({ groups, chat, log, t }) {
         <input id="waid" name="wa_id" inputmode="tel" placeholder="+351…">
         <div class="actions"><button>${ic('send')}${esc(t('sendToBot'))}</button></div>
       </form>
-      ${log ? `<h3 style="margin-top:18px">${esc(t('reply'))}</h3><pre class="msg">${esc(log)}</pre>` : ''}
+      ${log ? `<h2 style="margin-top:18px">${esc(t('reply'))}</h2><pre class="msg">${esc(log)}</pre>` : ''}
     </div>
-    <div class="card"><h3>${ic('inbox')}${esc(t('outboxTitle'))}</h3>
+    <div class="card"><h2>${ic('inbox')}${esc(t('outboxTitle'))}</h2>
       ${groups.outbox().length
         ? groups.outbox().map((m, i) => `<div class="outmsg">
           <pre class="msg" id="out-${i}">${esc(m.text)}</pre>
@@ -1873,7 +1876,7 @@ export function groupsPage({ groups, chat, log, t }) {
 
 
 /** A level as people say it: "4 — Upper intermediate", or a dash when unrated. */
-const levelName = (g, t) => (g ? `${g} — ${t(`grade${g}`)}` : t('levelUnset'))
+const levelName = (g, t) => (g ? `${g} · ${t(`grade${g}`)}` : t('levelUnset'))
 const levelOptions = (g, t) => `<option value="0"${g ? '' : ' selected'}>${esc(t('levelUnset'))}</option>${
   grades(t).map((x) => `<option value="${x.grade}"${x.grade === g ? ' selected' : ''}>${esc(levelName(x.grade, t))}</option>`).join('')}`
 const nights = (n, t) => t(n === 1 ? 'nightsPlayed1' : 'nightsPlayed', { n })
@@ -1914,7 +1917,7 @@ export function playersPage({ players, notice = '', t }) {
     <p class="muted">${esc(t('playersHelp'))}</p>
     ${notice ? `<div class="flash" role="status"><strong>${esc(notice)}</strong></div>` : ''}
     <form class="card" method="post" action="/players/levels">
-      <h3>${ic('user')}${esc(t('players'))} <span class="pill">${players.length}</span></h3>
+      <h2>${ic('user')}${esc(t('players'))} <span class="pill">${players.length}</span></h2>
       ${players.length ? `<input id="psearch" class="search" type="search" placeholder="${esc(t('searchPlayers'))}" aria-label="${esc(t('searchPlayers'))}" autocomplete="off">
       <div class="plist">${rows}</div>
       <label for="pnote">${esc(t('levelNote'))}</label>
@@ -1923,7 +1926,7 @@ export function playersPage({ players, notice = '', t }) {
         : `<p class="muted">${esc(t('noPlayersYet'))}</p>`}
     </form>
     <form class="card" method="post" action="/players/bulk">
-      <h3>${ic('plus')}${esc(t('addPlayers'))}</h3>
+      <h2>${ic('plus')}${esc(t('addPlayers'))}</h2>
       <p class="muted">${esc(t('addPlayersHelp'))}</p>
       <textarea name="text" rows="5" required placeholder="Rui Basto | M | 4&#10;Rita | F&#10;Carla Guerra | F | 5"></textarea>
       <div class="actions"><button>${ic('plus')}${esc(t('add'))}</button></div>
@@ -1948,19 +1951,19 @@ export function playerPage({ player: p, notice = '', t }) {
     ${notice ? `<div class="flash" role="status"><strong>${esc(notice)}</strong></div>` : ''}
     <div class="grid">
       <form class="card" method="post" action="/players/${p.id}/level">
-        <h3>${ic('up')}${esc(t('adjustLevel'))}</h3>
+        <h2>${ic('up')}${esc(t('adjustLevel'))}</h2>
         <label for="plevel">${esc(t('skillLevel'))}</label>
         <select id="plevel" name="grade">${levelOptions(p.grade, t)}</select>
         <label for="pnote1">${esc(t('levelNote'))}</label>
         <input id="pnote1" name="note" maxlength="200" placeholder="${esc(t('levelNotePlaceholder'))}">
         <div class="actions"><button>${ic('check')}${esc(t('save'))}</button></div>
       </form>
-      <div class="card"><h3>${ic('list')}${esc(t('levelHistory'))}</h3>
+      <div class="card"><h2>${ic('list')}${esc(t('levelHistory'))}</h2>
         ${hist ? `<ol class="history">${hist}</ol>` : `<p class="muted">${esc(t('noLevelYet'))}</p>`}
       </div>
     </div>
     <form class="card" method="post" action="/players/${p.id}">
-      <h3>${ic('user')}${esc(t('playerDetails'))}</h3>
+      <h2>${ic('user')}${esc(t('playerDetails'))}</h2>
       <div class="row">
         <div><label for="pname">${esc(t('playerName'))}</label>
           <input id="pname" name="name" value="${esc(p.name)}" maxlength="80" required></div>
@@ -1979,7 +1982,7 @@ export function playerPage({ player: p, notice = '', t }) {
           onclick="return confirm(${JSON.stringify(t('deletePlayerConfirm', { name: p.name })).replace(/"/g, '&quot;')})">${ic('trash')}${esc(t('remove'))}</button>
       </div>
     </form>
-    <div class="card"><h3>${ic('calendar')}${esc(t('nightsTitle'))}</h3>
+    <div class="card"><h2>${ic('calendar')}${esc(t('nightsTitle'))}</h2>
       ${p.nights.length ? `<div class="plist">${p.nights.map((x) => `<div class="prow"><div class="who">
         <a href="/t/${x.id}">${esc(x.level || '')} · ${esc(humanWhen(x, { lang: t.lang }))}</a>
         ${x.venue ? `<div class="sub">${esc(x.venue)}</div>` : ''}</div></div>`).join('')}</div>`

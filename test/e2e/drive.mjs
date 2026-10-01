@@ -152,7 +152,7 @@ await submit('form[action$="/scores"]', '.savebar button')
 await until(`document.querySelector('.flash')&&/Saved 4 scores/.test(document.querySelector('.flash').textContent)`)
 check('scores: Save all saves 4', /Saved 4 scores/.test(await text('.flash')), (await text('.flash')).trim())
 check('scores: values persisted', (await js(`document.querySelector('.match input[name^=a]').value`)) === '11')
-check('scores: round 2 is now the round message', /Round 2/.test(await text('#tab-rounds .card:not(.fold) h3 .pill')))
+check('scores: round 2 is now the round message', /Round 2/.test(await text('#tab-rounds .card:not(.fold) h2 .pill')))
 // per-match save on round 2
 await js(`var m=document.querySelectorAll('.match')[4];m.querySelector('input[name^=a]').value=7;m.querySelector('input[name^=b]').value=9;1`)
 await js(`document.querySelectorAll('.match')[4].querySelector('button.save').click();1`)
