@@ -324,6 +324,12 @@ docker compose exec app node scripts/seed.js --reset   # Padel Tribe sample data
 The tournament page is four tabs — Board, Teams, Rounds, Table — and the
 Rounds tab is one form: every score box on the page saves from the bar at the
 bottom, or one match from its own Save. Empty boxes mean "not played", never 0–0.
+Each match says which state it is in. Not played: two empty boxes and Save.
+Saved: the result shown as a result — winner in full ink, the scores as
+numerals, a quiet "Saved" — with **Edit** to change it. Edited or typed but not
+saved: the card turns amber with "Unsaved", Save becomes primary, **Cancel**
+(or Esc) puts the saved score back, and the save bar counts what is waiting.
+Leaving the page with unsaved scores asks first.
 
 Data lives in `data/planner.db` (gitignored, bind-mounted, survives recreation).
 

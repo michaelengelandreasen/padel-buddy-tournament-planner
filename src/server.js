@@ -315,7 +315,7 @@ const routes = [
     const q = new URL(req.url, 'http://x').searchParams
     const flash = q.get('posted') ? {
       what: q.get('posted'), tg: q.get('tg') || '', err: (q.get('err') || '').slice(0, 120),
-      n: q.get('n') || '',
+      n: q.get('n') || '', hl: q.get('hl') || '',
     } : q.get('signed') ? { what: 'board', signed: q.get('signed') } : null
     const pinnedId = activeTournament()?.id || 0
     const home = homePlace()
@@ -405,7 +405,7 @@ const routes = [
       post(hasNext ? roundMessage(tour, next, t.lang) : standingsMessage(tour, t.lang),
         { reason: hasNext ? `round ${next}` : 'final' })
     }
-    return { to: `/t/${id}?posted=scores&n=${changed}#rounds` }
+    return { to: `/t/${id}?posted=scores&n=${changed}${only && changed ? `&hl=${only}` : ''}#${only ? `match-${only}` : 'rounds'}` }
   }],
 
   // This night's courts: rename, add, remove — nothing outside the tournament moves.

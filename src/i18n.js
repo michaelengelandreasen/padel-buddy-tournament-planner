@@ -379,6 +379,12 @@ const EN = {
   balanceByLevel: 'Balance by level',
   balanceHelp: 'Pairs the strongest with the weakest so every pair adds up to about the same; unrated players count as 4.',
   inSpanish: 'In Spanish',
+  scoreSaved: 'Saved',
+  scoreEdit: 'Edit',
+  cancel: 'Cancel',
+  unsaved: 'Unsaved',
+  unsavedN: '{n} not saved yet',
+  savedScores1: 'Saved 1 score.',
 }
 
 const PT = {
@@ -729,6 +735,12 @@ const PT = {
   balanceByLevel: 'Equilibrar por nível',
   balanceHelp: 'Junta o mais forte com o mais fraco para as duplas ficarem equilibradas; quem não tem nível conta como 4.',
   inSpanish: 'Em espanhol',
+  scoreSaved: 'Guardado',
+  scoreEdit: 'Editar',
+  cancel: 'Cancelar',
+  unsaved: 'Por guardar',
+  unsavedN: '{n} por guardar',
+  savedScores1: '1 resultado guardado.',
 }
 
 
@@ -1079,6 +1091,12 @@ const UK = {
   balanceByLevel: 'Збалансувати за рівнем',
   balanceHelp: 'Ставить найсильнішого з найслабшим, щоб пари були рівними; гравці без рівня рахуються як 4.',
   inSpanish: 'Іспанською',
+  scoreSaved: 'Збережено',
+  scoreEdit: 'Змінити',
+  cancel: 'Скасувати',
+  unsaved: 'Не збережено',
+  unsavedN: 'Не збережено: {n}',
+  savedScores1: 'Збережено 1 результат.',
 }
 
 const ES = {
@@ -1428,6 +1446,12 @@ const ES = {
   balanceByLevel: 'Equilibrar por nivel',
   balanceHelp: 'Junta al más fuerte con el más flojo para que las parejas queden igualadas; quien no tiene nivel cuenta como 4.',
   inSpanish: 'En español',
+  scoreSaved: 'Guardado',
+  scoreEdit: 'Editar',
+  cancel: 'Cancelar',
+  unsaved: 'Sin guardar',
+  unsavedN: '{n} sin guardar',
+  savedScores1: '1 resultado guardado.',
 }
 
 const STRINGS = { en: EN, pt: PT, uk: UK, es: ES }

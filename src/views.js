@@ -39,6 +39,7 @@ const ICONS = {
   chat: '<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>',
   court: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M12 5v14"/>'
     + '<path d="M2 12h4M18 12h4"/>',
+  pencil: '<path d="M21.17 6.81a1 1 0 0 0-3.99-3.99L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5z"/><path d="m15 5 4 4"/>',
   user: '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
   up: '<path d="M22 7 13.5 15.5 8.5 10.5 2 17"/><path d="M16 7h6v6"/>',
   down: '<path d="M22 17 13.5 8.5 8.5 13.5 2 7"/><path d="M16 17h6v-6"/>',
@@ -431,7 +432,11 @@ function pbOnce(el,key){var k='__pb_'+key;if(el[k])return false;el[k]=1;return t
     // Not disabled: disabling the pressed button moves focus off it, and on a
     // phone that closes the keyboard the host is typing the next score with.
     if(btn)btn.classList.add('busy');
-    fetch(action,{method:'POST',body:new URLSearchParams(data),credentials:'same-origin',
+    // Resolved against the origin, which never carries user:pass. A page opened
+    // from a share link has them in its address, and fetch refuses any URL that
+    // does — every save would silently fall back to a full reload.
+    var target=new URL(action,location.href);target=location.origin+target.pathname+target.search;
+    fetch(target,{method:'POST',body:new URLSearchParams(data),credentials:'same-origin',
       headers:{'Accept':'text/html'},redirect:'follow'}).then(function(res){
       var to=new URL(res.url,location.href);
       // Only a redirect elsewhere is a navigation. A page rendered straight
@@ -464,6 +469,38 @@ function pbOnce(el,key){var k='__pb_'+key;if(el[k])return false;el[k]=1;return t
     });
   });
 })();`
+
+/**
+ * Score cards: Edit opens a saved match, Cancel puts its saved score back,
+ * typing marks it unsaved and the save bar counts what is waiting. Leaving the
+ * page with scores typed but not saved asks first.
+ */
+const SCORES_JS = `pbInit.push(function(){
+  var ms=[].slice.call(document.querySelectorAll('.match'));if(!ms.length)return;
+  var count=document.getElementById('unsaved-count');
+  function val(m,s){return m.querySelector('input[name^='+s+']').value.trim()}
+  function check(m){var d=val(m,'a')!==m.dataset.a||val(m,'b')!==m.dataset.b;m.classList.toggle('dirty',d);return d}
+  function tally(){var n=document.querySelectorAll('.match.dirty').length;
+    if(count)count.textContent=n?count.dataset.tpl.replace('{n}',n):''}
+  ms.forEach(function(m){
+    // After a save the page is morphed, not rebuilt: a box still holding an
+    // unsaved number elsewhere must stay marked as unsaved.
+    check(m);
+    if(!pbOnce(m,'score'))return;
+    var e=m.querySelector('[data-edit]'),c=m.querySelector('[data-cancel]');
+    m.addEventListener('click',function(ev){
+      if(ev.target.closest('[data-edit]')){m.classList.add('editing');var i=m.querySelector('input');i.focus();i.select()}
+      if(ev.target.closest('[data-cancel]')){m.querySelector('input[name^=a]').value=m.dataset.a;m.querySelector('input[name^=b]').value=m.dataset.b;
+        m.classList.remove('editing','dirty');tally();var ed=m.querySelector('[data-edit]');if(ed)ed.focus()}});
+    m.addEventListener('input',function(){check(m);tally()});
+    m.addEventListener('keydown',function(ev){if(ev.key==='Escape'&&m.querySelector('[data-cancel]')){ev.preventDefault();m.querySelector('[data-cancel]').click()}});
+  });
+  tally();
+  if(!window.__pbUnload){window.__pbUnload=1;
+    document.addEventListener('submit',function(){window.__pbSubmitting=1;setTimeout(function(){window.__pbSubmitting=0},4000)},true);
+    window.addEventListener('beforeunload',function(ev){
+      if(window.__pbSubmitting)return;if(document.querySelector('.match.dirty')){ev.preventDefault();ev.returnValue=''}})}
+});`
 
 /** A tab strip + its panels. `tabs` is [{id, icon, label, count?, body}]. */
 function tabbed(tabs, active) {
@@ -658,6 +695,9 @@ pre.msg{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--surface-2);
   background:var(--bg);border:2px solid color-mix(in oklab,var(--brand) 55%,var(--line));
   border-radius:12px;font-size:1.25rem;font-weight:800;font-variant-numeric:tabular-nums;
   box-shadow:inset 0 1px 2px rgba(0,0,0,.45);transition:border-color .15s ease-out}
+/* No spinner arrows: a score is typed, and the arrows crowd the number. */
+.match input{-moz-appearance:textfield;appearance:textfield}
+.match input::-webkit-inner-spin-button,.match input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
 .match input::placeholder{color:var(--muted);font-weight:600;opacity:1}
 .match input:hover{border-color:var(--brand)}
 .match input:focus{border-color:var(--brand);outline:none;
@@ -665,9 +705,48 @@ pre.msg{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--surface-2);
 /* A box that already holds a score wears it in the brand colour outright. */
 .match input:not(:placeholder-shown){border-color:var(--brand);color:var(--brand-soft)}
 .match button{padding:8px 18px}
+.match .acts{display:flex;flex-direction:column;gap:8px}
+/*
+ * Three states, said out loud. Not played: two empty boxes and Save. Saved: the
+ * result, as a result — the winning pair in full ink, the scores as numerals —
+ * with a quiet "Saved" and an Edit button; the boxes are put away. Editing (or
+ * typed but not saved yet): boxes back, "Unsaved" in amber, Save made primary,
+ * Cancel puts the saved score back. Without scripting the boxes simply stay.
+ */
+.match .state{display:none;margin-left:auto;align-items:center;gap:4px;text-transform:none;letter-spacing:0;
+  font-size:.78rem;font-weight:700}
+.match .state .i{width:14px;height:14px}
+.match .state.saved{color:var(--brand)}
+.match .state.unsaved{color:var(--accent)}
+.match .result{display:none;min-width:0}
+.match .result .line{display:flex;align-items:center;gap:12px;padding:6px 0;color:var(--muted)}
+.match .result .line+.line{border-top:1px solid var(--line)}
+.match .result .who{flex:1 1 auto;min-width:0;font-weight:600;overflow-wrap:anywhere}
+.match .result .pts{flex:0 0 76px;text-align:center;font-size:1.5rem;font-weight:800;
+  font-variant-numeric:tabular-nums;line-height:1.2}
+.match .result .win{color:var(--ink)}
+.match .result .win .pts{color:var(--brand)}
+.match .edit,.match .cancel{display:none}
+.js .match.done:not(.editing):not(.dirty) .state.saved{display:inline-flex}
+.js .match.done:not(.editing):not(.dirty) .result{display:block}
+.js .match.done:not(.editing):not(.dirty) .sides,
+.js .match.done:not(.editing):not(.dirty) .btn.save{display:none}
+.js .match.done:not(.editing):not(.dirty) .edit{display:inline-flex}
+.js .match.done.editing .cancel,.js .match.done.dirty .cancel{display:inline-flex}
+.js .match.dirty{border-color:color-mix(in oklab,var(--accent) 60%,var(--line))}
+.js .match.dirty .state.unsaved{display:inline-flex}
+.js .match.dirty .btn.save{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
+/* The match just saved settles in, so the eye finds what changed. */
+.match.just{animation:justsaved 1.2s cubic-bezier(.2,.8,.2,1) both}
+@keyframes justsaved{from{border-color:var(--brand);box-shadow:0 0 0 3px color-mix(in oklab,var(--brand) 35%,transparent)}
+  to{border-color:var(--line);box-shadow:0 0 0 0 transparent}}
+@media (prefers-reduced-motion:reduce){.match.just{animation:none;border-color:var(--brand)}}
+.savebar .count{margin-right:auto;align-self:center;color:var(--accent);font-weight:700;font-size:.9rem}
+.savebar .count:empty{display:none}
 @media (max-width:480px){
   .match{grid-template-columns:1fr}
-  .match button{width:100%}
+  .match .acts{flex-direction:row}
+  .match .acts .btn{flex:1 1 0}
 }
 /* A round's heading and its "post to the groups" button share a line, and wrap
    onto two on a phone rather than squeezing the button into an unreadable box. */
@@ -925,7 +1004,7 @@ export function page(title, body, { nav = '', script = '', t = translator(), her
 <strong>Padel Buddy</strong><small>${esc(t('navTournaments'))}</small></a>
 <nav>${nav}</nav>${langToggle(t.lang, here)}</header>
 ${SPRITE}
-<div class="wrap">${body}</div><script>${AJAX_JS}</script><script>${TABS_JS}</script><script>${PAIRS_JS}</script><script>${COPY_JS}</script>${script ? `<script>${script}</script>` : ''}<script>pbBoot()</script></body></html>`
+<div class="wrap">${body}</div><script>${AJAX_JS}</script><script>${TABS_JS}</script><script>${PAIRS_JS}</script><script>${COPY_JS}</script><script>${SCORES_JS}</script>${script ? `<script>${script}</script>` : ''}<script>pbBoot()</script></body></html>`
 }
 
 const navFor = (here, t) => [['/', 'navOverview', 'home'], ['/tournaments', 'navTournaments', 'trophy'],
@@ -949,8 +1028,18 @@ const wrapTable = (inner, cls = '') =>
  * so every box on the page can also be saved at once from the bar underneath.
  * Each name is the input's own <label>, so the accessible name is the team.
  */
-const matchBlock = (m, t) => `<div class="match" id="match-${m.id}">
-  <div class="court">${ic('court')} ${esc(courtName(m.court, t))}</div>
+const matchBlock = (m, t, { just = false } = {}) => {
+  const done = m.score_a != null && m.score_b != null
+  const win = done && m.score_a !== m.score_b ? (m.score_a > m.score_b ? 'a' : 'b') : ''
+  return `<div class="match${done ? ' done' : ''}${just ? ' just' : ''}" id="match-${m.id}"
+    data-a="${m.score_a ?? ''}" data-b="${m.score_b ?? ''}">
+  <div class="court">${ic('court')} ${esc(courtName(m.court, t))}
+    <span class="state saved">${ic('check')}${esc(t('scoreSaved'))}</span>
+    <span class="state unsaved">${esc(t('unsaved'))}</span></div>
+  ${done ? `<div class="result" aria-label="${esc(`${m.team_a} ${m.score_a} – ${m.score_b} ${m.team_b}`)}">${
+    [['a', m.team_a, m.score_a], ['b', m.team_b, m.score_b]].map(([side, team, score]) => `
+    <div class="line${win === side ? ' win' : ''}"><span class="who">${esc(team)}</span><span class="pts">${score}</span></div>`).join('')}
+  </div>` : ''}
   <div class="sides">
     ${[['a', m.team_a, m.score_a], ['b', m.team_b, m.score_b]].map(([side, team, score]) => `
     <div class="side">
@@ -959,8 +1048,13 @@ const matchBlock = (m, t) => `<div class="match" id="match-${m.id}">
         inputmode="numeric" placeholder="–" value="${score ?? ''}">
     </div>`).join('')}
   </div>
-  <button class="btn save" name="only" value="${m.id}">${ic('check')}${esc(t('save'))}</button>
+  <div class="acts">
+    <button class="btn save" name="only" value="${m.id}">${ic('check')}${esc(t('save'))}</button>
+    ${done ? `<button type="button" class="btn ghost edit" data-edit>${ic('pencil')}${esc(t('scoreEdit'))}</button>
+    <button type="button" class="btn ghost cancel" data-cancel>${ic('x')}${esc(t('cancel'))}</button>` : ''}
+  </div>
 </div>`
+}
 
 const levelCell = (code, t) => code
   ? `<span class="pill on">${esc(code)}</span> <span class="muted">${esc(levelShort(code, t))}</span>`
@@ -1216,7 +1310,7 @@ export function flashLine(flash, t) {
   if (flash.what === 'scores') {
     const n = Number(flash.n) || 0
     return `<div class="flash" role="status"><strong>${
-      esc(n ? t('savedScores', { n }) : t('savedNothing'))}</strong></div>`
+      esc(n === 1 ? t('savedScores1') : n ? t('savedScores', { n }) : t('savedNothing'))}</strong></div>`
   }
   bits.push(bits.length
     ? `<span>${esc(t('sentDraft'))}</span>`
@@ -1370,8 +1464,8 @@ export function tournamentPage({
         <h4>${esc(t('roundN', { n: r }))}${r === now && !allDone ? ` <span class="pill on">${esc(t('nowShort'))}</span>` : ''}</h4>
         <button type="submit" class="link" formaction="/t/${tour.id}/post" name="round" value="${r}"
           formnovalidate>${esc(t('postRound', { n: r }))}</button>
-      </div>${matches.filter((m) => m.round === r).map((m) => matchBlock(m, t)).join('')}`).join('')}
-      <div class="savebar"><button>${ic('check')}${esc(t('saveAll'))}</button></div>
+      </div>${matches.filter((m) => m.round === r).map((m) => matchBlock(m, t, { just: flash?.hl === String(m.id) })).join('')}`).join('')}
+      <div class="savebar"><span class="count" id="unsaved-count" aria-live="polite" data-tpl="${esc(t('unsavedN'))}"></span><button>${ic('check')}${esc(t('saveAll'))}</button></div>
     </form>`
 
   // The table stays a table on a phone: a ranking is read down a column, and
@@ -1704,7 +1798,7 @@ ${SPRITE}
   // Refresh in place: fetch the page, swap the content, keep the clock going.
   // A meta refresh blanks the screen every twenty seconds; this doesn't.
   setInterval(function(){
-    fetch(location.href,{credentials:'same-origin',cache:'no-store'}).then(function(r){
+    fetch(location.origin+location.pathname+location.search,{credentials:'same-origin',cache:'no-store'}).then(function(r){
       if(!r.ok)throw 0;return r.text()}).then(function(html){
       var doc=new DOMParser().parseFromString(html,'text/html');
       var next=doc.getElementById('tv-root');if(!next)return;
