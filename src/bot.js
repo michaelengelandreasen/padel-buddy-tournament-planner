@@ -2,10 +2,11 @@ import {
   addSignup, clubLanguage, clubRules, createTournament, currentTournament,
   findVenue, getClub, homePlace, listMatches, listSignups, playingTournament, removeSignup,
 } from './db.js'
-import { buildTeams, slots, standings } from './formats/nonstop.js'
+import { buildTeams, slots } from './formats/nonstop.js'
+import { dynamic, entrants, individual, plannedRounds, standings } from './formats/index.js'
 import { clock, dayName, parseWhen, shortDate, timeRange, validateWhen } from './dates.js'
 import {
-  courtName, courtsByTeam, currentRound, findGame, opponentIn, roundPlan, roundsOf, teamsNamed,
+  courtName, courtsByTeam, currentRound, findGame, opponentIn, partnerIn, roundPlan, roundsOf, teamsNamed,
 } from './rounds.js'
 import { levelHelp, levelTight, parseLevel } from './levels.js'
 import { translator } from './i18n.js'
@@ -44,6 +45,8 @@ function parseTournament(rest, { now = new Date(), lang } = {}) {
   })
   const head = (hits[0] ? clean.slice(0, hits[0].index) : clean).trim()
   if (/americano/i.test(head)) out.format = 'americano'
+  else if (/mexicano/i.test(head)) out.format = 'mexicano'
+  else if (/up\s*-?\s*(and\s*)?-?\s*down|updown|sobe/i.test(head)) out.format = 'up-down'
 
   const level = parseLevel(out.level, { lang })
   if (!level.ok) return { ok: false, error: `${level.error}\n\n${levelHelp(t)}` }
@@ -70,11 +73,11 @@ function parseTournament(rest, { now = new Date(), lang } = {}) {
 }
 
 /**
- * `!in Mike M partner Sofia` — and the four other ways people will write it.
+ * `!in Nico M partner Sofia` — and the four other ways people will write it.
  *
  * Gender is a bare M/F/X token or the words; partner is whatever follows
- * "partner", "with", "+" or "&". Anything left over is the name, so `!in Mike`
- * works and so does `!in Mike (M) with Sofia`.
+ * "partner", "with", "+" or "&". Anything left over is the name, so `!in Nico`
+ * works and so does `!in Nico (M) with Sofia`.
  */
 function parseSignup(rest) {
   let s = rest.replace(/[<>()]/g, ' ').trim()
@@ -95,7 +98,7 @@ function parseSignup(rest) {
   return { name: s.replace(/\s+/g, ' ').trim(), gender, partner }
 }
 
-/** Split "!in mike m partner sofia" into its command and the rest. */
+/** Split "!in nico m partner sofia" into its command and the rest. */
 function split(text) {
   const m = String(text || '').trim().match(/^!\s*([a-z]+)\b\s*(.*)$/is)
   return m ? { cmd: m[1].toLowerCase(), rest: m[2].trim() } : null
@@ -119,7 +122,7 @@ export function handle(text, { waId = '', isHost = true, lang = clubLanguage() }
   const board = (t, prefix = '') =>
     say(boardMessage(t, prefix, lang), { key: `board:${t.id}`, pin: true, reason: 'board' })
   const OPEN_CMD = '`!tournament non-stop level MX-4 date 2026-09-05 11:00 courts 3 duration 120`'
-  const IN_CMD = '`!in Mike M partner Sofia`'
+  const IN_CMD = '`!in Nico M partner Sofia`'
 
   if (cmd === 'tournament') {
     if (!isHost) return say(s('onlyHostOpens'))
@@ -141,7 +144,7 @@ export function handle(text, { waId = '', isHost = true, lang = clubLanguage() }
     const t = currentTournament()
     if (!t) return null
     const name = parseSignup(rest).name
-    if (!name) return say(s('whoIsDropping', { cmd: '`!out Mike`' }))
+    if (!name) return say(s('whoIsDropping', { cmd: '`!out Nico`' }))
     const gone = removeSignup(t.id, name)
     if (!gone) return say(s('notOnTheList', { name }))
     return board(t, s('isOut', { name: gone.name }))
@@ -183,7 +186,7 @@ export function handle(text, { waId = '', isHost = true, lang = clubLanguage() }
   if (cmd === 'where' || cmd === 'onde' || cmd === 'donde') {
     const t = tonight()
     if (!t) return say(s('noTournamentOpenShort'))
-    if (!rest) return say(s('whoAreYou', { cmd: '`!where Mike`' }))
+    if (!rest) return say(s('whoAreYou', { cmd: '`!where Nico`' }))
     return say(whereMessage(t, rest, lang), { reason: 'where' })
   }
 
@@ -205,6 +208,10 @@ export function handle(text, { waId = '', isHost = true, lang = clubLanguage() }
 }
 
 const b = (s) => `*${s}*`
+
+/** "Nonstop", or the night's own format — the word the group sees before the level. */
+const FORMAT_WORD = { americano: 'formatAmericano', mexicano: 'formatMexicano', 'up-down': 'formatUpDown' }
+const formatWord = (tour, s) => (FORMAT_WORD[tour?.format] ? s(FORMAT_WORD[tour.format]) : s('boardFormat'))
 
 /** The slot emoji the group already uses. Category decides which ones appear. */
 const SLOT = { F: '👩🏻', M: '👦🏼' }
@@ -239,7 +246,7 @@ export function boardMessage(t, prefix = '', lang = clubLanguage()) {
     : `📆 ${s('dateTBC')}`)
   const range = timeRange(t.play_time, t.duration_min, { lang })
   if (range) lines.push(`🕒 ${range}`)
-  lines.push(`📈 ${s('boardFormat')} ${levelTight(t.level) || '—'}`)
+  lines.push(`📈 ${formatWord(t, s)} ${levelTight(t.level) || '—'}`)
   lines.push('')
   // A night away from home says where, with that place's own map link if the
   // venue is a saved one; the club's link is only ever the club's.
@@ -272,8 +279,8 @@ export function boardMessage(t, prefix = '', lang = clubLanguage()) {
   lines.push(taken >= size
     ? (reserves.length ? s('boardFull', { n: reserves.length }) : s('boardFullClean'))
     : s('whosIn'))
-  lines.push(s('signupHint', { cmd: '`!in Mike M partner Sofia`' }))
-  lines.push(s('dropoutHint', { cmd: '`!out Mike`' }))
+  lines.push(s('signupHint', { cmd: '`!in Nico M partner Sofia`' }))
+  lines.push(s('dropoutHint', { cmd: '`!out Nico`' }))
 
   const rules = clubRules(lang)
   if (rules) lines.push('', b(s('important')), rules)
@@ -287,7 +294,7 @@ export const openedMessage = (t, lang) => boardMessage(t, '', lang)
 
 /** Everything the night messages read, fetched once. */
 function night(t) {
-  const { teams } = buildTeams(listSignups(t.id))
+  const { teams } = entrants(t, listSignups(t.id))
   return { teams, matches: listMatches(t.id) }
 }
 
@@ -326,10 +333,13 @@ export function roundMessage(tour, round, lang = clubLanguage()) {
   }
 
   const plan = roundPlan({ tournament: tour, matches, teams, round })
-  const last = round === rounds[rounds.length - 1]
+  // A Mexicano or Up and Down night only knows its rounds one at a time; the
+  // count is the clock's, and "last" is the clock's last, not the last drawn.
+  const total = dynamic(tour) ? Math.max(rounds.length, plannedRounds(tour)) : rounds.length
+  const last = round >= total
   const lines = [
-    `🎾 ${b(s('roundOfN', { n: round, total: rounds.length }))} · ${
-      s('boardFormat')} ${levelTight(tour.level) || ''}`.trim(),
+    `🎾 ${b(s('roundOfN', { n: round, total }))} · ${
+      formatWord(tour, s)} ${levelTight(tour.level) || ''}`.trim(),
   ]
   const when = clockWindow(tour, plan, lang)
   if (when) lines.push(`⏱ ${when}`)
@@ -345,6 +355,10 @@ export function roundMessage(tour, round, lang = clubLanguage()) {
 
   if (last) {
     lines.push('', `🏁 ${s('lastRoundNote')}`)
+  } else if (dynamic(tour) && !rounds.includes(round + 1)) {
+    // The next round is drawn from this one's scores, so it cannot be told yet.
+    lines.push('', b(`⏭ ${s('nextRoundAt', { n: round + 1, at: clock(plan.end, { lang }) || '—' })}`))
+    lines.push(s('nextFromScores'))
   } else {
     const nextRound = round + 1
     const nextAt = clock(plan.end, { lang })
@@ -367,7 +381,7 @@ export function roundMessage(tour, round, lang = clubLanguage()) {
 }
 
 /**
- * `!where Mike` — the same answer, for one person who does not want to read a
+ * `!where Nico` — the same answer, for one person who does not want to read a
  * list at all.
  *
  * Matched on any word of a pair's name, so people type their own first name and
@@ -394,9 +408,12 @@ export function whereMessage(tour, query, lang = clubLanguage()) {
   lines.push(now
     ? `🎾 ${s('nowShort')} · ${b(courtName(now.court, s, { always: true }))}${when ? ` (${when})` : ''}`
     : `☕ ${s('restingThisRound')}${when ? ` (${when})` : ''}`)
+  if (now && individual(tour)) lines.push(`🤝 ${partnerIn(now, team)}`)
   if (now) lines.push(`🆚 ${opponentIn(now, team)}`)
 
-  if (round >= (rounds[rounds.length - 1] ?? 0)) {
+  if (dynamic(tour) && round < plannedRounds(tour) && !rounds.includes(round + 1)) {
+    lines.push(`⏭ ${s('nextFromScores')}`)
+  } else if (round >= (rounds[rounds.length - 1] ?? 0)) {
     lines.push(`🏁 ${s('thatWasTheLast')}`)
   } else {
     const nextCourt = courtsByTeam(matches, round + 1).get(team)
@@ -420,7 +437,7 @@ export function scheduleMessage(tour, lang = clubLanguage()) {
   const { teams, matches } = night(tour)
   if (!matches.length) return s('noScheduleYet')
   const lines = [
-    `🗓 ${b(s('scheduleWord'))} · ${s('boardFormat')} ${levelTight(tour.level) || ''}`.trim(),
+    `🗓 ${b(s('scheduleWord'))} · ${formatWord(tour, s)} ${levelTight(tour.level) || ''}`.trim(),
   ]
   if (tour.play_date) lines.push(`📆 ${dayName(tour.play_date, { lang })} ${shortDate(tour.play_date)}`)
   const range = timeRange(tour.play_time, tour.duration_min, { lang })
@@ -441,11 +458,11 @@ export function scheduleMessage(tour, lang = clubLanguage()) {
 export function standingsMessage(tour, lang = clubLanguage()) {
   const s = translator(lang)
   const { teams, matches } = night(tour)
-  const table = standings(teams, matches)
+  const table = standings(tour, teams, matches)
   if (!table.length) return s('noResults')
   const medal = ['🥇', '🥈', '🥉']
   return [
-    `🏆 ${b(s('standings'))} · ${s('boardFormat')} ${levelTight(tour.level) || ''}`.trim(),
+    `🏆 ${b(s('standings'))} · ${formatWord(tour, s)} ${levelTight(tour.level) || ''}`.trim(),
     '',
     ...table.map((r, i) => `${medal[i] || `${i + 1}.`} ${r.team} — ${
       s('pointsWonShort', { points: r.points, won: r.won, played: r.played })}`),
@@ -461,13 +478,13 @@ export function helpMessage(lang = clubLanguage()) {
     '`!tournament non-stop level MX-4 date 2026-09-05 11:00 courts 3 duration 120`',
     '',
     b(s('helpPlayers')),
-    `\`!in Mike M partner Sofia\` — ${s('helpSignUpAsPair')}`,
-    `\`!out Mike\` — ${s('helpCancel')}`,
+    `\`!in Nico M partner Sofia\` — ${s('helpSignUpAsPair')}`,
+    `\`!out Nico\` — ${s('helpCancel')}`,
     `\`!list\` — ${s('helpWhoIsIn')}`,
     `\`!levels\` — ${s('helpWhatLevel')}`,
     '',
     b(s('helpOnTheNight')),
-    `\`!where Mike\` — ${s('helpWhere')}`,
+    `\`!where Nico\` — ${s('helpWhere')}`,
     `\`!round\` — ${s('helpRound')}`,
     `\`!next\` — ${s('helpNext')}`,
     `\`!table\` — ${s('helpTable')}`,

@@ -526,7 +526,7 @@ fun ConsoleScreen(
             OutlinedTextField(
                 text, { text = it },
                 label = { Text("Command") },
-                placeholder = { Text("!in Mike M partner Sofia") },
+                placeholder = { Text("!in Nico M partner Sofia") },
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                 singleLine = true,
             )
