@@ -70,11 +70,11 @@ function parseTournament(rest, { now = new Date(), lang } = {}) {
 }
 
 /**
- * `!in Mike M partner Sofia` — and the four other ways people will write it.
+ * `!in Nico M partner Sofia` — and the four other ways people will write it.
  *
  * Gender is a bare M/F/X token or the words; partner is whatever follows
- * "partner", "with", "+" or "&". Anything left over is the name, so `!in Mike`
- * works and so does `!in Mike (M) with Sofia`.
+ * "partner", "with", "+" or "&". Anything left over is the name, so `!in Nico`
+ * works and so does `!in Nico (M) with Sofia`.
  */
 function parseSignup(rest) {
   let s = rest.replace(/[<>()]/g, ' ').trim()
@@ -95,7 +95,7 @@ function parseSignup(rest) {
   return { name: s.replace(/\s+/g, ' ').trim(), gender, partner }
 }
 
-/** Split "!in mike m partner sofia" into its command and the rest. */
+/** Split "!in nico m partner sofia" into its command and the rest. */
 function split(text) {
   const m = String(text || '').trim().match(/^!\s*([a-z]+)\b\s*(.*)$/is)
   return m ? { cmd: m[1].toLowerCase(), rest: m[2].trim() } : null
@@ -119,7 +119,7 @@ export function handle(text, { waId = '', isHost = true, lang = clubLanguage() }
   const board = (t, prefix = '') =>
     say(boardMessage(t, prefix, lang), { key: `board:${t.id}`, pin: true, reason: 'board' })
   const OPEN_CMD = '`!tournament non-stop level MX-4 date 2026-09-05 11:00 courts 3 duration 120`'
-  const IN_CMD = '`!in Mike M partner Sofia`'
+  const IN_CMD = '`!in Nico M partner Sofia`'
 
   if (cmd === 'tournament') {
     if (!isHost) return say(s('onlyHostOpens'))
@@ -141,7 +141,7 @@ export function handle(text, { waId = '', isHost = true, lang = clubLanguage() }
     const t = currentTournament()
     if (!t) return null
     const name = parseSignup(rest).name
-    if (!name) return say(s('whoIsDropping', { cmd: '`!out Mike`' }))
+    if (!name) return say(s('whoIsDropping', { cmd: '`!out Nico`' }))
     const gone = removeSignup(t.id, name)
     if (!gone) return say(s('notOnTheList', { name }))
     return board(t, s('isOut', { name: gone.name }))
@@ -183,7 +183,7 @@ export function handle(text, { waId = '', isHost = true, lang = clubLanguage() }
   if (cmd === 'where' || cmd === 'onde' || cmd === 'donde') {
     const t = tonight()
     if (!t) return say(s('noTournamentOpenShort'))
-    if (!rest) return say(s('whoAreYou', { cmd: '`!where Mike`' }))
+    if (!rest) return say(s('whoAreYou', { cmd: '`!where Nico`' }))
     return say(whereMessage(t, rest, lang), { reason: 'where' })
   }
 
@@ -272,8 +272,8 @@ export function boardMessage(t, prefix = '', lang = clubLanguage()) {
   lines.push(taken >= size
     ? (reserves.length ? s('boardFull', { n: reserves.length }) : s('boardFullClean'))
     : s('whosIn'))
-  lines.push(s('signupHint', { cmd: '`!in Mike M partner Sofia`' }))
-  lines.push(s('dropoutHint', { cmd: '`!out Mike`' }))
+  lines.push(s('signupHint', { cmd: '`!in Nico M partner Sofia`' }))
+  lines.push(s('dropoutHint', { cmd: '`!out Nico`' }))
 
   const rules = clubRules(lang)
   if (rules) lines.push('', b(s('important')), rules)
@@ -367,7 +367,7 @@ export function roundMessage(tour, round, lang = clubLanguage()) {
 }
 
 /**
- * `!where Mike` — the same answer, for one person who does not want to read a
+ * `!where Nico` — the same answer, for one person who does not want to read a
  * list at all.
  *
  * Matched on any word of a pair's name, so people type their own first name and
@@ -461,13 +461,13 @@ export function helpMessage(lang = clubLanguage()) {
     '`!tournament non-stop level MX-4 date 2026-09-05 11:00 courts 3 duration 120`',
     '',
     b(s('helpPlayers')),
-    `\`!in Mike M partner Sofia\` — ${s('helpSignUpAsPair')}`,
-    `\`!out Mike\` — ${s('helpCancel')}`,
+    `\`!in Nico M partner Sofia\` — ${s('helpSignUpAsPair')}`,
+    `\`!out Nico\` — ${s('helpCancel')}`,
     `\`!list\` — ${s('helpWhoIsIn')}`,
     `\`!levels\` — ${s('helpWhatLevel')}`,
     '',
     b(s('helpOnTheNight')),
-    `\`!where Mike\` — ${s('helpWhere')}`,
+    `\`!where Nico\` — ${s('helpWhere')}`,
     `\`!round\` — ${s('helpRound')}`,
     `\`!next\` — ${s('helpNext')}`,
     `\`!table\` — ${s('helpTable')}`,

@@ -234,7 +234,7 @@ const EN = {
   telegramOn: 'Posting to group {chat}.',
   telegramHelp: 'Telegram has a real group API, so the bot posts by itself: the sign-up board '
     + 'is one pinned message it keeps up to date, and each round is posted fresh so it lands on '
-    + 'everyone\'s phone. Commands work with a slash too — /where mike.',
+    + 'everyone\'s phone. Commands work with a slash too — /where nico.',
   postBoard: 'Post the sign-up board',
   signupBoard: 'Sign-up board',
   tabBoard: 'Board',
@@ -247,7 +247,7 @@ const EN = {
   importHelp: 'Paste the night as the club posts it — date, time, level and the numbered '
     + 'list of players. The form below fills itself in; check it, then create.',
   importRead: 'Read the message',
-  importPlaceholder: '📅 13/09/26 - Domingo\n⏱ 09:30- 11:30\n\nMX4 - Padel Tribe\n\n1🎾 Rui Basto\n2🎾 Rita\n…',
+  importPlaceholder: '📅 13/09/26 - Domingo\n⏱ 09:30- 11:30\n\nMX4 - Padel Tribe\n\n1🎾 Ivo Lemos\n2🎾 Rita\n…',
   importFound: 'Read from the message',
   importPlayers: '{n} players',
   importPairs: '{n} pairs',
@@ -261,7 +261,7 @@ const EN = {
   importBadDate: '"{raw}" is not a date I can read.',
   importNoDate: 'No date found — pick one below.',
   importNoTime: 'No start time found — set one below.',
-  importNoPlayers: 'No numbered players found. Lines look like "3🎾 Carlos B".',
+  importNoPlayers: 'No numbered players found. Lines look like "3🎾 Paulo R".',
   importDuplicate: '{name} appears twice.',
   importedSignups: '{n} players signed up from the message.',
   // The pairs board.
@@ -592,7 +592,7 @@ const PT = {
   telegramHelp: 'O Telegram tem API oficial para grupos, por isso o bot publica sozinho: a '
     + 'mensagem de inscrições é uma só mensagem afixada que ele vai actualizando, e cada ronda é '
     + 'publicada de novo para chegar ao telemóvel de toda a gente. Os comandos também funcionam '
-    + 'com barra — /onde mike.',
+    + 'com barra — /onde nico.',
   postBoard: 'Publicar as inscrições',
   signupBoard: 'Inscrições',
   tabBoard: 'Inscrições',
@@ -604,7 +604,7 @@ const PT = {
   importHelp: 'Cola a noite tal como o clube a publica — data, hora, nível e a lista numerada '
     + 'de jogadores. O formulário em baixo preenche-se sozinho; confirma, e cria.',
   importRead: 'Ler a mensagem',
-  importPlaceholder: '📅 13/09/26 - Domingo\n⏱ 09:30- 11:30\n\nMX4 - Padel Tribe\n\n1🎾 Rui Basto\n2🎾 Rita\n…',
+  importPlaceholder: '📅 13/09/26 - Domingo\n⏱ 09:30- 11:30\n\nMX4 - Padel Tribe\n\n1🎾 Ivo Lemos\n2🎾 Rita\n…',
   importFound: 'Lido da mensagem',
   importPlayers: '{n} jogadores',
   importPairs: '{n} duplas',
@@ -618,7 +618,7 @@ const PT = {
   importBadDate: '"{raw}" não é uma data que eu consiga ler.',
   importNoDate: 'Não encontrei a data — escolhe uma em baixo.',
   importNoTime: 'Não encontrei a hora de início — define uma em baixo.',
-  importNoPlayers: 'Não encontrei jogadores numerados. As linhas são do género "3🎾 Carlos B".',
+  importNoPlayers: 'Não encontrei jogadores numerados. As linhas são do género "3🎾 Paulo R".',
   importDuplicate: '{name} aparece duas vezes.',
   importedSignups: '{n} jogadores inscritos a partir da mensagem.',
   pairsTitle: 'Duplas',
@@ -948,7 +948,7 @@ const UK = {
   telegramOn: 'Публікуємо в групу {chat}.',
   telegramHelp: 'У Telegram є справжній API для груп, тож бот публікує сам: список запису — одне '
     + 'закріплене повідомлення, яке він оновлює, а кожен раунд публікується заново, щоб дійти до всіх '
-    + 'телефонів. Команди працюють і зі скісною рискою — /where mike.',
+    + 'телефонів. Команди працюють і зі скісною рискою — /where nico.',
   postBoard: 'Опублікувати список запису',
   signupBoard: 'Список запису',
   tabBoard: 'Список',
@@ -960,7 +960,7 @@ const UK = {
   importHelp: 'Вставте вечір так, як його публікує клуб — дата, час, рівень і нумерований список '
     + 'гравців. Форма нижче заповниться сама; перевірте й створюйте.',
   importRead: 'Прочитати повідомлення',
-  importPlaceholder: '📅 13/09/26 - Domingo\n⏱ 09:30- 11:30\n\nMX4 - Padel Tribe\n\n1🎾 Rui Basto\n2🎾 Rita\n…',
+  importPlaceholder: '📅 13/09/26 - Domingo\n⏱ 09:30- 11:30\n\nMX4 - Padel Tribe\n\n1🎾 Ivo Lemos\n2🎾 Rita\n…',
   importFound: 'Прочитано з повідомлення',
   importPlayers: 'гравців: {n}',
   importPairs: 'пар: {n}',
@@ -974,7 +974,7 @@ const UK = {
   importBadDate: '"{raw}" — дату не вдалося прочитати.',
   importNoDate: 'Дати не знайдено — оберіть нижче.',
   importNoTime: 'Часу початку не знайдено — задайте нижче.',
-  importNoPlayers: 'Нумерованих гравців не знайдено. Рядки мають вигляд "3🎾 Carlos B".',
+  importNoPlayers: 'Нумерованих гравців не знайдено. Рядки мають вигляд "3🎾 Paulo R".',
   importDuplicate: '{name} трапляється двічі.',
   importedSignups: 'Записано гравців із повідомлення: {n}.',
   pairsTitle: 'Пари',
@@ -1303,7 +1303,7 @@ const ES = {
   telegramOn: 'Publicando en el grupo {chat}.',
   telegramHelp: 'Telegram tiene API oficial para grupos, así que el bot publica solo: la lista de '
     + 'inscritos es un único mensaje fijado que va actualizando, y cada ronda se publica de nuevo para '
-    + 'que llegue al móvil de todos. Los comandos también funcionan con barra — /donde mike.',
+    + 'que llegue al móvil de todos. Los comandos también funcionan con barra — /donde nico.',
   postBoard: 'Publicar la lista de inscritos',
   signupBoard: 'Inscritos',
   tabBoard: 'Inscritos',
@@ -1315,7 +1315,7 @@ const ES = {
   importHelp: 'Pega la noche tal como la publica el club — fecha, hora, nivel y la lista numerada '
     + 'de jugadores. El formulario de abajo se rellena solo; revísalo y crea.',
   importRead: 'Leer el mensaje',
-  importPlaceholder: '📅 13/09/26 - Domingo\n⏱ 09:30- 11:30\n\nMX4 - Padel Tribe\n\n1🎾 Rui Basto\n2🎾 Rita\n…',
+  importPlaceholder: '📅 13/09/26 - Domingo\n⏱ 09:30- 11:30\n\nMX4 - Padel Tribe\n\n1🎾 Ivo Lemos\n2🎾 Rita\n…',
   importFound: 'Leído del mensaje',
   importPlayers: '{n} jugadores',
   importPairs: '{n} parejas',
@@ -1329,7 +1329,7 @@ const ES = {
   importBadDate: '"{raw}" no es una fecha que pueda leer.',
   importNoDate: 'No he encontrado la fecha — elige una abajo.',
   importNoTime: 'No he encontrado la hora de inicio — pon una abajo.',
-  importNoPlayers: 'No he encontrado jugadores numerados. Las líneas son del tipo "3🎾 Carlos B".',
+  importNoPlayers: 'No he encontrado jugadores numerados. Las líneas son del tipo "3🎾 Paulo R".',
   importDuplicate: '{name} aparece dos veces.',
   importedSignups: '{n} jugadores apuntados desde el mensaje.',
   pairsTitle: 'Parejas',
