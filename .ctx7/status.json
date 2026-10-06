@@ -88,9 +88,41 @@
     {
       "title": "Clubs as a list with a home club; club form and venues merged",
       "state": "done"
+    },
+    {
+      "title": "Player register with level history",
+      "state": "done"
+    },
+    {
+      "title": "Spanish language",
+      "state": "done"
+    },
+    {
+      "title": "Organizer pitch deck",
+      "state": "done"
+    },
+    {
+      "title": "Push to GitHub (michaelengelandreasen/padel-buddy-tournament-planner)",
+      "state": "todo"
     }
   ],
   "activity": [
+    {
+      "at": "2026-10-06T09:46:55.530Z",
+      "text": "Organizer deck built (12 slides, 3 clips) in docs/deck/out; GitHub remote added, main merged with origin, ready to push"
+    },
+    {
+      "at": "2026-10-01T23:59:25.518Z",
+      "text": "Impeccable 4.4.0 rerun: 61 → 3 findings (3 intentional); headings, 11px floor, save bar"
+    },
+    {
+      "at": "2026-10-01T23:45:33.021Z",
+      "text": "Score cards: saved/unsaved/edit states with Edit + Cancel; fixed fetch from share-link pages"
+    },
+    {
+      "at": "2026-09-30T17:51:34.584Z",
+      "text": "Players page: levels 1–7 per player with dated history, balance-by-level pairing; Spanish added as fourth language"
+    },
     {
       "at": "2026-09-27T08:37:28.957Z",
       "text": "Tested the tablet view on a Samsung Galaxy Tab 2 in real Chrome 71 and Firefox 68 at every Tab 2 viewport: fixed text that never grew in old engines, run-together labels, a header that wrapped, names cut unseen; per-match Save misfired on old engines (fixed). test/tab2/run.sh re-runs it."
@@ -141,5 +173,5 @@
   "summary": "The tablet view now sizes itself in the page (largest text that fits, by bisection), so a 2018 browser gets the same result as a new one: all 26 Galaxy Tab 2 cases fit in real Chrome 71 and Firefox 68, with no clipping and no cut names; the club's 6-pair night reads at 25px on the 7-inch and 31px on",
   "next": "Install Firefox on the club's Tab 2, open /t/<id>/tv, tap for full screen; or switch Cloudflare's edge CA to Google Trust Services so Chrome works too",
   "url": "https://padel-tournament-planner.mikehome.users.ctx7.dev",
-  "updated": "2026-09-27T08:37:28.996Z"
+  "updated": "2026-10-06T09:46:55.611Z"
 }
