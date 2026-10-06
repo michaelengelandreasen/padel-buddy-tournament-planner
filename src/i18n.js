@@ -36,7 +36,9 @@ const EN = {
 
   navOverview: 'Overview',
   navTournaments: 'Tournaments',
+  navTournamentsTab: 'Events',
   navSettings: 'Settings',
+  navSettingsTab: 'Settings',
   navWhatsapp: 'WhatsApp',
 
   courts: 'Courts',
@@ -406,7 +408,9 @@ const PT = {
 
   navOverview: 'Resumo',
   navTournaments: 'Torneios',
+  navTournamentsTab: 'Torneios',
   navSettings: 'Definições',
+  navSettingsTab: 'Opções',
   navWhatsapp: 'WhatsApp',
 
   courts: 'Campos',
@@ -769,7 +773,9 @@ const UK = {
 
   navOverview: 'Огляд',
   navTournaments: 'Турніри',
+  navTournamentsTab: 'Турніри',
   navSettings: 'Налаштування',
+  navSettingsTab: 'Опції',
   navWhatsapp: 'WhatsApp',
 
   courts: 'Корти',
@@ -1130,7 +1136,9 @@ const ES = {
 
   navOverview: 'Resumen',
   navTournaments: 'Torneos',
+  navTournamentsTab: 'Torneos',
   navSettings: 'Ajustes',
+  navSettingsTab: 'Ajustes',
   navWhatsapp: 'WhatsApp',
 
   courts: 'Pistas',

@@ -586,6 +586,7 @@ header.top .brand{display:flex;align-items:center;gap:10px;min-width:0;flex:1 1 
 header.top .brand strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 header.top .mark{width:34px;height:34px;flex:0 0 34px;display:block}
 header.top .brand small{color:var(--muted);font-weight:600;margin-left:6px;white-space:nowrap}
+nav a .tab{display:none}
 nav{margin-left:auto;display:flex;gap:2px;max-width:100%;overflow-x:auto;
   scrollbar-width:none;-ms-overflow-style:none}
 nav::-webkit-scrollbar{display:none}
@@ -961,12 +962,21 @@ table.standings th .short{display:none}
   .wrap{padding:16px 14px calc(72px + env(safe-area-inset-bottom))}
   header.top{padding:8px 12px}
   nav{position:fixed;left:0;right:0;bottom:0;z-index:6;margin:0;width:auto;gap:0;
-    display:grid;grid-auto-flow:column;grid-auto-columns:auto;justify-content:space-around;overflow:visible;
+    /* Five equal columns that can shrink below their content: the bar is never
+       wider than the screen, whatever the label length or the phone's font size. */
+    display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);overflow:hidden;
     background:var(--surface);border-top:1px solid var(--line);
     padding:6px 2px calc(6px + env(safe-area-inset-bottom))}
   nav a{flex-direction:column;justify-content:center;gap:3px;min-height:52px;min-width:52px;padding:4px 4px;
     border-radius:10px;font-size:11px;font-weight:700;letter-spacing:-.01em;min-width:0}
-  nav a span{max-width:100%;overflow:hidden;text-overflow:ellipsis}
+  nav a span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  nav a .full{display:none}
+  nav a .tab{display:block}
+  /* A phone zoomed past 1.3x: the labels get the room the padding was taking. */
+}
+@media (max-width:330px){
+  nav a{padding:4px 0;letter-spacing:-.03em}
+  nav a span{font-size:10.5px}
   nav a .i{width:22px;height:22px}
   nav a.on{background:transparent;color:var(--brand)}
   .card{padding:16px}
@@ -1050,8 +1060,13 @@ ${SPRITE}
 
 const navFor = (here, t) => [['/', 'navOverview', 'home'], ['/tournaments', 'navTournaments', 'trophy'],
   ['/players', 'navPlayers', 'user'], ['/settings', 'navSettings', 'sliders'], ['/groups', 'navGroups', 'send']]
-  .map(([h, key, icon]) => `<a class="${here === h ? 'on' : ''}" href="${h}"${
-    here === h ? ' aria-current="page"' : ''}>${ic(icon)}<span>${esc(t(key))}</span></a>`).join('')
+  .map(([h, key, icon]) => {
+    // The phone tab bar gives each item a fifth of the screen; a label too long
+    // for that has a short form (navTournamentsTab…), used there and only there.
+    const tab = /^nav(Tournaments|Settings)$/.test(key) ? t(`${key}Tab`) : t(key)
+    return `<a class="${here === h ? 'on' : ''}" href="${h}"${here === h ? ' aria-current="page"' : ''} title="${esc(t(key))}">${
+      ic(icon)}<span class="full">${esc(t(key))}</span><span class="tab" aria-hidden="true">${esc(tab)}</span></a>`
+  }).join('')
 
 /** Status values are stored in English; only their display is translated. */
 const statusLabel = (status, t) => t({
