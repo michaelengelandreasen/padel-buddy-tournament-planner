@@ -5,6 +5,7 @@ import { parseWhen } from './dates.js'
 import { pickNight } from './rounds.js'
 import { parseLevel } from './levels.js'
 import { DEFAULT_LANGUAGE, isLanguage, translator } from './i18n.js'
+import { FORMATS, cleanRules, isFormat } from './formats/index.js'
 
 const path = process.env.DB_PATH || './data/planner.db'
 mkdirSync(dirname(path), { recursive: true })
@@ -173,7 +174,7 @@ function seedTournamentCourts(tid, count) {
 function migrate() {
   const clubCols = db.prepare('PRAGMA table_info(club)').all().map((c) => c.name)
   for (const [col, def] of [['language', "'en'"], ['rules_en', "''"], ['rules_pt', "''"], ['rules_uk', "''"], ['rules_es', "''"],
-    ['telegram_chat_id', "''"], ['active_tournament_id', '0'], ['home_venue_id', '0']]) {
+    ['telegram_chat_id', "''"], ['active_tournament_id', '0'], ['home_venue_id', '0'], ['format_rules', "'{}'"]]) {
     if (!clubCols.includes(col)) {
       db.exec(`ALTER TABLE club ADD COLUMN ${col} TEXT NOT NULL DEFAULT ${def}`)
     }
@@ -191,6 +192,11 @@ function migrate() {
   }
   if (!cols.includes('venue')) {
     db.exec("ALTER TABLE tournaments ADD COLUMN venue TEXT NOT NULL DEFAULT ''")
+  }
+  // The rules a night plays by: a copy of the club's preset for its format,
+  // taken when it is created, so editing a preset never rewrites a night.
+  if (!cols.includes('rules')) {
+    db.exec("ALTER TABLE tournaments ADD COLUMN rules TEXT NOT NULL DEFAULT ''")
   }
   // Clubs are a list now, one of them home. A club row that still carries a
   // name of its own becomes the first entry in that list, and home, once.
@@ -506,10 +512,11 @@ export function deleteTournament(id) {
 }
 
 export function createTournament(t) {
+  const format = isFormat(t.format) ? t.format : 'non-stop'
   const r = run(
-    `INSERT INTO tournaments (format, level, play_date, play_time, courts, duration_min, round_min, venue)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    t.format ?? 'non-stop', t.level ?? '', t.play_date ?? '', t.play_time ?? '',
+    `INSERT INTO tournaments (format, rules, level, play_date, play_time, courts, duration_min, round_min, venue)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    format, JSON.stringify(formatRules()[format]), t.level ?? '', t.play_date ?? '', t.play_time ?? '',
     t.courts ?? 2, t.duration_min ?? 90, t.round_min ?? 12, String(t.venue ?? '').trim().slice(0, 80),
   )
   const id = Number(r.lastInsertRowid)
@@ -682,4 +689,38 @@ export function addPlayersFromText(text) {
 export function deletePlayer(id) {
   run('DELETE FROM player_levels WHERE player_id = ?', id)
   run('DELETE FROM players WHERE id = ?', id)
+}
+
+// ---- the club's rules per format ----
+
+/** Every format's rules as the club set them, defaults filled in. */
+export function formatRules() {
+  let raw = {}
+  try { raw = JSON.parse(getClub()?.format_rules || '{}') } catch { raw = {} }
+  return Object.fromEntries(FORMATS.map((f) => [f, cleanRules(f, raw[f])]))
+}
+
+/** Save one format's preset. Nights already created keep the copy they took. */
+export function saveFormatRules(format, rules) {
+  if (!isFormat(format)) return formatRules()
+  const all = formatRules()
+  all[format] = cleanRules(format, rules)
+  run('UPDATE club SET format_rules = ? WHERE id = 1', JSON.stringify(all))
+  return all
+}
+
+/** Change a night's own rules — only while nothing is drawn yet. */
+export function setTournamentFormat(id, format, rules) {
+  const t = getTournament(id)
+  if (!t || !isFormat(format) || listMatches(id).length) return false
+  run('UPDATE tournaments SET format = ?, rules = ? WHERE id = ?', format, JSON.stringify(cleanRules(format, rules)), id)
+  return true
+}
+
+/** Write (or rewrite) one round of a night, leaving every other round alone. */
+export function replaceRound(tid, round, matches) {
+  run('DELETE FROM matches WHERE tournament_id = ? AND round = ?', tid, round)
+  const ins = db.prepare('INSERT INTO matches (tournament_id, round, court, team_a, team_b) VALUES (?, ?, ?, ?, ?)')
+  for (const m of matches) ins.run(tid, m.round, m.court, m.teamA, m.teamB)
+  return listMatches(tid)
 }

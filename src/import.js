@@ -136,7 +136,10 @@ export function parseBoard(text, { now = new Date(), lang } = {}) {
     const parsed = lv ? parseLevel(`${lv[1].toUpperCase()}-${lv[2]}`, { lang }) : { ok: false }
     if (parsed.ok && !out.level) {
       out.level = parsed.code
-      const rest = bare.replace(/nonstop|non-stop/i, '').replace(lv[0], '').replace(/^[\s\-–·:]+|[\s\-–·:]+$/g, '')
+      // The format's name sits beside the level on the bot's own board ("Mexicano MX4")
+      // and in many clubs' posts; it is not a place.
+      const rest = bare.replace(/nonstop|non-stop|americano|mexicano|up\s*(and|&)?\s*down|sobe\s*e\s*desce|sube\s*y\s*baja|вгору-вниз/i, '')
+        .replace(lv[0], '').replace(/^[\s\-–·:]+|[\s\-–·:]+$/g, '')
       if (rest && !out.location) out.location = tidyName(rest.toLowerCase())
       continue
     }

@@ -16,6 +16,7 @@ import { categories, grades, isMixedLevel, levelLabel, levelShort, parseLevel } 
 import { clock, humanWhen, todayISO, humanDate } from './dates.js'
 import { courtName, courtsByTeam, currentRound, roundComplete, roundPlan, roundsOf } from './rounds.js'
 import { LANGUAGES, translator } from './i18n.js'
+import { FORMATS, RULE_CHOICES, dynamic, individual, minimum, plannedRounds, rulesOf } from './formats/index.js'
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
@@ -802,6 +803,13 @@ pre.msg{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--surface-2);
   white-space:nowrap;display:inline-flex;align-items:center;gap:7px;transition:color .15s ease-out}
 .tabs button .i{width:18px;height:18px}
 .i.brand{stroke:none}
+.fh{display:none}.fh.on{display:block}
+form:has(#format) .fh{display:none}
+${FORMATS.map((f) => `form:has(#format option[value="${f}"]:checked) .fh[data-f="${f}"]{display:block}`).join('')}
+.fh .rules,.card .hint .rules{display:block;margin-top:4px;color:var(--ink)}
+.rules-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px 14px;margin-top:12px}
+.rules-row label{margin-top:0}
+.match>.err{grid-column:1/-1;margin:2px 0 8px}
 button .to{display:inline-flex;gap:3px;margin-left:4px;padding:3px 5px;border-radius:999px;background:var(--surface)}
 button .to .brand{width:14px;height:14px}
 .tabs button .brand{flex:none;transition:opacity .15s ease-out}
@@ -1084,7 +1092,7 @@ const wrapTable = (inner, cls = '') =>
  * so every box on the page can also be saved at once from the bar underneath.
  * Each name is the input's own <label>, so the accessible name is the team.
  */
-const matchBlock = (m, t, { just = false } = {}) => {
+const matchBlock = (m, t, { just = false, refused = '' } = {}) => {
   const done = m.score_a != null && m.score_b != null
   const win = done && m.score_a !== m.score_b ? (m.score_a > m.score_b ? 'a' : 'b') : ''
   return `<div class="match${done ? ' done' : ''}${just ? ' just' : ''}" id="match-${m.id}"
@@ -1096,6 +1104,7 @@ const matchBlock = (m, t, { just = false } = {}) => {
     [['a', m.team_a, m.score_a], ['b', m.team_b, m.score_b]].map(([side, team, score]) => `
     <div class="line${win === side ? ' win' : ''}"><span class="who">${esc(team)}</span><span class="pts">${score}</span></div>`).join('')}
   </div>` : ''}
+  ${refused ? `<p class="err" role="alert">${ic('alert')} ${esc(refused)}</p>` : ''}
   <div class="sides">
     ${[['a', m.team_a, m.score_a], ['b', m.team_b, m.score_b]].map(([side, team, score]) => `
     <div class="side">
@@ -1111,6 +1120,34 @@ const matchBlock = (m, t, { just = false } = {}) => {
   </div>
 </div>`
 }
+
+/** A format's name, as the club calls it. */
+const FORMAT_KEY = { 'non-stop': 'formatNonstop', americano: 'formatAmericano', mexicano: 'formatMexicano', 'up-down': 'formatUpDown' }
+const HELP_KEY = { 'non-stop': 'formatHelpNonstop', americano: 'formatHelpAmericano', mexicano: 'formatHelpMexicano', 'up-down': 'formatHelpUpDown' }
+const formatName = (f, t) => t(FORMAT_KEY[f] || 'formatNonstop')
+
+/** How each rule value reads. */
+const RULE_LABEL = {
+  seeding: { level: 'seedLevel', random: 'seedRandom', signup: 'seedSignup' },
+  pattern: { '14-23': 'pattern14', '13-24': 'pattern13', '12-34': 'pattern12' },
+  rest: { average: 'restAverage', half: 'restHalf', none: 'restNone' },
+  tiebreak: { wins: 'tbWins', diff: 'tbDiff' },
+  partners: { rotate: 'partnersRotate', fixed: 'partnersFixed' },
+  ties: { golden: 'tiesGolden', stay: 'tiesStay' },
+}
+const RULE_NAME = { points: 'rulePoints', seeding: 'ruleSeeding', pattern: 'rulePattern', rest: 'ruleRest',
+  tiebreak: 'ruleTiebreak', partners: 'rulePartners', ties: 'ruleTies' }
+const pointsLabel = (n, t) => (n ? t('rulePointsN', { n }) : t('rulePointsTimed'))
+const ruleValue = (k, v, t) => (k === 'points' ? pointsLabel(v, t) : t(RULE_LABEL[k][v]))
+
+/** One line saying how a night is played: "24 points · seeded by level · …". */
+const rulesSummary = (format, rules, t) => Object.entries(rules || {})
+  .map(([k, v]) => (k === 'points' ? pointsLabel(v, t) : `${t(RULE_NAME[k])}: ${ruleValue(k, v, t).toLowerCase()}`)).join(' · ')
+
+/** A select for one rule. */
+const ruleSelect = (format, k, value, t) => `<div><label for="r-${format}-${k}">${esc(t(RULE_NAME[k]))}</label>
+  <select id="r-${format}-${k}" name="${k}">${RULE_CHOICES[k].map((o) => `<option value="${o}"${
+    String(o) === String(value) ? ' selected' : ''}>${esc(ruleValue(k, o, t))}</option>`).join('')}</select></div>`
 
 const levelCell = (code, t) => code
   ? `<span class="pill on">${esc(code)}</span> <span class="muted">${esc(levelShort(code, t))}</span>`
@@ -1158,7 +1195,18 @@ export function overview({ club, home = null, venues = [], tournaments, courts, 
     </div>`, { nav: navFor('/', t), t, here: '/' })
 }
 
-export function settings({ club, courts, venues = [], notice = '', home = 0, t }) {
+export function settings({ club, courts, venues = [], notice = '', home = 0, rules = {}, saved = '', t }) {
+  const formatsPanel = `
+    <p class="muted">${esc(t('formatsHelp'))}</p>
+    ${FORMATS.filter((f) => Object.keys(rules[f] || {}).length).map((f) => `
+    <form class="card" method="post" action="/settings/formats" id="rules-${f}">
+      <h2>${ic(f === 'up-down' ? 'up' : f === 'mexicano' ? 'scale' : 'shuffle')}${esc(formatName(f, t))}</h2>
+      <p class="muted">${esc(t(HELP_KEY[f]))}</p>
+      ${saved === f ? `<div class="flash" role="status"><strong>${esc(t('rulesSaved', { format: formatName(f, t) }))}</strong></div>` : ''}
+      <input type="hidden" name="format" value="${f}">
+      <div class="rules-row">${Object.entries(rules[f]).map(([k, v]) => ruleSelect(f, k, v, t)).join('')}</div>
+      <div class="actions"><button>${ic('check')}${esc(t('saveRules', { format: formatName(f, t) }))}</button></div>
+    </form>`).join('')}`
   const courtsPanel = `
     <div class="card">
       <h2>${ic('court')}${esc(t('courts'))}</h2>
@@ -1233,10 +1281,11 @@ export function settings({ club, courts, venues = [], notice = '', home = 0, t }
       { id: 'courts', icon: 'court', label: t('courts'), count: courts.length, body: courtsPanel },
       { id: 'language', icon: 'globe', label: t('language'), body: langForm },
       { id: 'policy', icon: 'doc', label: t('tabPolicy'), body: policyForm },
+      { id: 'formats', icon: 'trophy', label: t('tabFormats'), body: formatsPanel },
     ], 'venues')}`, { nav: navFor('/settings', t), t, here: '/settings', tab: 'venues' })
 }
 
-export function tournamentsPage({ tournaments, venues = [], home = '', form = {}, error = '', imported = null, pasted = '', source = 'whatsapp', notice = '', filter = '', t }) {
+export function tournamentsPage({ tournaments, venues = [], home = '', form = {}, error = '', imported = null, pasted = '', source = 'whatsapp', notice = '', filter = '', rules = {}, t }) {
   const today = todayISO()
   const cat = form.level_category || 'MX'
   const grade = String(form.level_grade || (imported ? '' : 4))
@@ -1264,7 +1313,7 @@ export function tournamentsPage({ tournaments, venues = [], home = '', form = {}
 
   const list = tournaments.map((x) => `<div class="card"><div class="head">
       <div style="min-width:0"><strong>${esc(x.level) || esc(t('statusOpen'))}</strong>
-        <span class="muted"> · ${esc(levelShort(x.level, t))}</span><br>
+        <span class="muted"> · ${esc(levelShort(x.level, t))} · ${esc(formatName(x.format, t))}</span><br>
         <span class="muted">${esc(humanWhen(x, { lang: t.lang }))} · ${
           esc(t('courtsN', { n: x.courts }))}${x.venue && !filter ? ` · ${esc(x.venue)}` : ''}</span></div>
       <div class="rowact">
@@ -1305,6 +1354,11 @@ export function tournamentsPage({ tournaments, venues = [], home = '', form = {}
       ${error ? `<p class="err">${ic('alert')} ${esc(error)}</p>` : ''}
       ${readout}
       ${form.roster ? `<input type="hidden" name="roster" value="${esc(form.roster)}">` : ''}
+      <label for="format">${esc(t('format'))}</label>
+      <select id="format" name="format">${FORMATS.map((f) => `<option value="${f}"${
+        (form.format || 'non-stop') === f ? ' selected' : ''}>${esc(formatName(f, t))}</option>`).join('')}</select>
+      ${FORMATS.map((f) => `<p class="hint fh${(form.format || 'non-stop') === f ? ' on' : ''}" data-f="${f}">${esc(t(HELP_KEY[f]))}${
+        Object.keys(rules[f] || {}).length ? ` <span class="rules">${esc(rulesSummary(f, rules[f], t))}.</span> <a href="/settings#formats">${esc(t('clubRules'))}</a>` : ''}</p>`).join('')}
       <div class="row">
         <div><label for="level_category">${esc(t('category'))}</label>
           <select id="level_category" name="level_category">${catOpts}</select></div>
@@ -1374,8 +1428,9 @@ export function flashLine(flash, t) {
   }
   if (flash.what === 'scores') {
     const n = Number(flash.n) || 0
-    return `<div class="flash" role="status"><strong>${
-      esc(n === 1 ? t('savedScores1') : n ? t('savedScores', { n }) : t('savedNothing'))}</strong></div>`
+    return `<div class="flash${flash.bad?.length ? ' bad' : ''}" role="status"><strong>${
+      esc(n === 1 ? t('savedScores1') : n ? t('savedScores', { n }) : t('savedNothing'))}</strong>${
+      flash.bad?.length ? `<span>${esc(t('scoresRefused', { n: flash.bad.length }))}</span>` : ''}</div>`
   }
   bits.push(bits.length
     ? `<span>${esc(t('sentDraft'))}</span>`
@@ -1390,6 +1445,13 @@ export function tournamentPage({
   const rounds = roundsOf(matches)
   const now = currentRound(matches)
   const flashFor = (what) => (flash && flash.what === what ? flashLine(flash, t) : '')
+  // In Americano and Mexicano partners change every round: the entrants are
+  // players and there are no pairs to make. Mexicano and Up and Down draw one
+  // round at a time, so the night has rounds still to come that exist nowhere yet.
+  const solo = individual(tour)
+  const oneAtATime = dynamic(tour)
+  const planned = oneAtATime ? Math.max(rounds.length, plannedRounds(tour)) : rounds.length
+  const rules = rulesOf(tour)
   // A mixed level asks every pair to be one of each. The host would otherwise
   // find out at the draw, which is too late to fix by messaging anyone.
   // Only a pair whose genders are both known, and the same, is off a mixed
@@ -1397,7 +1459,7 @@ export function tournamentPage({
   const known = (p) => p.gender === 'M' || p.gender === 'F'
   const offLevel = isMixedLevel(tour.level)
     ? teams.filter((x) => x.players.every(known) && !x.mixed) : []
-  const allDone = rounds.length > 0 && rounds.every((r) => roundComplete(matches, r))
+  const allDone = rounds.length > 0 && rounds.length >= planned && rounds.every((r) => roundComplete(matches, r))
   // Where the host is in the night decides which tab opens: sign-ups before the
   // draw, the rounds during it, the table once every score is in.
   const active = !matches.length ? 'board' : allDone ? 'table' : 'rounds'
@@ -1456,7 +1518,28 @@ export function tournamentPage({
       </div>
     </form>`
 
-  const teamsPanel = pairsBoard + (teams.length ? `
+  const formatCard = matches.length ? '' : `
+    <form class="card" method="post" action="/t/${tour.id}/format">
+      <h2>${ic('trophy')}${esc(t('format'))} <span class="pill on">${esc(formatName(tour.format, t))}</span></h2>
+      <p class="muted">${esc(t(HELP_KEY[tour.format] || 'formatHelpNonstop'))}</p>
+      ${Object.keys(rules).length ? `<p class="hint"><span class="rules">${esc(rulesSummary(tour.format, rules, t))}.</span></p>` : ''}
+      <div class="row"><div><label for="nightformat">${esc(t('changeFormat'))}</label>
+        <select id="nightformat" name="format">${FORMATS.map((f) => `<option value="${f}"${tour.format === f ? ' selected' : ''}>${
+          esc(formatName(f, t))}</option>`).join('')}</select></div></div>
+      <div class="actions"><button class="btn ghost">${ic('check')}${esc(t('useFormat'))}</button>
+        <a href="/settings#formats">${esc(t('clubRules'))}</a></div>
+    </form>`
+  const playersPanel = `
+    <div class="card"><h2>${ic('users')}${esc(t('playersTitle'))} <span class="pill on">${esc(t('importPlayers', { n: teams.length }))}</span></h2>
+      <p class="muted">${esc(t('individualHelp', { format: formatName(tour.format, t) }))}</p>
+      ${wrapTable(`<tbody>${teams.map((x, i) => {
+        const p = x.players[0]
+        return `<tr><td class="pos">${i + 1}</td><td class="lead">${esc(p.name)}</td>
+          <td>${p.gender === 'F' || p.gender === 'M' ? `<span class="g ${p.gender}">${p.gender}</span>` : ''}</td>
+          <td>${p.grade ? `<span class="lv" title="${esc(`${t('skillLevel')}: ${p.grade} · ${t(`grade${p.grade}`)}`)}">${p.grade}</span>` : ''}</td></tr>`
+      }).join('') || `<tr><td class="muted">${esc(t('nobodyYet'))}</td></tr>`}</tbody>`, 'stack')}
+    </div>`
+  const teamsPanel = solo ? formatCard + playersPanel : formatCard + pairsBoard + (teams.length ? `
     <div class="card"><h2>${ic('users')}${esc(t('teams'))} (${teams.length})</h2>
       ${wrapTable(`<tbody>${teams.map((x, i) => `<tr><td class="pos">${i + 1}</td>
         <td class="lead">${esc(x.name)}</td>
@@ -1492,8 +1575,8 @@ export function tournamentPage({
     <div class="card"><h2>${ic('list')}${esc(t('schedule'))}</h2>
       <p class="muted">${esc(t('noSchedule'))}</p>
       <form method="post" action="/t/${tour.id}/schedule"><div class="actions">
-        <button ${teams.length < 2 ? 'disabled' : ''}>${ic('shuffle')}${esc(t('drawSchedule'))}</button></div></form>
-      ${teams.length < 2 ? `<p class="hint">${esc(t('needTwoPairs'))}</p>` : ''}
+        <button ${teams.length < minimum(tour) ? 'disabled' : ''}>${ic('shuffle')}${esc(t(oneAtATime ? 'drawFirstRound' : 'drawSchedule'))}</button></div></form>
+      ${teams.length < minimum(tour) ? `<p class="hint">${esc(t(solo ? 'needFourPlayers' : 'needTwoPairs'))}</p>` : ''}
     </div>${courtsCard}` : `
     ${courtsCard}
     <div class="card"><h2>${ic('compass')}${esc(t('roundTitle'))} <span class="pill on">${
@@ -1518,13 +1601,17 @@ export function tournamentPage({
         <pre class="msg" id="msg-schedule">${esc(scheduleText)}</pre></details>
     </div>` : ''}
     <form class="card" method="post" action="/t/${tour.id}/scores">
-      <h2>${ic('list')}${esc(t('schedule'))}</h2>
+      <h2>${ic('list')}${esc(t('schedule'))}${rules.points ? ` <span class="pill">${esc(t('playedTo', { n: rules.points }))}</span>` : ''}</h2>
       ${flashFor('scores')}
       ${rounds.map((r) => `<div class="roundhead" id="round-${r}">
         <h3>${esc(t('roundN', { n: r }))}${r === now && !allDone ? ` <span class="pill on">${esc(t('nowShort'))}</span>` : ''}</h3>
         <button type="submit" class="link" formaction="/t/${tour.id}/post" name="round" value="${r}"
           formnovalidate>${esc(t('postRound', { n: r }))}</button>
-      </div>${matches.filter((m) => m.round === r).map((m) => matchBlock(m, t, { just: flash?.hl === String(m.id) })).join('')}`).join('')}
+      </div>${matches.filter((m) => m.round === r).map((m) => matchBlock(m, t, { just: flash?.hl === String(m.id),
+        refused: flash?.bad?.includes(String(m.id)) ? flash.why : '' })).join('')}`).join('')}
+      ${oneAtATime && rounds.length < planned ? `<div class="roundhead pending" id="round-${rounds.length + 1}">
+        <h3>${esc(t('roundN', { n: rounds.length + 1 }))}</h3></div>
+        <p class="muted">${esc(t('roundPendingHelp', { prev: rounds.length, format: formatName(tour.format, t) }))}</p>` : ''}
       <div class="savebar"><span class="count" id="unsaved-count" aria-live="polite" data-tpl="${esc(t('unsavedN'))}"></span><button>${ic('check')}${esc(t('saveAll'))}</button></div>
     </form>`
 
@@ -1533,7 +1620,7 @@ export function tournamentPage({
   const th = (key, short) => `<th class="num"><span class="long">${esc(t(key))}</span><span class="short">${esc(short)}</span></th>`
   const tablePanel = `
     <div class="card"><h2>${ic('trophy')}${esc(t('standings'))}</h2>
-      ${wrapTable(`<thead><tr><th>#</th><th>${esc(t('team'))}</th>${th('played', 'P')}${th('won', 'W')}${
+      ${wrapTable(`<thead><tr><th>#</th><th>${esc(t(solo ? 'player' : 'team'))}</th>${th('played', 'P')}${th('won', 'W')}${
         th('points', 'Pts')}${th('against', 'Ag')}</tr></thead>
       <tbody>${table.map((r, i) => `<tr class="${i < 3 ? 'top' : ''}" data-key="${esc(r.team)}"><td class="pos">${i + 1}</td>
         <td class="team">${esc(r.team)}</td>
@@ -1560,6 +1647,7 @@ export function tournamentPage({
       ${place ? `<span class="place">${place.url
         ? `<a class="pinlink" href="${esc(place.url)}" target="_blank" rel="noopener" aria-label="${esc(t('openInMaps'))}" title="${esc(t('openInMaps'))}">${ic('pin')}</a>`
         : `<span class="pinlink off">${ic('pin')}</span>`}<a href="/tournaments?venue=${encodeURIComponent(place.name)}">${esc(place.name)}</a></span>` : ''}
+      <span>${ic('trophy')}${esc(formatName(tour.format, t))}</span>
       <span>${ic('court')}${esc(t('courtsN', { n: tour.courts }))}</span>
       <span>${ic('clock')}${esc(t('minutes', { n: tour.duration_min }))}</span>
       <span>${ic('repeat')}${esc(t('minRounds', { n: tour.round_min }))}</span>
@@ -1572,7 +1660,7 @@ export function tournamentPage({
       </form></p>
     ${tabbed([
       { id: 'board', icon: 'board', label: t('tabBoard'), body: board },
-      { id: 'teams', icon: 'users', label: t('tabTeams'), count: teams.length, body: teamsPanel },
+      { id: 'teams', icon: 'users', label: t(solo ? 'playersTitle' : 'tabTeams'), count: teams.length, body: teamsPanel },
       { id: 'rounds', icon: 'list', label: t('tabRounds'), count: rounds.length || null, body: roundsPanel },
       { id: 'table', icon: 'trophy', label: t('tabTable'), body: tablePanel },
     ], active)}`, { nav: navFor('/tournaments', t), t, here: '/tournaments', tab: active })
