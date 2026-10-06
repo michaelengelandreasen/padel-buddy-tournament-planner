@@ -1579,17 +1579,32 @@ export function tvPage({ tournament: tour, club, teams, matches, table, place = 
   // 2.95em; a table line 1.75.
   const gridCols = nameEm + 0.6 + (rounds.length - loud) * 1.9 + loud * 2.8 + (scored ? 2.6 : 0)
   const gridEm = 1.7 + pairs.length * 2
+    + (matches.some((m) => !/^\d{1,2}$/.test(m.court)) ? 1.3 : 0)   // the court-code legend
   const courtsEm = plan && !allDone ? 1.6 + courts * 2.95 + (plan.resting.length ? 1.5 : 0) : 0
   const leadEm = allDone ? 1.6 + table.length * 1.75 : scored ? 1.6 + 3 * 1.75 : 0
   // Stacked in one column beside the grid, or side by side under it.
   const sideEm = courtsEm + leadEm + (courtsEm && leadEm ? 0.6 : 0)
   const sidePortraitEm = Math.max(courtsEm, leadEm, 1)
 
+  // A grid cell holds two characters at most. Numbered courts already fit; a
+  // named one ("Center") gets a short code — its initial, two letters if that
+  // is taken — and the code is spelled out once under the grid.
+  const short = new Map()
+  for (const c of [...new Set(matches.map((m) => m.court))]) {
+    if (/^\d{1,2}$/.test(c)) { short.set(c, c); continue }
+    const word = c.replace(/^(court|campo|pista|корт)\s+/i, '')
+    const taken = new Set(short.values())
+    const code = [word.slice(0, 1), word.slice(0, 2)].map((x) => x.toUpperCase()).find((x) => !taken.has(x))
+      || word.slice(0, 2).toUpperCase() + short.size
+    short.set(c, code)
+  }
+  const named = [...short].filter(([c, code]) => c !== code)
   const cell = (r, name) => {
-    const court = where.get(r)?.get(name)
+    const full = where.get(r)?.get(name)
+    const court = full && short.get(full)
     const cls = [r === round && !allDone ? 'now' : r === next ? 'next' : r < round || allDone ? 'past' : '']
     if (!court) return `<td class="${cls} rest" title="${esc(t('sittingOut'))}">${ic('coffee')}</td>`
-    return `<td class="${cls}">${esc(court)}</td>`
+    return `<td class="${cls}"${court !== full ? ` title="${esc(full)}"` : ''}>${esc(court)}</td>`
   }
   const head = (r) => `<th class="${r === round && !allDone ? 'now' : r === next ? 'next' : r < round || allDone ? 'past' : ''}">${
     r === round && !allDone ? esc(t('nowShort')) : r === next ? esc(t('tvNext')) : esc(t('tvRound', { n: r }))}</th>`
@@ -1605,13 +1620,16 @@ export function tvPage({ tournament: tour, club, teams, matches, table, place = 
       <tbody>${pairs.map((name) => `<tr><td class="who" title="${esc(name)}">${esc(label(name))}</td>${
         rounds.map((r) => cell(r, name)).join('')}${
         scored ? `<td class="pts">${points.get(name) ?? 0}</td>` : ''}</tr>`).join('')}</tbody>
-    </table>` : `<p class="muted big">${esc(t('notDrawn'))}</p>`
+      ${named.length ? `<tfoot><tr><td class="legend" colspan="${rounds.length + 1 + (scored ? 1 : 0)}">${
+        named.map(([c, code]) => `<b>${esc(code)}</b> ${esc(c)}`).join(' · ')}</td></tr></tfoot>` : ''}
+    </table>`
+    : `<p class="muted big">${esc(t('notDrawn'))}</p>`
 
   const onCourt = plan && !allDone ? `
     <h2>${ic('court')}<span class="t">${esc(t('roundOfN', { n: round, total: rounds.length }))}</span>${
       from && to ? `<span class="when">${esc(from)} → ${esc(to)}</span>` : ''}</h2>
     <ul class="games">${plan.games.map((m) => `<li>
-      <span class="c">${esc(m.court)}</span>
+      <span class="c" title="${esc(m.court)}">${esc(short.get(m.court) || m.court)}</span>
       <span class="a">${esc(label(m.team_a))}</span><span class="b"><em>${esc(t('vsShort'))}</em> ${esc(label(m.team_b))}</span>
     </li>`).join('')}</ul>
     ${plan.resting.length ? `<p class="resting">${ic('coffee')}${esc(plan.resting.map(label).join(', '))}</p>` : ''}` : ''
@@ -1715,6 +1733,8 @@ table.where tbody tr:nth-child(even) td.who{background:color-mix(in oklab,var(--
 .side h2 .t{white-space:nowrap}
 .side h2 .when{color:var(--muted);font-weight:600;font-size:.8em;margin-left:.5em;white-space:nowrap}
 ul.games,ol.table{list-style:none;margin:0;padding:0}
+table.where td.legend{text-align:left;padding:.45em .6em 0;color:var(--muted);font-weight:600;font-size:.8em}
+table.where td.legend b{color:var(--accent);margin-right:.25em}
 ul.games li{display:grid;grid-template-columns:2.4em minmax(0,1fr);grid-column-gap:.5em;
   padding:.2em 0;border-bottom:1px solid var(--line)}
 ul.games .c{grid-row:span 2;align-self:center;font-weight:900;color:var(--accent);font-size:1.25em;text-align:center}
