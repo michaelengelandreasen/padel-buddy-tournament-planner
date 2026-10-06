@@ -291,6 +291,25 @@ const copyBtn = (id, t) => `<button type="button" class="btn ghost" data-copy="#
   ic('board')}<span>${esc(t('copy'))}</span></button>`
 
 /**
+ * Post one message to every group the club has, from one press.
+ *
+ * Telegram the server posts by itself. WhatsApp lets no app write into a group,
+ * so the same tap opens WhatsApp with the message already typed (wa.me) and the
+ * host only picks the group — the browser allows that window because it comes
+ * from the press itself. The two marks on the button say where it goes.
+ */
+const postBtn = (tid, msgId, t, fields = '') => `<form method="post" action="/t/${tid}/post" data-wa="#${msgId}">${fields}
+  <button title="${esc(t('postToGroupsHint'))}">${ic('send')}<span>${esc(t('postToGroups'))}</span><span class="to">${
+    brand('whatsapp')}${brand('telegram')}</span></button></form>`
+
+/** The WhatsApp half of a post: open the message in WhatsApp as the form goes. */
+const POST_JS = `pbInit.push(function(){
+if(window.__pbWa)return;window.__pbWa=1;
+document.addEventListener('submit',function(e){var f=e.target,sel=f&&f.getAttribute&&f.getAttribute('data-wa');if(!sel)return;
+var m=document.querySelector(sel);if(!m)return;
+window.open('https://wa.me/?text='+encodeURIComponent(m.textContent),'_blank','noopener')},true)});`
+
+/**
  * Saves that leave the page where it is.
  *
  * Every POST form is fetched rather than navigated, and the answer is *morphed*
@@ -502,11 +521,22 @@ const SCORES_JS = `pbInit.push(function(){
       if(window.__pbSubmitting)return;if(document.querySelector('.match.dirty')){ev.preventDefault();ev.returnValue=''}})}
 });`
 
+/**
+ * The two chat apps' own marks, in their own colours (Simple Icons, CC0). They
+ * name a source the way the apps do on the phone, which a generic chat bubble
+ * cannot: a host scanning for "the Telegram one" looks for the blue plane.
+ */
+const BRANDS = {
+  whatsapp: { color: '#25D366', path: 'M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z' },
+  telegram: { color: '#26A5E4', path: 'M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z' },
+}
+const brand = (name) => `<svg class="i brand" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="${BRANDS[name].color}" d="${BRANDS[name].path}"/></svg>`
+
 /** A tab strip + its panels. `tabs` is [{id, icon, label, count?, body}]. */
 function tabbed(tabs, active) {
   const strip = `<div class="tabs" role="tablist">${tabs.map((x) => `<button type="button" role="tab"
     id="tabbtn-${x.id}" data-tab="${x.id}" aria-controls="tab-${x.id}" aria-selected="${x.id === active}"
-    tabindex="${x.id === active ? 0 : -1}">${ic(x.icon)}<span>${esc(x.label)}</span>${
+    tabindex="${x.id === active ? 0 : -1}">${x.brand ? brand(x.brand) : ic(x.icon)}<span>${esc(x.label)}</span>${
       x.count != null ? `<span class="n">${x.count}</span>` : ''}</button>`).join('')}</div>`
   const panels = tabs.map((x) => `<section class="panel${x.id === active ? ' on' : ''}" id="tab-${x.id}"
     role="tabpanel" aria-labelledby="tabbtn-${x.id}">${x.body}</section>`).join('')
@@ -770,6 +800,14 @@ pre.msg{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--surface-2);
   border-radius:0;margin-bottom:-1px;padding:0 14px;min-height:46px;color:var(--muted);font-weight:700;
   white-space:nowrap;display:inline-flex;align-items:center;gap:7px;transition:color .15s ease-out}
 .tabs button .i{width:18px;height:18px}
+.i.brand{stroke:none}
+button .to{display:inline-flex;gap:3px;margin-left:4px;padding:3px 5px;border-radius:999px;background:var(--surface)}
+button .to .brand{width:14px;height:14px}
+.tabs button .brand{flex:none;transition:opacity .15s ease-out}
+.tabs button[aria-selected="false"] .brand{opacity:.75}
+.tabs button:hover .brand{opacity:1}
+.card.import .tabs{margin-top:10px}
+.card.import .panel>form>p:first-of-type{margin-top:12px}
 .tabs button .n{font-size:.74rem;font-weight:800;color:var(--muted);background:var(--surface-2);
   border-radius:999px;padding:1px 7px}
 .tabs button:hover{color:var(--ink);filter:none}
@@ -1007,11 +1045,11 @@ export function page(title, body, { nav = '', script = '', t = translator(), her
 <strong>Padel Buddy</strong><small>${esc(t('navTournaments'))}</small></a>
 <nav>${nav}</nav>${langToggle(t.lang, here)}</header>
 ${SPRITE}
-<div class="wrap">${body}</div><script>${AJAX_JS}</script><script>${TABS_JS}</script><script>${PAIRS_JS}</script><script>${COPY_JS}</script><script>${SCORES_JS}</script>${script ? `<script>${script}</script>` : ''}<script>pbBoot()</script></body></html>`
+<div class="wrap">${body}</div><script>${AJAX_JS}</script><script>${TABS_JS}</script><script>${PAIRS_JS}</script><script>${COPY_JS}</script><script>${POST_JS}</script><script>${SCORES_JS}</script>${script ? `<script>${script}</script>` : ''}<script>pbBoot()</script></body></html>`
 }
 
 const navFor = (here, t) => [['/', 'navOverview', 'home'], ['/tournaments', 'navTournaments', 'trophy'],
-  ['/players', 'navPlayers', 'user'], ['/settings', 'navSettings', 'sliders'], ['/groups', 'navGroups', 'chats']]
+  ['/players', 'navPlayers', 'user'], ['/settings', 'navSettings', 'sliders'], ['/groups', 'navGroups', 'send']]
   .map(([h, key, icon]) => `<a class="${here === h ? 'on' : ''}" href="${h}"${
     here === h ? ' aria-current="page"' : ''}>${ic(icon)}<span>${esc(t(key))}</span></a>`).join('')
 
@@ -1080,7 +1118,7 @@ export function overview({ club, home = null, venues = [], tournaments, courts, 
       <div class="card"><h2>${ic('court')}${esc(t('courts'))}</h2>
         <p class="muted">${courts.length ? courts.map((c) => esc(courtName(c.label, t))).join(' · ') : esc(t('noneYet'))}</p>
         <div class="actions"><a class="btn ghost" href="/settings">${ic('sliders')}${esc(t('manageCourts'))}</a></div></div>
-      <div class="card"><h2>${ic('chats')}${esc(t('navGroups'))}</h2>
+      <div class="card"><h2>${ic('send')}${esc(t('navGroups'))}</h2>
         <p><span class="pill ${live ? 'on' : ''}">${esc(live ? t('live') : t('draftMode'))}</span></p>
         <p class="muted">${esc(live ? t('postingToGroup') : t('draftExplain'))}</p>
         <div class="actions"><a class="btn ghost" href="/groups">${esc(t('open'))}${ic('arrow')}</a></div></div>
@@ -1183,7 +1221,7 @@ export function settings({ club, courts, venues = [], notice = '', home = 0, t }
     ], 'venues')}`, { nav: navFor('/settings', t), t, here: '/settings', tab: 'venues' })
 }
 
-export function tournamentsPage({ tournaments, venues = [], home = '', form = {}, error = '', imported = null, pasted = '', notice = '', filter = '', t }) {
+export function tournamentsPage({ tournaments, venues = [], home = '', form = {}, error = '', imported = null, pasted = '', source = 'whatsapp', notice = '', filter = '', t }) {
   const today = todayISO()
   const cat = form.level_category || 'MX'
   const grade = String(form.level_grade || (imported ? '' : 4))
@@ -1233,12 +1271,21 @@ export function tournamentsPage({ tournaments, venues = [], home = '', form = {}
   return page(t('newTournament'), `
     <h1>${esc(t('newTournament'))}</h1>
     ${notice ? `<div class="flash" role="status"><strong>${esc(notice)}</strong></div>` : ''}
-    <form class="card" method="post" action="/tournaments/import">
+    <section class="card import">
       <h2>${ic('chat')}${esc(t('importTitle'))}</h2>
-      <p class="muted">${esc(t('importHelp'))}</p>
-      <textarea name="text" rows="8" placeholder="${esc(t('importPlaceholder'))}" required>${esc(pasted)}</textarea>
-      <div class="actions"><button class="${imported ? 'btn ghost' : ''}">${ic('board')}${esc(t('importRead'))}</button></div>
-    </form>
+      ${tabbed(['whatsapp', 'telegram'].map((src) => ({
+        id: src, brand: src, label: src === 'whatsapp' ? 'WhatsApp' : 'Telegram',
+        body: `<form method="post" action="/tournaments/import">
+          <input type="hidden" name="source" value="${src}">
+          <p class="muted" id="help-${src}">${esc(t(src === 'whatsapp' ? 'importHelp' : 'importHelpTelegram'))}</p>
+          <textarea name="text" rows="8" aria-label="${esc(t(src === 'whatsapp' ? 'importPasteWhatsApp' : 'importPasteTelegram'))}"
+            aria-describedby="help-${src}"
+            placeholder="${esc(t(src === 'whatsapp' ? 'importPlaceholder' : 'importPlaceholderTelegram'))}" required>${
+            src === source ? esc(pasted) : ''}</textarea>
+          <div class="actions"><button class="${imported && src === source ? 'btn ghost' : ''}">${ic('board')}${esc(t('importRead'))}</button></div>
+        </form>`,
+      })), source)}
+    </section>
     <form class="card" method="post" action="/tournaments">
       ${error ? `<p class="err">${ic('alert')} ${esc(error)}</p>` : ''}
       ${readout}
@@ -1345,8 +1392,7 @@ export function tournamentPage({
       ${flashFor('board')}
       <pre class="msg" id="msg-board">${esc(message)}</pre>
       <div class="actions">
-        <form method="post" action="/t/${tour.id}/post">
-          <button>${ic('megaphone')}${esc(t('postToGroups'))}</button></form>
+        ${postBtn(tour.id, 'msg-board', t)}
         ${copyBtn('msg-board', t)}
         <a class="btn ghost" href="/groups">${ic('inbox')}${esc(t('outbox'))}</a>
       </div>
@@ -1440,9 +1486,7 @@ export function tournamentPage({
       <p class="muted">${esc(t('roundHelp'))}</p>
       ${flashFor(`round-${now}`)}
       <div class="actions" style="margin-top:8px">
-        <form method="post" action="/t/${tour.id}/post">
-          <input type="hidden" name="round" value="${now}">
-          <button>${ic('megaphone')}${esc(t('postToGroups'))}</button></form>
+        ${postBtn(tour.id, 'msg-round', t, `<input type="hidden" name="round" value="${now}">`)}
         ${copyBtn('msg-round', t)}
       </div>
       <details class="preview"><summary>${ic('arrow')}${esc(t('preview'))}</summary>
@@ -1452,9 +1496,7 @@ export function tournamentPage({
       <p class="muted">${esc(t('allRoundsHelp'))}</p>
       ${flashFor('schedule')}
       <div class="actions" style="margin-top:8px">
-        <form method="post" action="/t/${tour.id}/post">
-          <input type="hidden" name="what" value="schedule">
-          <button>${ic('megaphone')}${esc(t('postToGroups'))}</button></form>
+        ${postBtn(tour.id, 'msg-schedule', t, '<input type="hidden" name="what" value="schedule">')}
         ${copyBtn('msg-schedule', t)}
       </div>
       <details class="preview"><summary>${ic('arrow')}${esc(t('preview'))}</summary>
@@ -1491,9 +1533,7 @@ export function tournamentPage({
       ${flashFor('table')}
       <pre class="msg" id="msg-table">${esc(tableText)}</pre>
       <div class="actions">
-        <form method="post" action="/t/${tour.id}/post">
-          <input type="hidden" name="what" value="table">
-          <button>${ic('megaphone')}${esc(t('postToGroups'))}</button></form>
+        ${postBtn(tour.id, 'msg-table', t, '<input type="hidden" name="what" value="table">')}
         ${copyBtn('msg-table', t)}
       </div>
     </div>` : ''}`
