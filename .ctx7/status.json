@@ -103,10 +103,14 @@
     },
     {
       "title": "Push to GitHub (michaelengelandreasen/padel-buddy-tournament-planner)",
-      "state": "todo"
+      "state": "done"
     }
   ],
   "activity": [
+    {
+      "at": "2026-10-06T10:38:27.545Z",
+      "text": "Pushed main + testing to GitHub; token covers issues/PRs/actions/deployments/releases"
+    },
     {
       "at": "2026-10-06T09:46:55.530Z",
       "text": "Organizer deck built (12 slides, 3 clips) in docs/deck/out; GitHub remote added, main merged with origin, ready to push"
@@ -173,5 +177,5 @@
   "summary": "The tablet view now sizes itself in the page (largest text that fits, by bisection), so a 2018 browser gets the same result as a new one: all 26 Galaxy Tab 2 cases fit in real Chrome 71 and Firefox 68, with no clipping and no cut names; the club's 6-pair night reads at 25px on the 7-inch and 31px on",
   "next": "Install Firefox on the club's Tab 2, open /t/<id>/tv, tap for full screen; or switch Cloudflare's edge CA to Google Trust Services so Chrome works too",
   "url": "https://padel-tournament-planner.mikehome.users.ctx7.dev",
-  "updated": "2026-10-06T09:46:55.611Z"
+  "updated": "2026-10-06T10:38:27.545Z"
 }
