@@ -24,7 +24,7 @@ services:
       # the first command the bot sees, so there is nothing else to configure.
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       # The console's one shared login (HTTP Basic), the same on the VPN and the
-      # public URL. Share it inside the link: https://padel:buddy@host/ — no
+      # public URL. Share it inside the link: https://user:pass@host/ — no
       # accounts, no reset flow, the browser remembers it. Empty disables it.
       BASIC_AUTH: ${BASIC_AUTH:-padel:buddy}
     networks: [web, internal]

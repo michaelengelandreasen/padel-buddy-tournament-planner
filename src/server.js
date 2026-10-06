@@ -32,7 +32,7 @@ const PORT = Number(process.env.PORT || 8080)
  * The public URL puts a club's sign-up sheet and score entry on the open
  * internet, and the people who need it are a handful of hosts who will get the
  * link from each other. A username and password that travel inside the link
- * (`https://padel:buddy@host/`) is exactly the right amount of door: no
+ * (`https://user:pass@host/`) is exactly the right amount of door: no
  * accounts, no reset flow, and the browser remembers it. `BASIC_AUTH=user:pass`
  * in the environment; empty disables it. `/healthz` stays open for monitoring.
  */

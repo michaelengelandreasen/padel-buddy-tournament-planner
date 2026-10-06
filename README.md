@@ -11,7 +11,7 @@ last score is typed in — and anyone can ask `!where Mike` and get their own
 answer. The TV view shows the same board on the clubhouse screen.
 
 Live (VPN): https://padel-tournament-planner.mikehome.users.ctx7.dev
-Public: https://padeladmin.webperfology.com — a Cloudflare Tunnel; login `padel` / `buddy`,
+Public: https://padeladmin.webperfology.com — a Cloudflare Tunnel behind a shared login,
 see "Public domain" under Running.
 
 Seeded with **Padel Tribe**, R. Gonçalves Zarco 1813, Matosinhos (Porto) —
@@ -360,13 +360,13 @@ you manage there:
    then `docker compose up -d`. The tunnel shows *Healthy* in Zero Trust within
    seconds and the hostname serves the console.
 
-The console has one shared login, HTTP Basic — `padel` / `buddy` by default
-(`BASIC_AUTH=user:pass` in the environment; empty disables it). Share it inside
+The console has one shared login, HTTP Basic, set with `BASIC_AUTH=user:pass`
+in `.env` (empty disables it). Pick your own; never commit it. Share it inside
 the link and the browser remembers it:
 
 ```
-https://padel:buddy@padeladmin.webperfology.com/            console
-https://padel:buddy@padeladmin.webperfology.com/t/13/tv     the TV board
+https://USER:PASS@your-host/            console
+https://USER:PASS@your-host/t/13/tv     the TV board
 ```
 
 `/healthz` stays open. To go dark again, remove `COMPOSE_PROFILES` from `.env`
