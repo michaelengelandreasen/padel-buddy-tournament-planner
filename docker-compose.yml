@@ -1,4 +1,8 @@
-name: padel-tournament-planner
+# The public demo (branch `demo`): the SQLite version, invented players, reset
+# nightly. Serves padeladmin.webperfology.com through the Cloudflare Tunnel and
+# padel-buddy-demo.mikehome.users.ctx7.dev on the VPN. The club's own install
+# stays in ~/projects/padel-tournament-planner on `main`.
+name: padel-buddy-demo
 services:
   app:
     build: .
@@ -7,9 +11,10 @@ services:
     # mount belongs to us, not to root.
     user: "1000:1000"
     working_dir: /app
+    command: ["sh", "scripts/demo-run.sh"]
     environment:
       PORT: "8080"
-      DB_PATH: /app/data/planner.db
+      DB_PATH: /app/data/demo.db
       # The club's own clock. "Is this date in the past" and "which Friday is
       # next" are questions about an evening in Matosinhos, not about UTC.
       TZ: Europe/Lisbon
@@ -27,14 +32,17 @@ services:
       # public URL. Share it inside the link: https://user:pass@host/ — no
       # accounts, no reset flow, the browser remembers it. Empty disables it.
       BASIC_AUTH: ${BASIC_AUTH:-padel:buddy}
-    networks: [web, internal]
+    networks:
+      web: {}
+      private: { ipv4_address: 172.31.250.10 }
     volumes:
       # Absolute host paths: the broker only permits binds under the real
       # projects volume, and ./ resolves through a symlink it doesn't accept.
-      - ${PROJECTS_DIR}/padel-tournament-planner/src:/app/src
-      - ${PROJECTS_DIR}/padel-tournament-planner/scripts:/app/scripts
-      - ${PROJECTS_DIR}/padel-tournament-planner/test:/app/test
-      - ${PROJECTS_DIR}/padel-tournament-planner/data:/app/data
+      - ${PROJECTS_DIR}/padel-buddy-demo/src:/app/src
+      - ${PROJECTS_DIR}/padel-buddy-demo/scripts:/app/scripts
+      - ${PROJECTS_DIR}/padel-buddy-demo/test:/app/test
+      - ${PROJECTS_DIR}/padel-buddy-demo/docs:/app/docs
+      - ${PROJECTS_DIR}/padel-buddy-demo/data:/app/data
     labels:
       # The dashboard at mikehome.users.ctx7.dev lists containers carrying this
       # label. The broker stamps it when the agent creates a container; a
@@ -42,13 +50,13 @@ services:
       # disappears from the dashboard. Declared here so it survives recreation.
       - aidevserver.project=true
       - traefik.enable=true
-      - 'traefik.http.routers.padel-tournament-planner.rule=Host(`padel-tournament-planner.mikehome.users.ctx7.dev`)'
-      - traefik.http.routers.padel-tournament-planner.entrypoints=websecure
-      - traefik.http.routers.padel-tournament-planner.tls=true
-      - traefik.http.routers.padel-tournament-planner.tls.certresolver=cloudflare
-      - 'traefik.http.routers.padel-tournament-planner.tls.domains[0].main=mikehome.users.ctx7.dev'
-      - 'traefik.http.routers.padel-tournament-planner.tls.domains[0].sans=*.mikehome.users.ctx7.dev'
-      - traefik.http.services.padel-tournament-planner.loadbalancer.server.port=8080
+      - 'traefik.http.routers.padel-buddy-demo.rule=Host(`padel-buddy-demo.mikehome.users.ctx7.dev`)'
+      - traefik.http.routers.padel-buddy-demo.entrypoints=websecure
+      - traefik.http.routers.padel-buddy-demo.tls=true
+      - traefik.http.routers.padel-buddy-demo.tls.certresolver=cloudflare
+      - 'traefik.http.routers.padel-buddy-demo.tls.domains[0].main=mikehome.users.ctx7.dev'
+      - 'traefik.http.routers.padel-buddy-demo.tls.domains[0].sans=*.mikehome.users.ctx7.dev'
+      - traefik.http.services.padel-buddy-demo.loadbalancer.server.port=8080
 
   # Public entry on the club's own domain, through a Cloudflare Tunnel.
   #
@@ -74,13 +82,18 @@ services:
     command: tunnel --no-autoupdate run
     environment:
       TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
-    # Only the private network. On the shared `web` network four other projects
-    # also have a service called `app`, and Docker's DNS round-robins between
-    # them — so `http://app:8080` from here would reach somebody else's
-    # container one request in five. Here `app` can only mean ours.
-    networks: [internal]
+    # On the shared `web` network four other projects also have a service called
+    # `app`, and Docker's DNS round-robins between them — `http://app:8080`
+    # would reach somebody else's container one request in five.
+    # The private network alone has no way out here, so the tunnel also sits on
+    # `web` to reach Cloudflare. There four other projects have a service called
+    # `app`, so the name is pinned in /etc/hosts to this project's app instead.
+    networks: [web, private]
+    extra_hosts:
+      - "app:172.31.250.10"
 
 networks:
   web: { external: true }
-  # Project-private, so service names resolve to this project alone.
-  internal: {}
+  private:
+    ipam:
+      config: [{ subnet: 172.31.250.0/24 }]
