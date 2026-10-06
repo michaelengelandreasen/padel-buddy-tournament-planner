@@ -441,3 +441,12 @@ requests collected — creating and deleting its own tournament and clubs.
 ```
 TZ=Europe/Lisbon node --test
 ```
+
+## Branches
+
+- `main` — what runs live. Only tested work lands here.
+- `testing` — features are merged here first and tried out together.
+- `feature/<name>` — one branch per feature (`feature/postgres`, `feature/americano`, …),
+  branched from `testing` and merged back into it when done.
+
+Flow: `feature/*` → `testing` → (checked) → `main`.
