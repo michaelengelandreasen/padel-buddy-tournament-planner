@@ -76,4 +76,9 @@ for (const [name, partner] of [['Tomás Ribeiro', 'Gonçalo Faria'], ['Gonçalo 
 }
 createTournament({ level: 'F-4', play_date: next(0, 1), play_time: '10:00', courts: 3, duration_min: 120, round_min: 15, venue: 'Riverside Padel' })
 
+// A Mexicano night, signed up and ready to draw: partners change every round and
+// each round after the first comes from the table.
+const mexicano = createTournament({ format: 'mexicano', level: 'MX-4', play_date: next(3, 1), play_time: '19:00', courts: 3, duration_min: 90, round_min: 15 })
+for (const [name, gender] of ROSTER.slice(0, 12)) addSignup(mexicano.id, { name, gender, partner: '', wa_id: '' })
+
 console.log(`demo: tonight #${tonight.id} ${startTime}, ${teams.length} pairs, ${listMatches(tonight.id).length} matches`)

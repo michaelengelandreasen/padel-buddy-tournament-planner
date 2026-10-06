@@ -10,8 +10,9 @@ import {
   listCourts, listMatches, listSignups, listTournaments, recordScore, rememberTelegramChat,
   renameCourt, replaceMatches, saveClub, setPartner, telegramChat,
   addPlayersFromText, deletePlayer, getPlayer, listPlayers, setPlayerLevel, setPlayerLevels, updatePlayer,
+  formatRules, replaceRound, saveFormatRules, setTournamentFormat,
 } from './db.js'
-import { buildTeams, schedule, standings } from './formats/nonstop.js'
+import { advance, checkScore, draw, entrants, isFormat, minimum, standings } from './formats/index.js'
 import { handle, roundMessage, scheduleMessage, signupMessage, standingsMessage } from './bot.js'
 import { parseWhen, validateWhen } from './dates.js'
 import { currentRound, roundComplete, roundsOf } from './rounds.js'
@@ -98,9 +99,9 @@ async function body(req) {
 function view(id) {
   const tournament = getTournament(id)
   if (!tournament) return null
-  const { teams, waiting } = buildTeams(listSignups(tournament.id))
+  const { teams, waiting } = entrants(tournament, listSignups(tournament.id))
   const matches = listMatches(tournament.id)
-  return { tournament, teams, waiting, matches, table: standings(teams, matches),
+  return { tournament, teams, waiting, matches, table: standings(tournament, teams, matches),
     courts: listTournamentCourts(tournament.id) }
 }
 
@@ -165,9 +166,22 @@ const routes = [
 
   ['GET', /^\/settings$/, (_m, req, t) => {
     const q = new URL(req.url, 'http://x').searchParams
-    return { html: V.settings({ club: getClub(), courts: listCourts(), venues: listVenues(), t,
-      home: homePlace().venue?.id || 0,
+    return { html: V.settings({ club: getClub(), courts: listCourts(), venues: listVenues(), t, rules: formatRules(),
+      home: homePlace().venue?.id || 0, saved: q.get('saved') || '',
       notice: q.has('added') ? t('addedVenues', { n: Number(q.get('added')) || 0 }) : '' }) }
+  }],
+  // One format's preset. New nights take a copy; nights already made keep theirs.
+  ['POST', /^\/settings\/formats$/, async (_m, req) => {
+    const f = await body(req)
+    saveFormatRules(f.format, f)
+    return { to: `/settings?saved=${encodeURIComponent(f.format || '')}#formats` }
+  }],
+  // A night's own format and rules, until it is drawn.
+  ['POST', /^\/t\/(\d+)\/format$/, async (m, req) => {
+    const f = await body(req)
+    const id = Number(m[1])
+    if (isFormat(f.format)) setTournamentFormat(id, f.format, f.custom ? f : formatRules()[f.format])
+    return { to: `/t/${id}#teams` }
   }],
   ['POST', /^\/venues$/, async (_m, req) => { addVenue(await body(req)); return { to: '/settings#venues' } }],
   ['POST', /^\/venues\/bulk$/, async (_m, req) => {
@@ -230,7 +244,7 @@ const routes = [
     const home = homePlace()
     const all = listTournaments()
     const tournaments = !want ? all : all.filter((x) => (x.venue ? fold(x.venue) : fold(home.name)) === want)
-    return { html: V.tournamentsPage({ tournaments, venues: listVenues(), home: homePlace().name, t,
+    return { html: V.tournamentsPage({ rules: formatRules(), tournaments, venues: listVenues(), home: homePlace().name, t,
       filter: want ? (all.find((x) => fold(x.venue) === want)?.venue || (want === fold(home.name) ? home.name : q.get('venue'))) : '',
       notice: q.has('deleted') ? t('deletedTournament') : '' }) }
   }],
@@ -255,7 +269,7 @@ const routes = [
       courts: read.courts, duration_min: read.duration_min, round_min: 12,
       roster: JSON.stringify(read.players.map(({ name, partner, gender }) => ({ name, partner, gender }))),
     }
-    return { html: V.tournamentsPage({ tournaments: listTournaments(), venues: listVenues(), home: homePlace().name, form,
+    return { html: V.tournamentsPage({ rules: formatRules(), tournaments: listTournaments(), venues: listVenues(), home: homePlace().name, form,
       imported: read, pasted: f.text, source: f.source === 'telegram' ? 'telegram' : 'whatsapp', t }) }
   }],
 
@@ -265,7 +279,7 @@ const routes = [
     // is about anything else that can POST here. On a failure the page comes
     // back with the reason and what was typed, not a redirect that eats both.
     const bad = (error) => ({
-      html: V.tournamentsPage({ tournaments: listTournaments(), venues: listVenues(), home: homePlace().name, form: f, error, t }),
+      html: V.tournamentsPage({ rules: formatRules(), tournaments: listTournaments(), venues: listVenues(), home: homePlace().name, form: f, error, t }),
       code: 400,
     })
     const lang = t.lang
@@ -284,6 +298,7 @@ const routes = [
       return Number.isFinite(n) && n >= min && n <= max ? n : fallback
     }
     const created = createTournament({
+      format: isFormat(f.format) ? f.format : 'non-stop',
       level: level.code, play_date: when.date, play_time: when.time, venue: f.venue,
       courts: num(f.courts, 3, 1, 20),
       duration_min: num(f.duration_min, 90, 10, 600),
@@ -318,6 +333,7 @@ const routes = [
     const flash = q.get('posted') ? {
       what: q.get('posted'), tg: q.get('tg') || '', err: (q.get('err') || '').slice(0, 120),
       n: q.get('n') || '', hl: q.get('hl') || '',
+      bad: (q.get('bad') || '').split('.').filter(Boolean), why: (q.get('why') || '').slice(0, 160),
     } : q.get('signed') ? { what: 'board', signed: q.get('signed') } : null
     const pinnedId = activeTournament()?.id || 0
     const home = homePlace()
@@ -352,8 +368,8 @@ const routes = [
     const v = view(id)
     // This night's own courts, as named on its Rounds tab.
     const use = v.courts.map((c) => c.label)
-    const { matches } = schedule(v.teams, use,
-      { durationMin: v.tournament.duration_min, roundMin: v.tournament.round_min })
+    if (v.teams.length < minimum(v.tournament)) return { to: `/t/${id}#rounds` }
+    const matches = draw(v.tournament, v.teams, use)
     replaceMatches(id, matches)
     // The draw is the moment the night starts existing for the players, so the
     // first round goes to the groups without anyone having to remember to send it.
@@ -382,6 +398,9 @@ const routes = [
       return Number.isFinite(n) && n >= 0 && n <= 99 ? n : null
     }
     let changed = 0
+    // The club's rules decide what a valid score is (a total of 24, a winner…).
+    // A score that breaks them is not saved; the page says which and why.
+    const refused = []
     for (const mt of before) {
       if (only && mt.id !== only) continue
       if (!(`a${mt.id}` in f)) continue
@@ -391,7 +410,17 @@ const routes = [
         continue
       }
       if (a == null || b == null) continue
+      const wrong = checkScore(tour, a, b)
+      if (wrong) { refused.push({ id: mt.id, ...wrong }); continue }
       if (a !== mt.score_a || b !== mt.score_b) { recordScore(mt.id, a, b); changed++ }
+    }
+
+    // Mexicano and Up and Down only know their next round once this one is
+    // scored: draw it now, before deciding what to post.
+    {
+      const v = view(id)
+      const next = advance(tour, v.teams, v.matches, v.courts.map((c) => c.label))
+      if (next) replaceRound(id, next.round, next.matches)
     }
 
     // A round that became complete in this save is the only reliable "time has
@@ -407,7 +436,9 @@ const routes = [
       post(hasNext ? roundMessage(tour, next, t.lang) : standingsMessage(tour, t.lang),
         { reason: hasNext ? `round ${next}` : 'final' })
     }
-    return { to: `/t/${id}?posted=scores&n=${changed}${only && changed ? `&hl=${only}` : ''}#${only ? `match-${only}` : 'rounds'}` }
+    const bad = refused.length ? `&bad=${refused.map((r) => r.id).join('.')}&why=${encodeURIComponent(t(refused[0].key, refused[0].vars))}` : ''
+    return { to: `/t/${id}?posted=scores&n=${changed}${only && changed ? `&hl=${only}` : ''}${bad}#${
+      refused.length ? `match-${refused[0].id}` : only ? `match-${only}` : 'rounds'}` }
   }],
 
   // This night's courts: rename, add, remove — nothing outside the tournament moves.
@@ -455,9 +486,7 @@ const routes = [
     let redrawn = false
     if (listMatches(id).length) {
       const v = view(id)
-      const { matches } = schedule(v.teams, v.courts.map((c) => c.label),
-        { durationMin: tour.duration_min, roundMin: tour.round_min })
-      replaceMatches(id, matches)
+      replaceMatches(id, draw(v.tournament, v.teams, v.courts.map((c) => c.label)))
       redrawn = true
     }
     return { to: `/t/${id}?posted=pairs&n=${pairs / 2}${redrawn ? '&tg=redrawn' : ''}#teams` }
