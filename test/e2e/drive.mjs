@@ -214,7 +214,7 @@ check('overview: home restored', (await text('h1')) !== 'E2E Club', await text('
 
 // ---------- Groups + TV ----------
 await go('/groups')
-await js(`document.querySelector('#watext').value='!where mike';1`)
+await js(`document.querySelector('#watext').value='!where nico';1`)
 await submit('form[action="/groups/simulate"]')
 await until(`document.querySelector('pre.msg')`)
 check('groups: try a command answers in place', (await q('pre.msg')) && await alive())

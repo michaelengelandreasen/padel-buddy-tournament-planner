@@ -1877,7 +1877,7 @@ export function groupsPage({ groups, chat, log, t }) {
     <div class="card"><h2>${ic('terminal')}${esc(t('tryCommand'))}</h2>
       <form method="post" action="/groups/simulate">
         <label for="watext">${esc(t('message'))}</label>
-        <input id="watext" name="text" class="mono" placeholder="!where Mike" required>
+        <input id="watext" name="text" class="mono" placeholder="!where Nico" required>
         <label for="waid">${esc(t('fromOptional'))}</label>
         <input id="waid" name="wa_id" inputmode="tel" placeholder="+351…">
         <div class="actions"><button>${ic('send')}${esc(t('sendToBot'))}</button></div>
@@ -1948,7 +1948,7 @@ export function playersPage({ players, notice = '', t }) {
     <form class="card" method="post" action="/players/bulk">
       <h2>${ic('plus')}${esc(t('addPlayers'))}</h2>
       <p class="muted">${esc(t('addPlayersHelp'))}</p>
-      <textarea name="text" rows="5" required placeholder="Rui Basto | M | 4&#10;Rita | F&#10;Carla Guerra | F | 5"></textarea>
+      <textarea name="text" rows="5" required placeholder="Ivo Lemos | M | 4&#10;Rita | F&#10;Olga Saraiva | F | 5"></textarea>
       <div class="actions"><button>${ic('plus')}${esc(t('add'))}</button></div>
     </form>`, { nav: navFor('/players', t), t, here: '/players', script: PLAYERS_JS })
 }

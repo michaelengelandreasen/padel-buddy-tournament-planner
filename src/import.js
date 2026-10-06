@@ -4,8 +4,8 @@
  * The group posts a fixed shape — a date line, a time line, a level/venue line,
  * then a numbered list of players, one per line, in blocks of four — and the
  * host currently retypes it into whatever runs the night. This reads that
- * message as posted, sloppiness included: `09:30- 11:30`, `9 🎾 rafa Campos`,
- * `14🎾Tiago Delgado (dupla)`, a missing space after the racket, a name in
+ * message as posted, sloppiness included: `09:30- 11:30`, `9 🎾 zeca Ramos`,
+ * `14🎾Caio Quaresma (dupla)`, a missing space after the racket, a name in
  * lowercase. What it cannot read it says so, per field, and leaves for the host
  * to fill in on the form — a message is never rejected whole because one line
  * was odd.
@@ -13,11 +13,11 @@
  *   📅 13/09/26 - Domingo
  *   ⏱ 09:30- 11:30
  *   M9 - MAIA
- *   1🎾 Rui Basto
- *   2🎾 Rui Magalhaes
+ *   1🎾 Ivo Lemos
+ *   2🎾 Ivo Guimaraes
  *   …
- *   13🎾Pedro Delgado
- *   14🎾Tiago Delgado (dupla)      ← a pair with the line above
+ *   13🎾Abel Quaresma
+ *   14🎾Caio Quaresma (dupla)      ← a pair with the line above
  */
 
 import { addMinutes, isTime, parseWhen } from './dates.js'
@@ -33,7 +33,7 @@ const CLOCK = /\b([01]?\d|2[0-3])(?:\s*[:h.]\s*([0-5]\d)|\s*[hH](?![\p{L}])|\s*(
 const BARE_RANGE = /\b([01]?\d|2[0-3])\s*(?:-|–|—|a|às|as|to|até)\s*([01]?\d|2[0-3])\s*[hH]?\b/iu
 const pad = (n) => String(n).padStart(2, '0')
 
-/** `rafa Campos` → `Rafa Campos`; particles like `de` stay down. */
+/** `zeca Ramos` → `Zeca Ramos`; particles like `de` stay down. */
 export function tidyName(raw) {
   const PARTICLES = new Set(['de', 'da', 'do', 'das', 'dos', 'e', 'di', 'del', 'van', 'von'])
   return String(raw || '').replace(/\s+/g, ' ').trim().split(' ').map((w, i) => {
@@ -56,7 +56,7 @@ const PAIR_NOTE = /\(\s*(dupla|pair|par|par(?:ceiro|ceira)|with|com)\s*\)/iu
 
 /**
  * What WhatsApp itself prepends when a message is copied from the desktop app
- * or exported: `[12/09/26, 10:15:23] Mike: ` or `12/09/26, 10:15 - Mike: `.
+ * or exported: `[12/09/26, 10:15:23] Nico: ` or `12/09/26, 10:15 - Nico: `.
  * Left in, that date and time are the copy's, not the night's, and every
  * roster line starts with a bracket instead of a number.
  */

@@ -37,25 +37,25 @@ function next(weekday, weeksAhead = 0) {
 }
 const SATURDAY = 6, FRIDAY = 5
 
-// The club's real Saturday group: five mixed pairs in, and Mike still looking
+// A Saturday group: five mixed pairs in, and Nico still looking
 // for a partner — which is exactly the state an empty slot next to his name says.
 //
 // Five pairs on three courts is the shape worth sampling: two courts busy, one
 // pair resting, and one slot on the board still open. A three-pair night draws a
 // single match and makes the round message look like it has nothing to say.
 const MIXED = [
-  ['Mike', 'M', ''],
-  ['Paula Quevedo', 'F', 'Luís Miranda'], ['Luís Miranda', 'M', 'Paula Quevedo'],
-  ['Adriana Osório', 'F', 'Manuel Lima'], ['Manuel Lima', 'M', 'Adriana Osório'],
-  ['Maria Aries', 'F', 'Filipe Herculano'], ['Filipe Herculano', 'M', 'Maria Aries'],
-  ['Rita Bessa', 'F', 'André Pinto'], ['André Pinto', 'M', 'Rita Bessa'],
-  ['Sofia Marques', 'F', 'Tiago Ferreira'], ['Tiago Ferreira', 'M', 'Sofia Marques'],
+  ['Nico', 'M', ''],
+  ['Laura Quintas', 'F', 'Hélio Varela'], ['Hélio Varela', 'M', 'Laura Quintas'],
+  ['Daniela Seabra', 'F', 'Jaime Costa'], ['Jaime Costa', 'M', 'Daniela Seabra'],
+  ['Lúcia Abreu', 'F', 'Rodrigo Barreira'], ['Rodrigo Barreira', 'M', 'Lúcia Abreu'],
+  ['Vera Sales', 'F', 'Simão Brito'], ['Simão Brito', 'M', 'Vera Sales'],
+  ['Raquel Dantas', 'F', 'Fausto Correia'], ['Fausto Correia', 'M', 'Raquel Dantas'],
 ]
 
 const MENS = [
-  ['Nuno Cardoso', 'M', 'Bruno Teixeira'], ['Bruno Teixeira', 'M', 'Nuno Cardoso'],
-  ['Diogo Moreira', 'M', 'Filipe Rocha'], ['Filipe Rocha', 'M', 'Diogo Moreira'],
-  ['Ricardo Santos', 'M', ''],
+  ['Renato Calado', 'M', 'Alberto Teles'], ['Alberto Teles', 'M', 'Renato Calado'],
+  ['Mauro Pestana', 'M', 'Xavier Viana'], ['Xavier Viana', 'M', 'Mauro Pestana'],
+  ['Lauro Simões', 'M', ''],
 ]
 
 // Round 1 is in the books; the rest of the morning hasn't happened yet.
