@@ -52,6 +52,25 @@ export function tidyName(raw) {
  * "3 Courts". Any number of players is fine; nobody writes 100.
  */
 const ROSTER = /^\s*(\d{1,2})\s*(?:🎾|[-–.):])\s*(.+?)\s*$/u
+
+/**
+ * The board this bot posts in a Telegram group lists players by slot rather
+ * than by number: `👩🏻 Ana Lima`, `👦🏼 Rui`, and a bare emoji for a slot still
+ * open. The emoji is the gender the slot asks for, so it comes along.
+ */
+const SLOT_LINE = /^\s*(👩|👦|👨|🧑|👧|•)[\u{1F3FB}-\u{1F3FF}]?\s+(\S.*?)\s*$/u
+/** A slot still open: the emoji alone. Part of the board, but nobody in it. */
+const EMPTY_SLOT = /^\s*(👩|👦|👨|🧑|👧)[\u{1F3FB}-\u{1F3FF}]?\s*$/u
+const SLOT_GENDER = { '👩': 'F', '👧': 'F', '👦': 'M', '👨': 'M', '🧑': '', '•': '' }
+/** "Reserves (2)" — the heading between the slots and the reserves' bullets. */
+const COUNT_HEADING = /^\s*\*?[^\d\n*]{2,30}\(\d+\)\*?\s*$/u
+
+/**
+ * What Telegram Desktop puts above each message when several are copied at
+ * once: `Nico, [07.10.26 21:15]` (sometimes with a trailing colon) on a line
+ * of its own. It is the copy's header, not part of the night.
+ */
+const TG_HEADER = /^\s*[^\n\[\]]{1,40},\s*\[[^\]]{4,40}\]:?\s*$/u
 const PAIR_NOTE = /\(\s*(dupla|pair|par|par(?:ceiro|ceira)|with|com)\s*\)/iu
 
 /**
@@ -65,6 +84,7 @@ const COPY_PREFIX = /^\s*\[?\d{1,2}[/.]\d{1,2}[/.]\d{2,4},?\s+\d{1,2}:\d{2}(?::\
 export function parseBoard(text, { now = new Date(), lang } = {}) {
   const t = translator(lang)
   const lines = String(text || '').replace(/\r/g, '').split('\n')
+    .filter((l) => !TG_HEADER.test(l))
     .map((l) => l.replace(COPY_PREFIX, '').replace(/\uFE0F/g, ''))
   const out = {
     date: '', time: '', duration_min: 0, level: '', location: '',
@@ -72,7 +92,8 @@ export function parseBoard(text, { now = new Date(), lang } = {}) {
   }
 
   // Header lines are the ones before the first numbered player.
-  const firstPlayer = lines.findIndex((l) => ROSTER.test(l))
+  const isPlayer = (l) => ROSTER.test(l) || SLOT_LINE.test(l)
+  const firstPlayer = lines.findIndex(isPlayer)
   const head = (firstPlayer >= 0 ? lines.slice(0, firstPlayer) : lines).map((l) => l.trim()).filter(Boolean)
   const body = firstPlayer >= 0 ? lines.slice(firstPlayer) : []
 
@@ -125,15 +146,23 @@ export function parseBoard(text, { now = new Date(), lang } = {}) {
   if (!out.level) out.warnings.push(t('importNoLevel'))
 
   // The roster. "(dupla)" on a line pairs it with the line above.
+  // A slot line has no number of its own; it takes its place in the list.
   let prev = null
+  let fromSlots = false
   for (const line of body) {
     const m = line.match(ROSTER)
-    if (!m || !line.trim()) continue
-    let name = m[2].replace(/^🎾\s*/u, '')
+    const slot = !m && line.match(SLOT_LINE)
+    if (!line.trim() || COUNT_HEADING.test(line) || EMPTY_SLOT.test(line)) continue
+    // Past the list, the board goes on in prose — "Who's in?", the club's
+    // rules — and none of that is a player, bullet or not.
+    if (!m && !slot) { if (fromSlots) break; continue }
+    if (slot) fromSlots = true
+    let name = (m ? m[2] : slot[2]).replace(/^🎾\s*/u, '')
     const isPair = PAIR_NOTE.test(name)
     name = tidyName(name.replace(PAIR_NOTE, '').replace(/\(.*?\)/g, '').trim())
     if (!name) continue
-    const player = { n: Number(m[1]), name, partner: '' }
+    const player = { n: m ? Number(m[1]) : out.players.length + 1, name, partner: '',
+      gender: slot ? SLOT_GENDER[slot[1]] : '' }
     if (isPair && prev) { player.partner = prev.name; prev.partner = name }
     out.players.push(player)
     prev = player

@@ -433,3 +433,43 @@ test('es: dates and clocks read in Spanish, and the parser takes Spanish days an
   assert.equal(parseWhen('miércoles', { now }).date, '2026-09-16')
   assert.equal(translator('es')('whosIn'), '¿Quién se apunta?')
 })
+
+// ---- importing from Telegram ----
+test('import: the board the bot posts in Telegram — slots, genders, reserves, no prose', () => {
+  const board = [
+    'Nico, [07.10.26 21:15]',
+    '📆 Sunday 18/10/2026',
+    '🕒 10:00-12:00',
+    '📈 Nonstop MX4',
+    '',
+    '📍 Riverside Padel',
+    'https://maps.google.com/?q=Porto',
+    '',
+    '2 Courts',
+    '',
+    '👩🏻 Joana Freitas',
+    '👦🏼 Pedro Antunes',
+    '👩🏻',
+    '👦🏼 Bruno Castro',
+    '',
+    'Reserves (1)',
+    '• Teresa Vale',
+    '',
+    'Who’s in?',
+    '• not a player, part of the club rules',
+  ].join('\n')
+  const r = parseBoard(board, { now: NOW })
+  assert.equal(r.date, '2026-10-18')
+  assert.equal(r.time, '10:00')
+  assert.equal(r.duration_min, 120)
+  assert.equal(r.level, 'MX-4')
+  assert.equal(r.location, 'Riverside Padel')
+  assert.deepEqual(r.players.map((p) => [p.name, p.gender]),
+    [['Joana Freitas', 'F'], ['Pedro Antunes', 'M'], ['Bruno Castro', 'M'], ['Teresa Vale', '']])
+})
+
+test('import: a numbered list copied from Telegram Desktop drops the name-and-time headers', () => {
+  const r = parseBoard('Nico, [07.10.26 21:15]:\n📅 18/10/26\n⏱ 10:00-12:00\nMX4 - Riverside\n\nNico, [07.10.26 21:16]\n1🎾 Ana\n2🎾 Rui', { now: NOW })
+  assert.deepEqual(r.players.map((p) => p.name), ['Ana', 'Rui'])
+  assert.equal(r.location, 'Riverside')
+})

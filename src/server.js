@@ -253,10 +253,10 @@ const routes = [
       level_grade: level.ok ? String(level.grade) : '',
       play_date: read.date, play_time: read.time, venue: read.location,
       courts: read.courts, duration_min: read.duration_min, round_min: 12,
-      roster: JSON.stringify(read.players.map(({ name, partner }) => ({ name, partner }))),
+      roster: JSON.stringify(read.players.map(({ name, partner, gender }) => ({ name, partner, gender }))),
     }
     return { html: V.tournamentsPage({ tournaments: listTournaments(), venues: listVenues(), home: homePlace().name, form,
-      imported: read, pasted: f.text, t }) }
+      imported: read, pasted: f.text, source: f.source === 'telegram' ? 'telegram' : 'whatsapp', t }) }
   }],
 
   ['POST', /^\/tournaments$/, async (_m, req, t) => {
@@ -299,7 +299,9 @@ const routes = [
         for (const p of roster.slice(0, 64)) {
           const name = String(p?.name || '').replace(/\s+/g, ' ').trim().slice(0, 80)
           if (!name) continue
-          addSignup(created.id, { name, gender: '', partner: String(p?.partner || '').slice(0, 80), wa_id: '' })
+          // A Telegram board names each slot's gender; a WhatsApp list never does.
+          const gender = p?.gender === 'M' || p?.gender === 'F' ? p.gender : ''
+          addSignup(created.id, { name, gender, partner: String(p?.partner || '').slice(0, 80), wa_id: '' })
           signed++
         }
       }
