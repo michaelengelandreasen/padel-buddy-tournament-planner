@@ -16,6 +16,7 @@ import { categories, grades, isMixedLevel, levelLabel, levelShort, parseLevel } 
 import { clock, humanWhen, todayISO, humanDate } from './dates.js'
 import { courtName, courtsByTeam, currentRound, roundComplete, roundPlan, roundsOf } from './rounds.js'
 import { LANGUAGES, translator } from './i18n.js'
+import { FORMATS, RULE_CHOICES, dynamic, individual, minimum, plannedRounds, rulesOf } from './formats/index.js'
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
@@ -55,6 +56,7 @@ const ICONS = {
   repeat: '<path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/>'
     + '<path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>',
   send: '<path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>',
+  minus: '<path d="M5 12h14"/>',
   megaphone: '<path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>',
   inbox: '<path d="M22 12h-6l-2 3h-4l-2-3H2"/>'
     + '<path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
@@ -165,6 +167,8 @@ function place(chip,target){
   if(!target)return;
   if(target.classList.contains('chip')){
     var a=chip.parentNode,b=target.parentNode;if(a===b&&a===tray)return;
+    // Onto someone in the unpaired list: join the list, don't swap them out of it.
+    if(b===tray){tray.appendChild(chip);return}
     var nb=target.nextSibling;a.insertBefore(target,chip.nextSibling);
     if(b===tray)b.appendChild(chip);else b.insertBefore(chip,nb);
     if(a===tray){a.appendChild(target)}
@@ -177,6 +181,8 @@ function select(chip){if(sel)sel.classList.remove('sel');sel=chip===sel?null:chi
   board.querySelectorAll('.pick').forEach(function(e){e.classList.remove('pick')});
   if(sel){seatsOf().forEach(function(s){if(!chipsIn(s).length)s.classList.add('pick')});if(sel.parentNode!==tray)tray.classList.add('pick')}}
 board.addEventListener('click',function(e){
+  var out=e.target.closest('.out');
+  if(out){var c=out.parentNode.querySelector('.chip');if(c){tray.appendChild(c);select(null)}return}
   var chip=e.target.closest('.chip');
   if(chip){if(sel&&sel!==chip){place(sel,chip);select(null)}else select(chip);return}
   var seat=e.target.closest('.seat,.tray');
@@ -188,12 +194,14 @@ board.addEventListener('keydown',function(e){
 });
 var drag=null;
 board.addEventListener('pointerdown',function(e){
-  var chip=e.target.closest('.chip');if(!chip||e.button)return;
+  var chip=e.target.closest('.chip');if(!chip||e.button||!e.target.closest('.handle'))return;
+  e.preventDefault();
   drag={chip:chip,x:e.clientX,y:e.clientY,on:false,ghost:null,over:null};
   chip.setPointerCapture(e.pointerId);
 });
-function targetAt(x,y){var el=document.elementFromPoint(x,y);if(!el)return null;
-  var c=el.closest('.chip');if(c&&c!==drag.ghost)return c;return el.closest('.seat,.tray')}
+// The ghost is passed in: by the time a drop is resolved the drag is already over.
+function targetAt(x,y,ghost){var el=document.elementFromPoint(x,y);if(!el)return null;
+  var c=el.closest('.chip');if(c&&c!==ghost)return c;return el.closest('.seat,.tray')}
 board.addEventListener('pointermove',function(e){
   if(!drag)return;
   if(!drag.on){if(Math.hypot(e.clientX-drag.x,e.clientY-drag.y)<6)return;
@@ -203,14 +211,14 @@ board.addEventListener('pointermove',function(e){
     drag.dx=e.clientX-r.left;drag.dy=e.clientY-r.top;document.body.appendChild(drag.ghost);
     drag.chip.classList.add('ghost');select(null)}
   drag.ghost.style.left=(e.clientX-drag.dx)+'px';drag.ghost.style.top=(e.clientY-drag.dy)+'px';
-  var t=targetAt(e.clientX,e.clientY);if(t!==drag.over){if(drag.over)drag.over.classList.remove('over');
+  var t=targetAt(e.clientX,e.clientY,drag.ghost);if(t!==drag.over){if(drag.over)drag.over.classList.remove('over');
     drag.over=t;if(t)t.classList.add('over')}
 });
 function endDrag(e){
   if(!drag)return;var d=drag;drag=null;
   if(!d.on)return;
   d.chip.classList.remove('ghost');if(d.ghost)d.ghost.remove();if(d.over)d.over.classList.remove('over');
-  var t=targetAt(e.clientX,e.clientY);if(t&&t!==d.chip)place(d.chip,t);
+  var t=targetAt(e.clientX,e.clientY,d.ghost);if(t&&t!==d.chip)place(d.chip,t);
 }
 board.addEventListener('pointerup',endDrag);board.addEventListener('pointercancel',endDrag);
 function shuffle(list){for(var i=list.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=list[i];list[i]=list[j];list[j]=t}return list}
@@ -289,6 +297,25 @@ const courtList = (courts, base, t, { fixed = false } = {}) => `
 /** A Copy button for the message in `#id`. */
 const copyBtn = (id, t) => `<button type="button" class="btn ghost" data-copy="#${id}" data-done="${esc(t('copied'))}">${
   ic('board')}<span>${esc(t('copy'))}</span></button>`
+
+/**
+ * Post one message to every group the club has, from one press.
+ *
+ * Telegram the server posts by itself. WhatsApp lets no app write into a group,
+ * so the same tap opens WhatsApp with the message already typed (wa.me) and the
+ * host only picks the group — the browser allows that window because it comes
+ * from the press itself. The two marks on the button say where it goes.
+ */
+const postBtn = (tid, msgId, t, fields = '') => `<form method="post" action="/t/${tid}/post" data-wa="#${msgId}">${fields}
+  <button title="${esc(t('postToGroupsHint'))}">${ic('send')}<span>${esc(t('postToGroups'))}</span><span class="to">${
+    brand('whatsapp')}${brand('telegram')}</span></button></form>`
+
+/** The WhatsApp half of a post: open the message in WhatsApp as the form goes. */
+const POST_JS = `pbInit.push(function(){
+if(window.__pbWa)return;window.__pbWa=1;
+document.addEventListener('submit',function(e){var f=e.target,sel=f&&f.getAttribute&&f.getAttribute('data-wa');if(!sel)return;
+var m=document.querySelector(sel);if(!m)return;
+window.open('https://wa.me/?text='+encodeURIComponent(m.textContent),'_blank','noopener')},true)});`
 
 /**
  * Saves that leave the page where it is.
@@ -502,11 +529,22 @@ const SCORES_JS = `pbInit.push(function(){
       if(window.__pbSubmitting)return;if(document.querySelector('.match.dirty')){ev.preventDefault();ev.returnValue=''}})}
 });`
 
+/**
+ * The two chat apps' own marks, in their own colours (Simple Icons, CC0). They
+ * name a source the way the apps do on the phone, which a generic chat bubble
+ * cannot: a host scanning for "the Telegram one" looks for the blue plane.
+ */
+const BRANDS = {
+  whatsapp: { color: '#25D366', path: 'M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z' },
+  telegram: { color: '#26A5E4', path: 'M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z' },
+}
+const brand = (name) => `<svg class="i brand" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="${BRANDS[name].color}" d="${BRANDS[name].path}"/></svg>`
+
 /** A tab strip + its panels. `tabs` is [{id, icon, label, count?, body}]. */
 function tabbed(tabs, active) {
   const strip = `<div class="tabs" role="tablist">${tabs.map((x) => `<button type="button" role="tab"
     id="tabbtn-${x.id}" data-tab="${x.id}" aria-controls="tab-${x.id}" aria-selected="${x.id === active}"
-    tabindex="${x.id === active ? 0 : -1}">${ic(x.icon)}<span>${esc(x.label)}</span>${
+    tabindex="${x.id === active ? 0 : -1}">${x.brand ? brand(x.brand) : ic(x.icon)}<span>${esc(x.label)}</span>${
       x.count != null ? `<span class="n">${x.count}</span>` : ''}</button>`).join('')}</div>`
   const panels = tabs.map((x) => `<section class="panel${x.id === active ? ' on' : ''}" id="tab-${x.id}"
     role="tabpanel" aria-labelledby="tabbtn-${x.id}">${x.body}</section>`).join('')
@@ -556,6 +594,7 @@ header.top .brand{display:flex;align-items:center;gap:10px;min-width:0;flex:1 1 
 header.top .brand strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 header.top .mark{width:34px;height:34px;flex:0 0 34px;display:block}
 header.top .brand small{color:var(--muted);font-weight:600;margin-left:6px;white-space:nowrap}
+nav a .tab{display:none}
 nav{margin-left:auto;display:flex;gap:2px;max-width:100%;overflow-x:auto;
   scrollbar-width:none;-ms-overflow-style:none}
 nav::-webkit-scrollbar{display:none}
@@ -770,6 +809,21 @@ pre.msg{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--surface-2);
   border-radius:0;margin-bottom:-1px;padding:0 14px;min-height:46px;color:var(--muted);font-weight:700;
   white-space:nowrap;display:inline-flex;align-items:center;gap:7px;transition:color .15s ease-out}
 .tabs button .i{width:18px;height:18px}
+.i.brand{stroke:none}
+.fh{display:none}.fh.on{display:block}
+form:has(#format) .fh{display:none}
+${FORMATS.map((f) => `form:has(#format option[value="${f}"]:checked) .fh[data-f="${f}"]{display:block}`).join('')}
+.fh .rules,.card .hint .rules{display:block;margin-top:4px;color:var(--ink)}
+.rules-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px 14px;margin-top:12px}
+.rules-row label{margin-top:0}
+.match>.err{grid-column:1/-1;margin:2px 0 8px}
+button .to{display:inline-flex;gap:3px;margin-left:4px;padding:3px 5px;border-radius:999px;background:var(--surface)}
+button .to .brand{width:14px;height:14px}
+.tabs button .brand{flex:none;transition:opacity .15s ease-out}
+.tabs button[aria-selected="false"] .brand{opacity:.75}
+.tabs button:hover .brand{opacity:1}
+.card.import .tabs{margin-top:10px}
+.card.import .panel>form>p:first-of-type{margin-top:12px}
 .tabs button .n{font-size:.74rem;font-weight:800;color:var(--muted);background:var(--surface-2);
   border-radius:999px;padding:1px 7px}
 .tabs button:hover{color:var(--ink);filter:none}
@@ -865,7 +919,7 @@ table.standings th .short{display:none}
 .seat.pick,.tray.pick{border-style:solid;border-color:color-mix(in oklab,var(--brand) 60%,var(--line))}
 .chip{appearance:none;border:1px solid var(--line);background:var(--surface);color:var(--ink);
   border-radius:9px;padding:0 10px;min-height:40px;width:100%;min-width:0;font:inherit;font-weight:600;text-align:left;
-  display:inline-flex;align-items:center;gap:8px;cursor:grab;touch-action:none;user-select:none;
+  display:inline-flex;align-items:center;gap:8px;cursor:pointer;touch-action:manipulation;user-select:none;
   overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .chip:hover{border-color:var(--muted);filter:none}
 .chip .name{min-width:0;overflow:hidden;text-overflow:ellipsis}
@@ -892,7 +946,19 @@ table.standings th .short{display:none}
 .history .when{color:var(--muted);font-size:.85rem;min-width:9ch;font-variant-numeric:tabular-nums}
 .history .hnote{flex:1 1 100%;color:var(--muted);font-size:.9rem}
 @media (max-width:480px){.prow{flex-wrap:wrap}.prow select{max-width:100%;flex:1 1 100%}}
-.chip .grip{width:18px;height:18px;flex:0 0 auto;color:var(--muted);margin-left:-4px;fill:currentColor;stroke:none;opacity:.9}
+/* Only the handle drags. The rest of the name is a tap target and lets a finger
+   scroll the page — a drag that starts anywhere hijacks every scroll. */
+.chip .handle{align-self:stretch;display:flex;align-items:center;margin:0 -2px 0 -10px;padding:0 4px 0 10px;
+  cursor:grab;touch-action:none}
+.chip .grip{width:18px;height:18px;flex:0 0 auto;color:var(--muted);fill:currentColor;stroke:none;opacity:.9}
+.seat{position:relative}
+.seat .chip{padding-right:46px}
+.seat .out{display:none;position:absolute;right:7px;top:50%;transform:translateY(-50%);width:34px;height:34px;
+  min-height:0;padding:0;border-radius:8px;border:1px solid var(--line);background:var(--surface-2);color:var(--muted);
+  align-items:center;justify-content:center}
+.seat .out .i{width:16px;height:16px}
+.seat .out:hover,.seat .out:focus-visible{color:var(--ink);border-color:var(--muted)}
+.seat:has(.chip) .out{display:flex}
 .chip:hover .grip,.chip.sel .grip{color:var(--brand)}
 .chip .g{flex:0 0 auto;font-size:.7rem;font-weight:800;padding:1px 6px;border-radius:999px;
   background:var(--surface-2);color:var(--muted)}
@@ -923,12 +989,21 @@ table.standings th .short{display:none}
   .wrap{padding:16px 14px calc(72px + env(safe-area-inset-bottom))}
   header.top{padding:8px 12px}
   nav{position:fixed;left:0;right:0;bottom:0;z-index:6;margin:0;width:auto;gap:0;
-    display:grid;grid-auto-flow:column;grid-auto-columns:auto;justify-content:space-around;overflow:visible;
+    /* Five equal columns that can shrink below their content: the bar is never
+       wider than the screen, whatever the label length or the phone's font size. */
+    display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);overflow:hidden;
     background:var(--surface);border-top:1px solid var(--line);
     padding:6px 2px calc(6px + env(safe-area-inset-bottom))}
   nav a{flex-direction:column;justify-content:center;gap:3px;min-height:52px;min-width:52px;padding:4px 4px;
     border-radius:10px;font-size:11px;font-weight:700;letter-spacing:-.01em;min-width:0}
-  nav a span{max-width:100%;overflow:hidden;text-overflow:ellipsis}
+  nav a span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  nav a .full{display:none}
+  nav a .tab{display:block}
+  /* A phone zoomed past 1.3x: the labels get the room the padding was taking. */
+}
+@media (max-width:330px){
+  nav a{padding:4px 0;letter-spacing:-.03em}
+  nav a span{font-size:10.5px}
   nav a .i{width:22px;height:22px}
   nav a.on{background:transparent;color:var(--brand)}
   .card{padding:16px}
@@ -1007,13 +1082,18 @@ export function page(title, body, { nav = '', script = '', t = translator(), her
 <strong>Padel Buddy</strong><small>${esc(t('navTournaments'))}</small></a>
 <nav>${nav}</nav>${langToggle(t.lang, here)}</header>
 ${SPRITE}
-<div class="wrap">${body}</div><script>${AJAX_JS}</script><script>${TABS_JS}</script><script>${PAIRS_JS}</script><script>${COPY_JS}</script><script>${SCORES_JS}</script>${script ? `<script>${script}</script>` : ''}<script>pbBoot()</script></body></html>`
+<div class="wrap">${body}</div><script>${AJAX_JS}</script><script>${TABS_JS}</script><script>${PAIRS_JS}</script><script>${COPY_JS}</script><script>${POST_JS}</script><script>${SCORES_JS}</script>${script ? `<script>${script}</script>` : ''}<script>pbBoot()</script></body></html>`
 }
 
 const navFor = (here, t) => [['/', 'navOverview', 'home'], ['/tournaments', 'navTournaments', 'trophy'],
-  ['/players', 'navPlayers', 'user'], ['/settings', 'navSettings', 'sliders'], ['/groups', 'navGroups', 'chats']]
-  .map(([h, key, icon]) => `<a class="${here === h ? 'on' : ''}" href="${h}"${
-    here === h ? ' aria-current="page"' : ''}>${ic(icon)}<span>${esc(t(key))}</span></a>`).join('')
+  ['/players', 'navPlayers', 'user'], ['/settings', 'navSettings', 'sliders'], ['/groups', 'navGroups', 'send']]
+  .map(([h, key, icon]) => {
+    // The phone tab bar gives each item a fifth of the screen; a label too long
+    // for that has a short form (navTournamentsTab…), used there and only there.
+    const tab = /^nav(Tournaments|Settings)$/.test(key) ? t(`${key}Tab`) : t(key)
+    return `<a class="${here === h ? 'on' : ''}" href="${h}"${here === h ? ' aria-current="page"' : ''} title="${esc(t(key))}">${
+      ic(icon)}<span class="full">${esc(t(key))}</span><span class="tab" aria-hidden="true">${esc(tab)}</span></a>`
+  }).join('')
 
 /** Status values are stored in English; only their display is translated. */
 const statusLabel = (status, t) => t({
@@ -1031,7 +1111,7 @@ const wrapTable = (inner, cls = '') =>
  * so every box on the page can also be saved at once from the bar underneath.
  * Each name is the input's own <label>, so the accessible name is the team.
  */
-const matchBlock = (m, t, { just = false } = {}) => {
+const matchBlock = (m, t, { just = false, refused = '' } = {}) => {
   const done = m.score_a != null && m.score_b != null
   const win = done && m.score_a !== m.score_b ? (m.score_a > m.score_b ? 'a' : 'b') : ''
   return `<div class="match${done ? ' done' : ''}${just ? ' just' : ''}" id="match-${m.id}"
@@ -1043,6 +1123,7 @@ const matchBlock = (m, t, { just = false } = {}) => {
     [['a', m.team_a, m.score_a], ['b', m.team_b, m.score_b]].map(([side, team, score]) => `
     <div class="line${win === side ? ' win' : ''}"><span class="who">${esc(team)}</span><span class="pts">${score}</span></div>`).join('')}
   </div>` : ''}
+  ${refused ? `<p class="err" role="alert">${ic('alert')} ${esc(refused)}</p>` : ''}
   <div class="sides">
     ${[['a', m.team_a, m.score_a], ['b', m.team_b, m.score_b]].map(([side, team, score]) => `
     <div class="side">
@@ -1058,6 +1139,34 @@ const matchBlock = (m, t, { just = false } = {}) => {
   </div>
 </div>`
 }
+
+/** A format's name, as the club calls it. */
+const FORMAT_KEY = { 'non-stop': 'formatNonstop', americano: 'formatAmericano', mexicano: 'formatMexicano', 'up-down': 'formatUpDown' }
+const HELP_KEY = { 'non-stop': 'formatHelpNonstop', americano: 'formatHelpAmericano', mexicano: 'formatHelpMexicano', 'up-down': 'formatHelpUpDown' }
+const formatName = (f, t) => t(FORMAT_KEY[f] || 'formatNonstop')
+
+/** How each rule value reads. */
+const RULE_LABEL = {
+  seeding: { level: 'seedLevel', random: 'seedRandom', signup: 'seedSignup' },
+  pattern: { '14-23': 'pattern14', '13-24': 'pattern13', '12-34': 'pattern12' },
+  rest: { average: 'restAverage', half: 'restHalf', none: 'restNone' },
+  tiebreak: { wins: 'tbWins', diff: 'tbDiff' },
+  partners: { rotate: 'partnersRotate', fixed: 'partnersFixed' },
+  ties: { golden: 'tiesGolden', stay: 'tiesStay' },
+}
+const RULE_NAME = { points: 'rulePoints', seeding: 'ruleSeeding', pattern: 'rulePattern', rest: 'ruleRest',
+  tiebreak: 'ruleTiebreak', partners: 'rulePartners', ties: 'ruleTies' }
+const pointsLabel = (n, t) => (n ? t('rulePointsN', { n }) : t('rulePointsTimed'))
+const ruleValue = (k, v, t) => (k === 'points' ? pointsLabel(v, t) : t(RULE_LABEL[k][v]))
+
+/** One line saying how a night is played: "24 points · seeded by level · …". */
+const rulesSummary = (format, rules, t) => Object.entries(rules || {})
+  .map(([k, v]) => (k === 'points' ? pointsLabel(v, t) : `${t(RULE_NAME[k])}: ${ruleValue(k, v, t).toLowerCase()}`)).join(' · ')
+
+/** A select for one rule. */
+const ruleSelect = (format, k, value, t) => `<div><label for="r-${format}-${k}">${esc(t(RULE_NAME[k]))}</label>
+  <select id="r-${format}-${k}" name="${k}">${RULE_CHOICES[k].map((o) => `<option value="${o}"${
+    String(o) === String(value) ? ' selected' : ''}>${esc(ruleValue(k, o, t))}</option>`).join('')}</select></div>`
 
 const levelCell = (code, t) => code
   ? `<span class="pill on">${esc(code)}</span> <span class="muted">${esc(levelShort(code, t))}</span>`
@@ -1080,7 +1189,7 @@ export function overview({ club, home = null, venues = [], tournaments, courts, 
       <div class="card"><h2>${ic('court')}${esc(t('courts'))}</h2>
         <p class="muted">${courts.length ? courts.map((c) => esc(courtName(c.label, t))).join(' · ') : esc(t('noneYet'))}</p>
         <div class="actions"><a class="btn ghost" href="/settings">${ic('sliders')}${esc(t('manageCourts'))}</a></div></div>
-      <div class="card"><h2>${ic('chats')}${esc(t('navGroups'))}</h2>
+      <div class="card"><h2>${ic('send')}${esc(t('navGroups'))}</h2>
         <p><span class="pill ${live ? 'on' : ''}">${esc(live ? t('live') : t('draftMode'))}</span></p>
         <p class="muted">${esc(live ? t('postingToGroup') : t('draftExplain'))}</p>
         <div class="actions"><a class="btn ghost" href="/groups">${esc(t('open'))}${ic('arrow')}</a></div></div>
@@ -1105,7 +1214,18 @@ export function overview({ club, home = null, venues = [], tournaments, courts, 
     </div>`, { nav: navFor('/', t), t, here: '/' })
 }
 
-export function settings({ club, courts, venues = [], notice = '', home = 0, t }) {
+export function settings({ club, courts, venues = [], notice = '', home = 0, rules = {}, saved = '', t }) {
+  const formatsPanel = `
+    <p class="muted">${esc(t('formatsHelp'))}</p>
+    ${FORMATS.filter((f) => Object.keys(rules[f] || {}).length).map((f) => `
+    <form class="card" method="post" action="/settings/formats" id="rules-${f}">
+      <h2>${ic(f === 'up-down' ? 'up' : f === 'mexicano' ? 'scale' : 'shuffle')}${esc(formatName(f, t))}</h2>
+      <p class="muted">${esc(t(HELP_KEY[f]))}</p>
+      ${saved === f ? `<div class="flash" role="status"><strong>${esc(t('rulesSaved', { format: formatName(f, t) }))}</strong></div>` : ''}
+      <input type="hidden" name="format" value="${f}">
+      <div class="rules-row">${Object.entries(rules[f]).map(([k, v]) => ruleSelect(f, k, v, t)).join('')}</div>
+      <div class="actions"><button>${ic('check')}${esc(t('saveRules', { format: formatName(f, t) }))}</button></div>
+    </form>`).join('')}`
   const courtsPanel = `
     <div class="card">
       <h2>${ic('court')}${esc(t('courts'))}</h2>
@@ -1180,10 +1300,11 @@ export function settings({ club, courts, venues = [], notice = '', home = 0, t }
       { id: 'courts', icon: 'court', label: t('courts'), count: courts.length, body: courtsPanel },
       { id: 'language', icon: 'globe', label: t('language'), body: langForm },
       { id: 'policy', icon: 'doc', label: t('tabPolicy'), body: policyForm },
+      { id: 'formats', icon: 'trophy', label: t('tabFormats'), body: formatsPanel },
     ], 'venues')}`, { nav: navFor('/settings', t), t, here: '/settings', tab: 'venues' })
 }
 
-export function tournamentsPage({ tournaments, venues = [], home = '', form = {}, error = '', imported = null, pasted = '', notice = '', filter = '', t }) {
+export function tournamentsPage({ tournaments, venues = [], home = '', form = {}, error = '', imported = null, pasted = '', source = 'whatsapp', notice = '', filter = '', rules = {}, t }) {
   const today = todayISO()
   const cat = form.level_category || 'MX'
   const grade = String(form.level_grade || (imported ? '' : 4))
@@ -1211,7 +1332,7 @@ export function tournamentsPage({ tournaments, venues = [], home = '', form = {}
 
   const list = tournaments.map((x) => `<div class="card"><div class="head">
       <div style="min-width:0"><strong>${esc(x.level) || esc(t('statusOpen'))}</strong>
-        <span class="muted"> · ${esc(levelShort(x.level, t))}</span><br>
+        <span class="muted"> · ${esc(levelShort(x.level, t))} · ${esc(formatName(x.format, t))}</span><br>
         <span class="muted">${esc(humanWhen(x, { lang: t.lang }))} · ${
           esc(t('courtsN', { n: x.courts }))}${x.venue && !filter ? ` · ${esc(x.venue)}` : ''}</span></div>
       <div class="rowact">
@@ -1233,16 +1354,30 @@ export function tournamentsPage({ tournaments, venues = [], home = '', form = {}
   return page(t('newTournament'), `
     <h1>${esc(t('newTournament'))}</h1>
     ${notice ? `<div class="flash" role="status"><strong>${esc(notice)}</strong></div>` : ''}
-    <form class="card" method="post" action="/tournaments/import">
+    <section class="card import">
       <h2>${ic('chat')}${esc(t('importTitle'))}</h2>
-      <p class="muted">${esc(t('importHelp'))}</p>
-      <textarea name="text" rows="8" placeholder="${esc(t('importPlaceholder'))}" required>${esc(pasted)}</textarea>
-      <div class="actions"><button class="${imported ? 'btn ghost' : ''}">${ic('board')}${esc(t('importRead'))}</button></div>
-    </form>
+      ${tabbed(['whatsapp', 'telegram'].map((src) => ({
+        id: src, brand: src, label: src === 'whatsapp' ? 'WhatsApp' : 'Telegram',
+        body: `<form method="post" action="/tournaments/import">
+          <input type="hidden" name="source" value="${src}">
+          <p class="muted" id="help-${src}">${esc(t(src === 'whatsapp' ? 'importHelp' : 'importHelpTelegram'))}</p>
+          <textarea name="text" rows="8" aria-label="${esc(t(src === 'whatsapp' ? 'importPasteWhatsApp' : 'importPasteTelegram'))}"
+            aria-describedby="help-${src}"
+            placeholder="${esc(t(src === 'whatsapp' ? 'importPlaceholder' : 'importPlaceholderTelegram'))}" required>${
+            src === source ? esc(pasted) : ''}</textarea>
+          <div class="actions"><button class="${imported && src === source ? 'btn ghost' : ''}">${ic('board')}${esc(t('importRead'))}</button></div>
+        </form>`,
+      })), source)}
+    </section>
     <form class="card" method="post" action="/tournaments">
       ${error ? `<p class="err">${ic('alert')} ${esc(error)}</p>` : ''}
       ${readout}
       ${form.roster ? `<input type="hidden" name="roster" value="${esc(form.roster)}">` : ''}
+      <label for="format">${esc(t('format'))}</label>
+      <select id="format" name="format">${FORMATS.map((f) => `<option value="${f}"${
+        (form.format || 'non-stop') === f ? ' selected' : ''}>${esc(formatName(f, t))}</option>`).join('')}</select>
+      ${FORMATS.map((f) => `<p class="hint fh${(form.format || 'non-stop') === f ? ' on' : ''}" data-f="${f}">${esc(t(HELP_KEY[f]))}${
+        Object.keys(rules[f] || {}).length ? ` <span class="rules">${esc(rulesSummary(f, rules[f], t))}.</span> <a href="/settings#formats">${esc(t('clubRules'))}</a>` : ''}</p>`).join('')}
       <div class="row">
         <div><label for="level_category">${esc(t('category'))}</label>
           <select id="level_category" name="level_category">${catOpts}</select></div>
@@ -1312,8 +1447,9 @@ export function flashLine(flash, t) {
   }
   if (flash.what === 'scores') {
     const n = Number(flash.n) || 0
-    return `<div class="flash" role="status"><strong>${
-      esc(n === 1 ? t('savedScores1') : n ? t('savedScores', { n }) : t('savedNothing'))}</strong></div>`
+    return `<div class="flash${flash.bad?.length ? ' bad' : ''}" role="status"><strong>${
+      esc(n === 1 ? t('savedScores1') : n ? t('savedScores', { n }) : t('savedNothing'))}</strong>${
+      flash.bad?.length ? `<span>${esc(t('scoresRefused', { n: flash.bad.length }))}</span>` : ''}</div>`
   }
   bits.push(bits.length
     ? `<span>${esc(t('sentDraft'))}</span>`
@@ -1328,6 +1464,13 @@ export function tournamentPage({
   const rounds = roundsOf(matches)
   const now = currentRound(matches)
   const flashFor = (what) => (flash && flash.what === what ? flashLine(flash, t) : '')
+  // In Americano and Mexicano partners change every round: the entrants are
+  // players and there are no pairs to make. Mexicano and Up and Down draw one
+  // round at a time, so the night has rounds still to come that exist nowhere yet.
+  const solo = individual(tour)
+  const oneAtATime = dynamic(tour)
+  const planned = oneAtATime ? Math.max(rounds.length, plannedRounds(tour)) : rounds.length
+  const rules = rulesOf(tour)
   // A mixed level asks every pair to be one of each. The host would otherwise
   // find out at the draw, which is too late to fix by messaging anyone.
   // Only a pair whose genders are both known, and the same, is off a mixed
@@ -1335,7 +1478,7 @@ export function tournamentPage({
   const known = (p) => p.gender === 'M' || p.gender === 'F'
   const offLevel = isMixedLevel(tour.level)
     ? teams.filter((x) => x.players.every(known) && !x.mixed) : []
-  const allDone = rounds.length > 0 && rounds.every((r) => roundComplete(matches, r))
+  const allDone = rounds.length > 0 && rounds.length >= planned && rounds.every((r) => roundComplete(matches, r))
   // Where the host is in the night decides which tab opens: sign-ups before the
   // draw, the rounds during it, the table once every score is in.
   const active = !matches.length ? 'board' : allDone ? 'table' : 'rounds'
@@ -1345,8 +1488,7 @@ export function tournamentPage({
       ${flashFor('board')}
       <pre class="msg" id="msg-board">${esc(message)}</pre>
       <div class="actions">
-        <form method="post" action="/t/${tour.id}/post">
-          <button>${ic('megaphone')}${esc(t('postToGroups'))}</button></form>
+        ${postBtn(tour.id, 'msg-board', t)}
         ${copyBtn('msg-board', t)}
         <a class="btn ghost" href="/groups">${ic('inbox')}${esc(t('outbox'))}</a>
       </div>
@@ -1359,7 +1501,7 @@ export function tournamentPage({
   // Before the draw the Teams tab is the pairs board; after it, the list. A
   // seat per two players, one extra for an odd count so nobody is off the board.
   const chip = (p) => `<button type="button" class="chip" data-name="${esc(p.name)}" data-gender="${esc(p.gender || '')}"
-    data-grade="${p.grade || ''}" draggable="false">${ic('grip', 'grip')}${
+    data-grade="${p.grade || ''}" draggable="false"><span class="handle" title="${esc(t('dragHandle'))}">${ic('grip', 'grip')}</span>${
     p.gender === 'F' || p.gender === 'M' ? `<span class="g ${p.gender}">${p.gender}</span>` : ''}<span class="name">${esc(p.name)}</span>${
     p.grade ? `<span class="lv" title="${esc(`${t('skillLevel')}: ${p.grade} · ${t(`grade${p.grade}`)}`)}">${p.grade}</span>` : ''}</button>`
   const everyone = teams.flatMap((x) => x.players).concat(waiting)
@@ -1381,7 +1523,8 @@ export function tournamentPage({
         <div class="pairs" data-mixed="${isMixedLevel(tour.level) ? 1 : ''}">${Array.from({ length: seatCount }, (_, i) => `<div class="pair">
           <span class="num">${i + 1}</span>
           ${[0, 1].map((k) => `<div class="seat" aria-label="${esc(t('seatEmpty'))}">${
-            teams[i] && teams[i].players[k] ? chip(teams[i].players[k]) : ''}</div>`).join('')}
+            teams[i] && teams[i].players[k] ? chip(teams[i].players[k]) : ''}<button type="button" class="out"
+            aria-label="${esc(t('unpairPlayer'))}" title="${esc(t('unpairPlayer'))}">${ic('minus')}</button></div>`).join('')}
         </div>`).join('')}</div>
         <div class="tray" data-empty="${esc(t('nobodyYet'))}" aria-label="${esc(t('unpaired'))}">${
           waiting.map(chip).join('')}</div>
@@ -1395,7 +1538,28 @@ export function tournamentPage({
       </div>
     </form>`
 
-  const teamsPanel = pairsBoard + (teams.length ? `
+  const formatCard = matches.length ? '' : `
+    <form class="card" method="post" action="/t/${tour.id}/format">
+      <h2>${ic('trophy')}${esc(t('format'))} <span class="pill on">${esc(formatName(tour.format, t))}</span></h2>
+      <p class="muted">${esc(t(HELP_KEY[tour.format] || 'formatHelpNonstop'))}</p>
+      ${Object.keys(rules).length ? `<p class="hint"><span class="rules">${esc(rulesSummary(tour.format, rules, t))}.</span></p>` : ''}
+      <div class="row"><div><label for="nightformat">${esc(t('changeFormat'))}</label>
+        <select id="nightformat" name="format">${FORMATS.map((f) => `<option value="${f}"${tour.format === f ? ' selected' : ''}>${
+          esc(formatName(f, t))}</option>`).join('')}</select></div></div>
+      <div class="actions"><button class="btn ghost">${ic('check')}${esc(t('useFormat'))}</button>
+        <a href="/settings#formats">${esc(t('clubRules'))}</a></div>
+    </form>`
+  const playersPanel = `
+    <div class="card"><h2>${ic('users')}${esc(t('playersTitle'))} <span class="pill on">${esc(t('importPlayers', { n: teams.length }))}</span></h2>
+      <p class="muted">${esc(t('individualHelp', { format: formatName(tour.format, t) }))}</p>
+      ${wrapTable(`<tbody>${teams.map((x, i) => {
+        const p = x.players[0]
+        return `<tr><td class="pos">${i + 1}</td><td class="lead">${esc(p.name)}</td>
+          <td>${p.gender === 'F' || p.gender === 'M' ? `<span class="g ${p.gender}">${p.gender}</span>` : ''}</td>
+          <td>${p.grade ? `<span class="lv" title="${esc(`${t('skillLevel')}: ${p.grade} · ${t(`grade${p.grade}`)}`)}">${p.grade}</span>` : ''}</td></tr>`
+      }).join('') || `<tr><td class="muted">${esc(t('nobodyYet'))}</td></tr>`}</tbody>`, 'stack')}
+    </div>`
+  const teamsPanel = solo ? formatCard + playersPanel : formatCard + pairsBoard + (teams.length ? `
     <div class="card"><h2>${ic('users')}${esc(t('teams'))} (${teams.length})</h2>
       ${wrapTable(`<tbody>${teams.map((x, i) => `<tr><td class="pos">${i + 1}</td>
         <td class="lead">${esc(x.name)}</td>
@@ -1431,8 +1595,8 @@ export function tournamentPage({
     <div class="card"><h2>${ic('list')}${esc(t('schedule'))}</h2>
       <p class="muted">${esc(t('noSchedule'))}</p>
       <form method="post" action="/t/${tour.id}/schedule"><div class="actions">
-        <button ${teams.length < 2 ? 'disabled' : ''}>${ic('shuffle')}${esc(t('drawSchedule'))}</button></div></form>
-      ${teams.length < 2 ? `<p class="hint">${esc(t('needTwoPairs'))}</p>` : ''}
+        <button ${teams.length < minimum(tour) ? 'disabled' : ''}>${ic('shuffle')}${esc(t(oneAtATime ? 'drawFirstRound' : 'drawSchedule'))}</button></div></form>
+      ${teams.length < minimum(tour) ? `<p class="hint">${esc(t(solo ? 'needFourPlayers' : 'needTwoPairs'))}</p>` : ''}
     </div>${courtsCard}` : `
     ${courtsCard}
     <div class="card"><h2>${ic('compass')}${esc(t('roundTitle'))} <span class="pill on">${
@@ -1440,9 +1604,7 @@ export function tournamentPage({
       <p class="muted">${esc(t('roundHelp'))}</p>
       ${flashFor(`round-${now}`)}
       <div class="actions" style="margin-top:8px">
-        <form method="post" action="/t/${tour.id}/post">
-          <input type="hidden" name="round" value="${now}">
-          <button>${ic('megaphone')}${esc(t('postToGroups'))}</button></form>
+        ${postBtn(tour.id, 'msg-round', t, `<input type="hidden" name="round" value="${now}">`)}
         ${copyBtn('msg-round', t)}
       </div>
       <details class="preview"><summary>${ic('arrow')}${esc(t('preview'))}</summary>
@@ -1452,22 +1614,24 @@ export function tournamentPage({
       <p class="muted">${esc(t('allRoundsHelp'))}</p>
       ${flashFor('schedule')}
       <div class="actions" style="margin-top:8px">
-        <form method="post" action="/t/${tour.id}/post">
-          <input type="hidden" name="what" value="schedule">
-          <button>${ic('megaphone')}${esc(t('postToGroups'))}</button></form>
+        ${postBtn(tour.id, 'msg-schedule', t, '<input type="hidden" name="what" value="schedule">')}
         ${copyBtn('msg-schedule', t)}
       </div>
       <details class="preview"><summary>${ic('arrow')}${esc(t('preview'))}</summary>
         <pre class="msg" id="msg-schedule">${esc(scheduleText)}</pre></details>
     </div>` : ''}
     <form class="card" method="post" action="/t/${tour.id}/scores">
-      <h2>${ic('list')}${esc(t('schedule'))}</h2>
+      <h2>${ic('list')}${esc(t('schedule'))}${rules.points ? ` <span class="pill">${esc(t('playedTo', { n: rules.points }))}</span>` : ''}</h2>
       ${flashFor('scores')}
       ${rounds.map((r) => `<div class="roundhead" id="round-${r}">
         <h3>${esc(t('roundN', { n: r }))}${r === now && !allDone ? ` <span class="pill on">${esc(t('nowShort'))}</span>` : ''}</h3>
         <button type="submit" class="link" formaction="/t/${tour.id}/post" name="round" value="${r}"
           formnovalidate>${esc(t('postRound', { n: r }))}</button>
-      </div>${matches.filter((m) => m.round === r).map((m) => matchBlock(m, t, { just: flash?.hl === String(m.id) })).join('')}`).join('')}
+      </div>${matches.filter((m) => m.round === r).map((m) => matchBlock(m, t, { just: flash?.hl === String(m.id),
+        refused: flash?.bad?.includes(String(m.id)) ? flash.why : '' })).join('')}`).join('')}
+      ${oneAtATime && rounds.length < planned ? `<div class="roundhead pending" id="round-${rounds.length + 1}">
+        <h3>${esc(t('roundN', { n: rounds.length + 1 }))}</h3></div>
+        <p class="muted">${esc(t('roundPendingHelp', { prev: rounds.length, format: formatName(tour.format, t) }))}</p>` : ''}
       <div class="savebar"><span class="count" id="unsaved-count" aria-live="polite" data-tpl="${esc(t('unsavedN'))}"></span><button>${ic('check')}${esc(t('saveAll'))}</button></div>
     </form>`
 
@@ -1476,7 +1640,7 @@ export function tournamentPage({
   const th = (key, short) => `<th class="num"><span class="long">${esc(t(key))}</span><span class="short">${esc(short)}</span></th>`
   const tablePanel = `
     <div class="card"><h2>${ic('trophy')}${esc(t('standings'))}</h2>
-      ${wrapTable(`<thead><tr><th>#</th><th>${esc(t('team'))}</th>${th('played', 'P')}${th('won', 'W')}${
+      ${wrapTable(`<thead><tr><th>#</th><th>${esc(t(solo ? 'player' : 'team'))}</th>${th('played', 'P')}${th('won', 'W')}${
         th('points', 'Pts')}${th('against', 'Ag')}</tr></thead>
       <tbody>${table.map((r, i) => `<tr class="${i < 3 ? 'top' : ''}" data-key="${esc(r.team)}"><td class="pos">${i + 1}</td>
         <td class="team">${esc(r.team)}</td>
@@ -1491,9 +1655,7 @@ export function tournamentPage({
       ${flashFor('table')}
       <pre class="msg" id="msg-table">${esc(tableText)}</pre>
       <div class="actions">
-        <form method="post" action="/t/${tour.id}/post">
-          <input type="hidden" name="what" value="table">
-          <button>${ic('megaphone')}${esc(t('postToGroups'))}</button></form>
+        ${postBtn(tour.id, 'msg-table', t, '<input type="hidden" name="what" value="table">')}
         ${copyBtn('msg-table', t)}
       </div>
     </div>` : ''}`
@@ -1505,6 +1667,7 @@ export function tournamentPage({
       ${place ? `<span class="place">${place.url
         ? `<a class="pinlink" href="${esc(place.url)}" target="_blank" rel="noopener" aria-label="${esc(t('openInMaps'))}" title="${esc(t('openInMaps'))}">${ic('pin')}</a>`
         : `<span class="pinlink off">${ic('pin')}</span>`}<a href="/tournaments?venue=${encodeURIComponent(place.name)}">${esc(place.name)}</a></span>` : ''}
+      <span>${ic('trophy')}${esc(formatName(tour.format, t))}</span>
       <span>${ic('court')}${esc(t('courtsN', { n: tour.courts }))}</span>
       <span>${ic('clock')}${esc(t('minutes', { n: tour.duration_min }))}</span>
       <span>${ic('repeat')}${esc(t('minRounds', { n: tour.round_min }))}</span>
@@ -1517,7 +1680,7 @@ export function tournamentPage({
       </form></p>
     ${tabbed([
       { id: 'board', icon: 'board', label: t('tabBoard'), body: board },
-      { id: 'teams', icon: 'users', label: t('tabTeams'), count: teams.length, body: teamsPanel },
+      { id: 'teams', icon: 'users', label: t(solo ? 'playersTitle' : 'tabTeams'), count: teams.length, body: teamsPanel },
       { id: 'rounds', icon: 'list', label: t('tabRounds'), count: rounds.length || null, body: roundsPanel },
       { id: 'table', icon: 'trophy', label: t('tabTable'), body: tablePanel },
     ], active)}`, { nav: navFor('/tournaments', t), t, here: '/tournaments', tab: active })
@@ -1877,7 +2040,7 @@ export function groupsPage({ groups, chat, log, t }) {
     <div class="card"><h2>${ic('terminal')}${esc(t('tryCommand'))}</h2>
       <form method="post" action="/groups/simulate">
         <label for="watext">${esc(t('message'))}</label>
-        <input id="watext" name="text" class="mono" placeholder="!where Mike" required>
+        <input id="watext" name="text" class="mono" placeholder="!where Nico" required>
         <label for="waid">${esc(t('fromOptional'))}</label>
         <input id="waid" name="wa_id" inputmode="tel" placeholder="+351…">
         <div class="actions"><button>${ic('send')}${esc(t('sendToBot'))}</button></div>
@@ -1948,7 +2111,7 @@ export function playersPage({ players, notice = '', t }) {
     <form class="card" method="post" action="/players/bulk">
       <h2>${ic('plus')}${esc(t('addPlayers'))}</h2>
       <p class="muted">${esc(t('addPlayersHelp'))}</p>
-      <textarea name="text" rows="5" required placeholder="Rui Basto | M | 4&#10;Rita | F&#10;Carla Guerra | F | 5"></textarea>
+      <textarea name="text" rows="5" required placeholder="Ivo Lemos | M | 4&#10;Rita | F&#10;Olga Saraiva | F | 5"></textarea>
       <div class="actions"><button>${ic('plus')}${esc(t('add'))}</button></div>
     </form>`, { nav: navFor('/players', t), t, here: '/players', script: PLAYERS_JS })
 }

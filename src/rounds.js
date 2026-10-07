@@ -48,6 +48,16 @@ export function roundWindow({ play_time, round_min }, round) {
   }
 }
 
+/**
+ * The people on one side of the net. In a pair format a side is the pair's own
+ * name ("Ana & Rui") and the entrant is the same string; in an individual
+ * format (Americano, Mexicano) partners change every round, the entrant is one
+ * player, and a side is two of them joined for that match. Everything that asks
+ * "is this entrant in this match" goes through here, so it works for both.
+ */
+export const members = (side) => String(side ?? '').split(' & ')
+export const onSide = (side, entrant) => side === entrant || members(side).includes(entrant)
+
 /** Courts in the order the club posts them, not the order SQLite returns them. */
 const byCourt = (a, b) => String(a.court).localeCompare(String(b.court), undefined, { numeric: true })
 
@@ -60,7 +70,7 @@ const byCourt = (a, b) => String(a.court).localeCompare(String(b.court), undefin
  */
 export function roundPlan({ tournament, matches, teams, round }) {
   const games = matches.filter((m) => m.round === round).sort(byCourt)
-  const playing = new Set(games.flatMap((m) => [m.team_a, m.team_b]))
+  const playing = new Set(games.flatMap((m) => [m.team_a, m.team_b, ...members(m.team_a), ...members(m.team_b)]))
   return {
     round,
     rounds: roundsOf(matches),
@@ -81,8 +91,10 @@ export function courtsByTeam(matches, round) {
   const map = new Map()
   for (const m of matches) {
     if (m.round !== round) continue
-    map.set(m.team_a, m.court)
-    map.set(m.team_b, m.court)
+    for (const side of [m.team_a, m.team_b]) {
+      map.set(side, m.court)
+      for (const p of members(side)) map.set(p, m.court)
+    }
   }
   return map
 }
@@ -108,11 +120,18 @@ export function teamsNamed(teams, query) {
 
 /** Where one pair is in a round: their match and their court, or null if resting. */
 export function findGame(matches, round, team) {
-  return matches.find((m) => m.round === round && (m.team_a === team || m.team_b === team)) || null
+  return matches.find((m) => m.round === round && (onSide(m.team_a, team) || onSide(m.team_b, team))) || null
 }
 
 /** The pair on the other side of the net. */
-export const opponentIn = (game, team) => (game ? (game.team_a === team ? game.team_b : game.team_a) : '')
+export const opponentIn = (game, team) => (game ? (onSide(game.team_a, team) ? game.team_b : game.team_a) : '')
+
+/** Who an individual entrant plays beside in this game; '' in a pair format. */
+export function partnerIn(game, entrant) {
+  if (!game) return ''
+  const side = onSide(game.team_a, entrant) ? game.team_a : game.team_b
+  return side === entrant ? '' : members(side).filter((p) => p !== entrant).join(' & ')
+}
 
 /** Every match in a round has both scores — the signal that the round is over. */
 export const roundComplete = (matches, round) => {
