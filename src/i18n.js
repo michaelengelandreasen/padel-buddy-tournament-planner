@@ -275,7 +275,7 @@ const EN = {
   pairsTitle: 'Pairs',
   pairN: 'Pair {n}',
   unpaired: 'Unpaired',
-  pairsHelp: 'Drag a player onto a seat, or tap one player and then another to swap them. '
+  pairsHelp: 'Drag a player by the dotted handle onto a seat, or tap one player and then another to swap them; the minus button sends a player to the unpaired list. '
     + 'Nothing is written until you save.',
   pairsLocked: 'The schedule is drawn from these pairs. Saving a change here redraws it.',
   pairsRedrawConfirm: 'Save these pairs and redraw the schedule? Scores entered so far are lost.',
@@ -336,6 +336,8 @@ const EN = {
   preview: 'Preview',
   postToGroups: 'Post to the groups',
   postToGroupsHint: 'Posts to the Telegram group and opens WhatsApp with the message typed — pick the group and send.',
+  unpairPlayer: "Move to unpaired",
+  dragHandle: "Drag to move",
   format: "Format",
   formatNonstop: "Non-stop",
   formatAmericano: "Americano",
@@ -690,7 +692,7 @@ const PT = {
   pairsTitle: 'Duplas',
   pairN: 'Dupla {n}',
   unpaired: 'Sem dupla',
-  pairsHelp: 'Arrasta um jogador para um lugar, ou toca num jogador e depois noutro para os trocar. '
+  pairsHelp: 'Arrasta um jogador pela pega pontilhada para um lugar, ou toca num jogador e depois noutro para os trocar; o botão menos passa um jogador para os sem dupla. '
     + 'Nada é gravado até guardares.',
   pairsLocked: 'O calendário foi sorteado a partir destas duplas. Guardar uma alteração aqui sorteia-o de novo.',
   pairsRedrawConfirm: 'Guardar estas duplas e sortear o calendário de novo? Os resultados já introduzidos perdem-se.',
@@ -751,6 +753,8 @@ const PT = {
   preview: 'Pré-visualizar',
   postToGroups: 'Publicar nos grupos',
   postToGroupsHint: 'Publica no grupo de Telegram e abre o WhatsApp com a mensagem escrita — escolhe o grupo e envia.',
+  unpairPlayer: "Passar para sem dupla",
+  dragHandle: "Arrasta para mover",
   format: "Formato",
   formatNonstop: "Non-stop",
   formatAmericano: "Americano",
@@ -1105,7 +1109,7 @@ const UK = {
   pairsTitle: 'Пари',
   pairN: 'Пара {n}',
   unpaired: 'Без пари',
-  pairsHelp: 'Перетягніть гравця на місце або торкніться одного, а потім іншого, щоб поміняти їх. '
+  pairsHelp: 'Перетягніть гравця за крапчастий маркер на місце або торкніться одного, а потім іншого, щоб поміняти їх; кнопка «мінус» переносить гравця до тих, хто без пари. '
     + 'Нічого не записується, поки не збережете.',
   pairsLocked: 'Розклад складено з цих пар. Збереження змін складе його заново.',
   pairsRedrawConfirm: 'Зберегти ці пари й скласти розклад заново? Уже введені результати буде втрачено.',
@@ -1166,6 +1170,8 @@ const UK = {
   preview: 'Перегляд',
   postToGroups: 'Опублікувати в групи',
   postToGroupsHint: 'Публікує в групу Telegram і відкриває WhatsApp із готовим повідомленням — оберіть групу й надішліть.',
+  unpairPlayer: "Перенести до гравців без пари",
+  dragHandle: "Перетягніть, щоб перемістити",
   format: "Формат",
   formatNonstop: "Non-stop",
   formatAmericano: "Americano",
@@ -1519,7 +1525,7 @@ const ES = {
   pairsTitle: 'Parejas',
   pairN: 'Pareja {n}',
   unpaired: 'Sin pareja',
-  pairsHelp: 'Arrastra un jugador a un hueco, o toca un jugador y luego otro para intercambiarlos. '
+  pairsHelp: 'Arrastra un jugador por el asa punteada a un hueco, o toca un jugador y luego otro para intercambiarlos; el botón menos pasa un jugador a sin pareja. '
     + 'No se guarda nada hasta que guardes.',
   pairsLocked: 'El calendario se sorteó con estas parejas. Guardar un cambio aquí lo vuelve a sortear.',
   pairsRedrawConfirm: '¿Guardar estas parejas y volver a sortear el calendario? Se pierden los resultados ya introducidos.',
@@ -1580,6 +1586,8 @@ const ES = {
   preview: 'Vista previa',
   postToGroups: 'Publicar en los grupos',
   postToGroupsHint: 'Publica en el grupo de Telegram y abre WhatsApp con el mensaje escrito: elige el grupo y envía.',
+  unpairPlayer: "Pasar a sin pareja",
+  dragHandle: "Arrastra para mover",
   format: "Formato",
   formatNonstop: "Non-stop",
   formatAmericano: "Americano",
