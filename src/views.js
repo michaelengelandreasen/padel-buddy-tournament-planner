@@ -56,6 +56,7 @@ const ICONS = {
   repeat: '<path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/>'
     + '<path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>',
   send: '<path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>',
+  minus: '<path d="M5 12h14"/>',
   megaphone: '<path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>',
   inbox: '<path d="M22 12h-6l-2 3h-4l-2-3H2"/>'
     + '<path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
@@ -166,6 +167,8 @@ function place(chip,target){
   if(!target)return;
   if(target.classList.contains('chip')){
     var a=chip.parentNode,b=target.parentNode;if(a===b&&a===tray)return;
+    // Onto someone in the unpaired list: join the list, don't swap them out of it.
+    if(b===tray){tray.appendChild(chip);return}
     var nb=target.nextSibling;a.insertBefore(target,chip.nextSibling);
     if(b===tray)b.appendChild(chip);else b.insertBefore(chip,nb);
     if(a===tray){a.appendChild(target)}
@@ -178,6 +181,8 @@ function select(chip){if(sel)sel.classList.remove('sel');sel=chip===sel?null:chi
   board.querySelectorAll('.pick').forEach(function(e){e.classList.remove('pick')});
   if(sel){seatsOf().forEach(function(s){if(!chipsIn(s).length)s.classList.add('pick')});if(sel.parentNode!==tray)tray.classList.add('pick')}}
 board.addEventListener('click',function(e){
+  var out=e.target.closest('.out');
+  if(out){var c=out.parentNode.querySelector('.chip');if(c){tray.appendChild(c);select(null)}return}
   var chip=e.target.closest('.chip');
   if(chip){if(sel&&sel!==chip){place(sel,chip);select(null)}else select(chip);return}
   var seat=e.target.closest('.seat,.tray');
@@ -189,12 +194,14 @@ board.addEventListener('keydown',function(e){
 });
 var drag=null;
 board.addEventListener('pointerdown',function(e){
-  var chip=e.target.closest('.chip');if(!chip||e.button)return;
+  var chip=e.target.closest('.chip');if(!chip||e.button||!e.target.closest('.handle'))return;
+  e.preventDefault();
   drag={chip:chip,x:e.clientX,y:e.clientY,on:false,ghost:null,over:null};
   chip.setPointerCapture(e.pointerId);
 });
-function targetAt(x,y){var el=document.elementFromPoint(x,y);if(!el)return null;
-  var c=el.closest('.chip');if(c&&c!==drag.ghost)return c;return el.closest('.seat,.tray')}
+// The ghost is passed in: by the time a drop is resolved the drag is already over.
+function targetAt(x,y,ghost){var el=document.elementFromPoint(x,y);if(!el)return null;
+  var c=el.closest('.chip');if(c&&c!==ghost)return c;return el.closest('.seat,.tray')}
 board.addEventListener('pointermove',function(e){
   if(!drag)return;
   if(!drag.on){if(Math.hypot(e.clientX-drag.x,e.clientY-drag.y)<6)return;
@@ -204,14 +211,14 @@ board.addEventListener('pointermove',function(e){
     drag.dx=e.clientX-r.left;drag.dy=e.clientY-r.top;document.body.appendChild(drag.ghost);
     drag.chip.classList.add('ghost');select(null)}
   drag.ghost.style.left=(e.clientX-drag.dx)+'px';drag.ghost.style.top=(e.clientY-drag.dy)+'px';
-  var t=targetAt(e.clientX,e.clientY);if(t!==drag.over){if(drag.over)drag.over.classList.remove('over');
+  var t=targetAt(e.clientX,e.clientY,drag.ghost);if(t!==drag.over){if(drag.over)drag.over.classList.remove('over');
     drag.over=t;if(t)t.classList.add('over')}
 });
 function endDrag(e){
   if(!drag)return;var d=drag;drag=null;
   if(!d.on)return;
   d.chip.classList.remove('ghost');if(d.ghost)d.ghost.remove();if(d.over)d.over.classList.remove('over');
-  var t=targetAt(e.clientX,e.clientY);if(t&&t!==d.chip)place(d.chip,t);
+  var t=targetAt(e.clientX,e.clientY,d.ghost);if(t&&t!==d.chip)place(d.chip,t);
 }
 board.addEventListener('pointerup',endDrag);board.addEventListener('pointercancel',endDrag);
 function shuffle(list){for(var i=list.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=list[i];list[i]=list[j];list[j]=t}return list}
@@ -912,7 +919,7 @@ table.standings th .short{display:none}
 .seat.pick,.tray.pick{border-style:solid;border-color:color-mix(in oklab,var(--brand) 60%,var(--line))}
 .chip{appearance:none;border:1px solid var(--line);background:var(--surface);color:var(--ink);
   border-radius:9px;padding:0 10px;min-height:40px;width:100%;min-width:0;font:inherit;font-weight:600;text-align:left;
-  display:inline-flex;align-items:center;gap:8px;cursor:grab;touch-action:none;user-select:none;
+  display:inline-flex;align-items:center;gap:8px;cursor:pointer;touch-action:manipulation;user-select:none;
   overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .chip:hover{border-color:var(--muted);filter:none}
 .chip .name{min-width:0;overflow:hidden;text-overflow:ellipsis}
@@ -939,7 +946,19 @@ table.standings th .short{display:none}
 .history .when{color:var(--muted);font-size:.85rem;min-width:9ch;font-variant-numeric:tabular-nums}
 .history .hnote{flex:1 1 100%;color:var(--muted);font-size:.9rem}
 @media (max-width:480px){.prow{flex-wrap:wrap}.prow select{max-width:100%;flex:1 1 100%}}
-.chip .grip{width:18px;height:18px;flex:0 0 auto;color:var(--muted);margin-left:-4px;fill:currentColor;stroke:none;opacity:.9}
+/* Only the handle drags. The rest of the name is a tap target and lets a finger
+   scroll the page — a drag that starts anywhere hijacks every scroll. */
+.chip .handle{align-self:stretch;display:flex;align-items:center;margin:0 -2px 0 -10px;padding:0 4px 0 10px;
+  cursor:grab;touch-action:none}
+.chip .grip{width:18px;height:18px;flex:0 0 auto;color:var(--muted);fill:currentColor;stroke:none;opacity:.9}
+.seat{position:relative}
+.seat .chip{padding-right:46px}
+.seat .out{display:none;position:absolute;right:7px;top:50%;transform:translateY(-50%);width:34px;height:34px;
+  min-height:0;padding:0;border-radius:8px;border:1px solid var(--line);background:var(--surface-2);color:var(--muted);
+  align-items:center;justify-content:center}
+.seat .out .i{width:16px;height:16px}
+.seat .out:hover,.seat .out:focus-visible{color:var(--ink);border-color:var(--muted)}
+.seat:has(.chip) .out{display:flex}
 .chip:hover .grip,.chip.sel .grip{color:var(--brand)}
 .chip .g{flex:0 0 auto;font-size:.7rem;font-weight:800;padding:1px 6px;border-radius:999px;
   background:var(--surface-2);color:var(--muted)}
@@ -1482,7 +1501,7 @@ export function tournamentPage({
   // Before the draw the Teams tab is the pairs board; after it, the list. A
   // seat per two players, one extra for an odd count so nobody is off the board.
   const chip = (p) => `<button type="button" class="chip" data-name="${esc(p.name)}" data-gender="${esc(p.gender || '')}"
-    data-grade="${p.grade || ''}" draggable="false">${ic('grip', 'grip')}${
+    data-grade="${p.grade || ''}" draggable="false"><span class="handle" title="${esc(t('dragHandle'))}">${ic('grip', 'grip')}</span>${
     p.gender === 'F' || p.gender === 'M' ? `<span class="g ${p.gender}">${p.gender}</span>` : ''}<span class="name">${esc(p.name)}</span>${
     p.grade ? `<span class="lv" title="${esc(`${t('skillLevel')}: ${p.grade} · ${t(`grade${p.grade}`)}`)}">${p.grade}</span>` : ''}</button>`
   const everyone = teams.flatMap((x) => x.players).concat(waiting)
@@ -1504,7 +1523,8 @@ export function tournamentPage({
         <div class="pairs" data-mixed="${isMixedLevel(tour.level) ? 1 : ''}">${Array.from({ length: seatCount }, (_, i) => `<div class="pair">
           <span class="num">${i + 1}</span>
           ${[0, 1].map((k) => `<div class="seat" aria-label="${esc(t('seatEmpty'))}">${
-            teams[i] && teams[i].players[k] ? chip(teams[i].players[k]) : ''}</div>`).join('')}
+            teams[i] && teams[i].players[k] ? chip(teams[i].players[k]) : ''}<button type="button" class="out"
+            aria-label="${esc(t('unpairPlayer'))}" title="${esc(t('unpairPlayer'))}">${ic('minus')}</button></div>`).join('')}
         </div>`).join('')}</div>
         <div class="tray" data-empty="${esc(t('nobodyYet'))}" aria-label="${esc(t('unpaired'))}">${
           waiting.map(chip).join('')}</div>
