@@ -8,11 +8,11 @@ if (!/sandbox/.test(process.env.DB_PATH)) { console.error('refusing: DB_PATH is 
 const { createTournament, addSignup } = await import('/app/src/db.js')
 const F = ['Ana Rita', 'Beatriz', 'Catarina Sousa', 'Daniela', 'Inês Figueiredo', 'Joana', 'Leonor', 'Mariana Braga',
   'Marta', 'Patrícia Almeida', 'Rita', 'Sofia', 'Teresa', 'Vera Lúcia', 'Clara', 'Helena']
-const M = ['André', 'Bruno Teixeira', 'Carlos', 'Diogo', 'Eduardo Carvalho', 'Filipe', 'Gonçalo', 'Hugo',
-  'João Pedro', 'Luís', 'Miguel Ferreira', 'Nuno', 'Pedro', 'Ricardo Santos', 'Tiago', 'Vasco']
+const M = ['André', 'Alberto Teles', 'Carlos', 'Diogo', 'Ernesto Valente', 'Filipe', 'Gonçalo', 'Hugo',
+  'João Pedro', 'Luís', 'Ilídio Freire', 'Nuno', 'Pedro', 'Lauro Simões', 'Tiago', 'Vasco']
 // The club's own size: six pairs on three courts, long real names included.
-const SIX = [['Paula Quevedo', 'Luís Miranda'], ['Adriana Osório', 'Manuel Lima'], ['Maria Aries', 'Filipe Herculano'],
-  ['Rita Sousa', 'João Almeida'], ['Inês Costa', 'Miguel Ferreira'], ['Beatriz Lima', 'Tiago Nunes']]
+const SIX = [['Laura Quintas', 'Hélio Varela'], ['Daniela Seabra', 'Jaime Costa'], ['Lúcia Abreu', 'Rodrigo Barreira'],
+  ['Rita Sousa', 'João Almeida'], ['Inês Costa', 'Ilídio Freire'], ['Beatriz Lima', 'Tiago Nunes']]
 const ids = {}
 for (const [pairs, courts, dur] of [[6, 3, 60], [12, 6, 120], [16, 8, 150]]) {
   const t = createTournament({ level: 'MX-4', play_date: '2026-09-27', play_time: '19:00', courts, duration_min: dur, round_min: 12 })
