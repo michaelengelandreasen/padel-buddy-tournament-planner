@@ -111,23 +111,23 @@ pres.addSection({ title: 'Why' })
   s.addImage({ data: logo, x: M, y: 0.9, w: 0.95, h: 0.95, objectName: 'logo' })
   s.addText('Padel Buddy', { x: M + 1.15, y: 0.98, w: 4, h: 0.45, fontSize: 22, bold: true, color: HEX.ink, margin: 0, isTextBox: true, objectName: 'brand' })
   s.addText('Tournaments', { x: M + 1.15, y: 1.42, w: 4, h: 0.35, fontSize: 15, color: HEX.muted, margin: 0, isTextBox: true, objectName: 'brand-sub' })
-  s.addText('Run your padel nights from the group chat', { placeholder: 'title' })
+  s.addText('Run your padel tournaments from the group chat', { placeholder: 'title' })
   s.addText('No more printed sheets, PDFs or re-typed WhatsApp lists. Paste the club\'s message, and every player knows where to go next, on their own phone.', { placeholder: 'body' })
   frame(s, file('tv.png'), 7.55, 1.55, 5.2, 5.2 * 959 / 1920, 'tv-shot')
   frame(s, file('phone-scores.png'), 10.9, 3.15, 1.75, 1.75 * 954 / 441, 'phone-shot')
-  s.addNotes('Padel Buddy Tournaments runs a club\'s tournament nights: sign-ups, pairs, the schedule, scores, standings, and the messages to the group. Everything in this deck is the real app; the players are invented.')
+  s.addNotes('Padel Buddy Tournaments runs a club\'s tournaments, morning or evening: sign-ups, pairs, the schedule, scores, standings, and the messages to the group. Everything in this deck is the real app; the players are invented.')
 }
 
 // 2 — The problem
 {
   const s = pres.addSlide({ masterName: 'CONTENT', sectionTitle: 'Why' })
-  s.addText('Every night, the same admin', { placeholder: 'title' })
-  kicker(s, 'What a nonstop or Americano night costs the organizer today')
+  s.addText('Every tournament, the same admin', { placeholder: 'title' })
+  kicker(s, 'What a nonstop or Americano tournament costs the organizer today')
   const rows = [
     ['board', 'Re-typing the list', 'The group fills the slots in WhatsApp; someone copies sixteen names into a spreadsheet.'],
     ['users', 'Pairs on paper', 'Partners, the odd player out, a pair that cancels at 18:55.'],
     ['court', '"Which court am I on?"', 'Twenty people at the wall between rounds, squinting at a printed grid.'],
-    ['trophy', 'Scores and the table by hand', 'Adding up points after the night, then a PDF in the group the next day.'],
+    ['trophy', 'Scores and the table by hand', 'Adding up points afterwards, then a PDF in the group the next day.'],
   ]
   for (const [i, [ic, head, body]] of rows.entries()) {
     const x = M + (i % 2) * 6.15, y = 2.05 + Math.floor(i / 2) * 2.2
@@ -143,7 +143,7 @@ pres.addSection({ title: 'Why' })
 pres.addSection({ title: 'How it works' })
 {
   const s = pres.addSlide({ masterName: 'CONTENT', sectionTitle: 'How it works' })
-  s.addText('A night in four steps', { placeholder: 'title' })
+  s.addText('A tournament in four steps', { placeholder: 'title' })
   kicker(s, 'The organizer does the first two from a phone; the app does the rest')
   const steps = [
     ['chat', 'Paste', 'The club\'s usual WhatsApp sign-up message. Date, time, level, club and every name are read from it.'],
@@ -160,7 +160,7 @@ pres.addSection({ title: 'How it works' })
     s.addText(head, { x: x + 0.35, y: y + 1.45, w: w - 0.7, h: 0.55, fontSize: 24, bold: true, color: HEX.emerald, margin: 0, isTextBox: true, objectName: `step-head-${i}` })
     s.addText(body, { x: x + 0.35, y: y + 2.1, w: w - 0.7, h: 1.9, fontSize: 15, color: HEX.muted, margin: 0, valign: 'top', isTextBox: true, objectName: `step-body-${i}` })
   }
-  s.addNotes('Four steps. Paste and Pair happen before the night; Play and Post happen during it, and Post is automatic: the last score of a round sends the next round to the group.')
+  s.addNotes('Four steps. Paste and Pair happen before the tournament; Play and Post happen during it, and Post is automatic: the last score of a round sends the next round to the group.')
 }
 
 // 4 — Paste
@@ -172,9 +172,9 @@ pres.addSection({ title: 'How it works' })
   bullets(s, [
     ['Your format, as it is', 'The date line, the time line and the numbered list the group already uses. Copied from a phone or from WhatsApp Desktop.'],
     ['Read, then checked by you', 'Date, start, duration, level and club fill the form. Anything it could not read is named, not guessed.'],
-    ['One tap creates the night', 'Every player signed up at once; "(dupla)" pairs stay together.'],
+    ['One tap creates the tournament', 'Every player signed up at once; "(dupla)" pairs stay together.'],
   ], 8.1, 1.95, 4.6, 4.9)
-  s.addNotes('Clip: the organizer pastes the club\'s usual WhatsApp message, presses Read the message, checks what was understood, and creates the night with all eight players signed up.')
+  s.addNotes('Clip: the organizer pastes the club\'s usual WhatsApp message, presses Read the message, checks what was understood, and creates the tournament with all eight players signed up.')
 }
 
 // 5 — Pair
@@ -185,7 +185,7 @@ pres.addSection({ title: 'How it works' })
   video(s, 'v3-pairs', M, 1.95, 7.0)
   bullets(s, [
     ['Drag, or tap two players', 'Works with a thumb on a phone as well as a mouse.'],
-    ['Pair up the rest at random', 'Fills every empty seat; on a mixed night, one of each per pair.'],
+    ['Pair up the rest at random', 'Fills every empty seat; on a mixed level, one of each per pair.'],
     ['Balance by level', 'Strongest with weakest, so every pair adds up to about the same.'],
   ], 8.1, 1.95, 4.6, 4.9)
   s.addNotes('Clip: one player is placed by hand, the rest are paired at random, and the pairs are saved. Balance by level uses each player\'s saved level.')
@@ -255,8 +255,8 @@ pres.addSection({ title: 'For the club' })
   frame(s, file('player.png'), 5.43, 1.45, w, h, 'player-shot')
   bullets(s, [
     ['Every player, kept', 'Everyone who ever signed up, filled in from sign-ups and pasted messages.'],
-    ['Levels with a history', 'A 1 to 7 level per player. Each change is kept with its date and a note: "won three nights running".'],
-    ['Used on the night', 'Levels show on the pairs board and drive Balance by level.'],
+    ['Levels with a history', 'A 1 to 7 level per player. Each change is kept with its date and a note: "won three tournaments running".'],
+    ['Used on the day', 'Levels show on the pairs board and drive Balance by level.'],
   ], M, 1.55, 4.4, 5.3)
   s.addNotes('The player register. Levels are the same 1 to 7 ladder the tournaments use; the history makes level decisions explainable to players.')
 }
@@ -270,7 +270,7 @@ pres.addSection({ title: 'For the club' })
     ['phone', 'Phone first', 'Everything works one-handed on a phone; the desktop is a bonus.'],
     ['chats', 'WhatsApp and Telegram', 'One message, both groups. Copy buttons everywhere for WhatsApp.'],
     ['flag', 'Several clubs', 'Play at home or away. Each club with its own address and map link.'],
-    ['court', 'Courts per night', 'Name them, add or remove them for one night without touching the next.'],
+    ['court', 'Courts per tournament', 'Name them, add or remove them for one tournament without touching the next.'],
     ['trophy', 'Standings ready to share', 'A real table on screen, and the same table as a message for the group.'],
   ]
   const tw = (W - 2 * M - 2 * 0.35) / 3, th = 2.25
@@ -281,7 +281,7 @@ pres.addSection({ title: 'For the club' })
     s.addText(head, { x: x + 1.05, y: y + 0.3, w: tw - 1.3, h: 0.6, fontSize: 18, bold: true, color: HEX.ink, margin: 0, valign: 'middle', isTextBox: true, objectName: `tile-head-${i}` })
     s.addText(body, { x: x + 0.3, y: y + 1.05, w: tw - 0.6, h: 1.05, fontSize: 14, color: HEX.muted, margin: 0, valign: 'top', isTextBox: true, objectName: `tile-body-${i}` })
   }
-  s.addNotes('The details that make it fit a real club: languages, phones, both chat apps, several venues, courts that change from night to night, and standings ready to share.')
+  s.addNotes('The details that make it fit a real club: languages, phones, both chat apps, several venues, courts that change from one tournament to the next, and standings ready to share.')
 }
 
 // 11 — Coming next
@@ -311,7 +311,7 @@ pres.addSection({ title: 'Next' })
 {
   const s = pres.addSlide({ masterName: 'TITLE', sectionTitle: 'Next' })
   s.addImage({ data: logo, x: M, y: 0.9, w: 0.95, h: 0.95, objectName: 'logo' })
-  s.addText('Your next night, without the paper', { placeholder: 'title' })
+  s.addText('Your next tournament, without the paper', { placeholder: 'title' })
   s.addText('We set up your club and courts. You paste your usual message. Your players get every round on their phones.', { placeholder: 'body' })
   frame(s, file('phone-board.png'), 8.0, 0.95, 2.35, 2.35 * 954 / 441, 'phone-board')
   frame(s, file('phone-pairs.png'), 10.55, 1.45, 2.15, 2.15 * 954 / 441, 'phone-pairs')
