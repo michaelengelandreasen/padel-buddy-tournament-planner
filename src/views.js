@@ -2346,7 +2346,7 @@ export function mePage({ account, nights = [], notice = '', t }) {
     ${can('player') ? `<div class="card"><h2>${ic('trophy')}${esc(t('yourNights'))}</h2>
       ${nights.length ? `<ul class="nights">${nights.map((n) => `<li><a href="/t/${n.id}/tv"><strong>${esc(n.level || '')}</strong> ${
         esc(humanWhen(n, { lang: t.lang }))}</a>${n.venue ? ` <span class="muted">· ${esc(n.venue)}</span>` : ''}</li>`).join('')}</ul>`
-        : `<p class="muted">${esc(t('noNightsYet'))}</p>`}
+        : `<p class="muted">${esc(t('noTournamentsMe'))}</p>`}
     </div>` : ''}
     <form method="post" action="/logout" class="signout"><button class="btn ghost">${ic('x')}${esc(t('signOut'))}</button></form>`,
   { nav: who().account && (who().account.active.has('organizer') || who().account.active.has('club')) ? navFor('/me', t) : '', t })
