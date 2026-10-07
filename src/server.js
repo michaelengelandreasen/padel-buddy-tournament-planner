@@ -23,6 +23,8 @@ import { LANGUAGES, isLanguage, translator } from './i18n.js'
 import { bus, listen } from './messaging/transport.js'
 import { normalizeCommand } from './messaging/telegram.js'
 import * as V from './views.js'
+import * as A from './accounts.js'
+import { channelsFor, sendCode, showCodes } from './notify.js'
 
 const groups = bus()
 const PORT = Number(process.env.PORT || 8080)
@@ -86,8 +88,58 @@ async function body(req) {
   if ((req.headers['content-type'] || '').includes('application/json')) {
     try { return JSON.parse(raw || '{}') } catch { return {} }
   }
-  return Object.fromEntries(new URLSearchParams(raw))
+  const params = new URLSearchParams(raw)
+  const out = Object.fromEntries(params)
+  // Checkboxes that share a name arrive once per box ticked.
+  if (params.has('roles')) out.roles = params.getAll('roles')
+  return out
 }
+
+/** `name=value; other=…` → {name: value}. */
+const cookies = (req) => Object.fromEntries(String(req.headers.cookie || '').split(/;\s*/).filter(Boolean)
+  .map((c) => { const i = c.indexOf('='); return [c.slice(0, i), decodeURIComponent(c.slice(i + 1))] }))
+const secure = (req) => String(req.headers['x-forwarded-proto'] || '').includes('https')
+  || /\.(dev|com|pt|es|net|org)$/.test(String(req.headers.host || '').split(':')[0])
+const cookie = (req, name, value, maxAgeSec) => `${name}=${encodeURIComponent(value)}; Path=/; HttpOnly; SameSite=Lax${
+  secure(req) ? '; Secure' : ''}; Max-Age=${maxAgeSec}`
+const baseUrl = (req) => `${secure(req) ? 'https' : 'http'}://${req.headers['x-forwarded-host'] || req.headers.host}`
+
+/**
+ * Who may open what, with accounts on. `open` needs nobody: signing in, the
+ * clubhouse TV and the player's own "where do I go" lookup. `account` is any
+ * signed-in person. `run` is an organizer or a club. `club` is the club alone.
+ */
+function access(path, method) {
+  if (/^\/(healthz|register|login(\/(resend|link))?|verify|logout)$/.test(path)) return 'open'
+  if (method === 'GET' && /^\/(t\/\d+\/tv|api\/tournaments\/\d+\/round)$/.test(path)) return 'open'
+  if (/^\/me(\/|$)/.test(path)) return 'account'
+  if (/^\/(settings|venues|courts|home|members)(\/|$)/.test(path)) return 'club'
+  return 'run'
+}
+
+/** Send a sign-in code and remember, in a signed cookie, who is signing in. */
+async function startSignIn(req, account, channel, t, next = '') {
+  const ways = channelsFor(account)
+  const via = ways.includes(channel) ? channel : ways[0]
+  if (!via) return { html: V.loginPage({ form: {}, error: 'noChannel', t }), code: 503 }
+  const c = A.newCode(account.id, via)
+  if (c.error) return { html: V.loginPage({ form: {}, error: c.error, t }), code: 429 }
+  let sent
+  try { sent = await sendCode(account, via, c, { lang: t.lang, base: baseUrl(req) }) } catch (err) {
+    console.error(err)
+    return { html: V.loginPage({ form: {}, error: 'codeNotSent', t }), code: 502 }
+  }
+  const state = [account.id, via, next, sent.shown || '', sent.link || ''].map((x) => String(x).replace(/\|/g, '')).join('|')
+  return { to: '/verify', cookies: [cookie(req, 'pb_login', A.sign(state), 20 * 60)] }
+}
+function signInState(req) {
+  const v = A.unsign(cookies(req).pb_login)
+  if (!v) return null
+  const [id, channel, next, shown, link] = v.split('|')
+  const account = A.getAccount(Number(id))
+  return account ? { account, channel, next, shown: showCodes() ? shown : '', link: showCodes() ? link : '' } : null
+}
+const landing = (account, next) => (next && /^\/(?!\/)/.test(next) ? next : A.can(account, 'run') ? '/' : '/me')
 
 /**
  * Everything a tournament view needs, derived in one place.
@@ -106,6 +158,81 @@ function view(id) {
 }
 
 const routes = [
+  // ---- accounts ----
+  ['GET', /^\/register$/, (_m, _r, t) => ({ html: V.registerPage({ t }) })],
+  ['POST', /^\/register$/, async (_m, req, t) => {
+    const f = await body(req)
+    const r = A.register(f)
+    if (r.error) return { html: V.registerPage({ form: f, error: r.error, t }), code: 400 }
+    return startSignIn(req, r.account, '', t)
+  }],
+  ['GET', /^\/login$/, (_m, req, t) => {
+    const next = new URL(req.url, 'http://x').searchParams.get('next') || ''
+    return { html: V.loginPage({ form: { next }, t }) }
+  }],
+  ['POST', /^\/login$/, async (_m, req, t) => {
+    const f = await body(req)
+    const email = A.cleanEmail(f.who)
+    const phone = email ? '' : A.cleanPhone(f.who)
+    const hit = A.findAccount({ email, phone })
+    if (!hit) return { html: V.loginPage({ form: f, error: email || phone ? 'noSuchAccount' : 'regBadContact', t }), code: 404 }
+    return startSignIn(req, A.getAccount(hit.id), email ? 'email' : '', t, f.next || '')
+  }],
+  ['POST', /^\/login\/resend$/, async (_m, req, t) => {
+    const s = signInState(req)
+    if (!s) return { to: '/login' }
+    const f = await body(req)
+    return startSignIn(req, s.account, f.channel, t, s.next)
+  }],
+  ['GET', /^\/verify$/, (_m, req, t) => {
+    const s = signInState(req)
+    if (!s) return { to: '/login' }
+    return { html: V.verifyPage({ ...s, channels: channelsFor(s.account), t }) }
+  }],
+  ['POST', /^\/verify$/, async (_m, req, t) => {
+    const s = signInState(req)
+    if (!s) return { to: '/login' }
+    const f = await body(req)
+    const ok = A.checkCode(s.account.id, f.code)
+    if (ok.error) return { html: V.verifyPage({ ...s, channels: channelsFor(s.account), error: ok.error, t }), code: 400 }
+    return { to: landing(s.account, s.next), cookies: [
+      cookie(req, 'pb_session', A.newSession(s.account.id), 60 * 86400), cookie(req, 'pb_login', '', 0)] }
+  }],
+  ['GET', /^\/login\/link$/, (_m, req) => {
+    const id = A.checkLink(new URL(req.url, 'http://x').searchParams.get('token'))
+    if (!id) return { to: '/login' }
+    return { to: landing(A.getAccount(id), ''), cookies: [cookie(req, 'pb_session', A.newSession(id), 60 * 86400)] }
+  }],
+  ['POST', /^\/logout$/, (_m, req) => {
+    A.endSession(cookies(req).pb_session)
+    return { to: '/login', cookies: [cookie(req, 'pb_session', '', 0)] }
+  }],
+  ['GET', /^\/me$/, (_m, req, t) => {
+    const account = V.viewer.getStore().account
+    const q = new URL(req.url, 'http://x').searchParams
+    const nights = account.player_id ? (getPlayer(account.player_id)?.nights || []) : []
+    const notice = q.has('saved') ? t('playerSaved') : q.get('role') === 'active' ? t('roleAdded')
+      : q.get('role') === 'pending' ? t('roleRequested') : ''
+    return { html: V.mePage({ account, nights, notice, t }) }
+  }],
+  ['POST', /^\/me$/, async (_m, req) => {
+    A.updateProfile(V.viewer.getStore().account.id, await body(req))
+    return { to: '/me?saved=1' }
+  }],
+  ['POST', /^\/me\/role$/, async (_m, req) => {
+    const f = await body(req)
+    return { to: `/me?role=${A.grantRole(V.viewer.getStore().account.id, f.role) || ''}` }
+  }],
+  ['GET', /^\/members$/, (_m, req, t) => {
+    const q = new URL(req.url, 'http://x').searchParams
+    return { html: V.membersPage({ accounts: A.listAccounts(), t,
+      notice: q.has('approved') ? t('roleApproved') : q.has('removed') ? t('roleRemoved') : q.has('kept') ? t('lastClubKept') : '' }) }
+  }],
+  ['POST', /^\/members\/(\d+)\/(player|organizer|club)\/(active|remove)$/, (m) => {
+    const ok = A.setRoleStatus(Number(m[1]), m[2], m[3])
+    return { to: `/members?${!ok ? 'kept' : m[3] === 'active' ? 'approved' : 'removed'}=1` }
+  }],
+
   ['GET', /^\/$/, (_m, _r, t) => ({ html: V.overview({
     club: getClub(), home: homePlace(), venues: listVenues(), tournaments: listTournaments(),
     courts: listCourts(), live: groups.live, pinned: activeTournament()?.id || 0,
@@ -567,7 +694,32 @@ const routes = [
 
 createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x')
-  if (!OPEN_PATHS.has(url.pathname) && !authOk(req)) {
+  // With accounts on, a signed-in person replaces the shared login, and what
+  // they may open depends on their roles (see access()).
+  const accountsOn = A.accountsOn()
+  const account = accountsOn ? A.sessionAccount(cookies(req).pb_session) : null
+  if (account) account.pendingCount = account.active.has('club') ? A.pendingCount() : 0
+  if (accountsOn) {
+    const need = access(url.pathname, req.method)
+    if (need !== 'open' && !account) {
+      if (req.method !== 'GET') { res.writeHead(401); return res.end() }
+      return seeOther(res, `/login?next=${encodeURIComponent(url.pathname + url.search)}`)
+    }
+    if ((need === 'run' && !A.can(account, 'run')) || (need === 'club' && !A.can(account, 'club'))) {
+      // A player who opens the console lands on their own page instead.
+      if (req.method === 'GET' && need === 'run') return seeOther(res, '/me')
+      return V.viewer.run({ accounts: true, account }, () =>
+        html(res, V.forbiddenPage({ need, t: translator(clubLanguage()) }), 403))
+    }
+  }
+  return V.viewer.run({ accounts: accountsOn, account }, () => route(req, res, url))
+}).listen(PORT, () => {
+  console.log(`padel-tournament-planner on :${PORT} (groups: ${groups.name}${A.accountsOn() ? ', accounts on' : ''})`)
+  startTelegram()
+})
+
+async function route(req, res, url) {
+  if (!A.accountsOn() && !OPEN_PATHS.has(url.pathname) && !authOk(req)) {
     res.writeHead(401, {
       'www-authenticate': 'Basic realm="Padel Buddy", charset="UTF-8"',
       'content-type': 'text/plain; charset=utf-8',
@@ -584,6 +736,7 @@ createServer(async (req, res) => {
     if (!m) continue
     try {
       const out = await fn(m, req, t)
+      if (out.cookies) res.setHeader('set-cookie', out.cookies)
       if (out.to) return seeOther(res, out.to)
       if (out.json) return json(res, out.json, out.code || 200)
       return html(res, out.html, out.code || 200)
@@ -594,10 +747,7 @@ createServer(async (req, res) => {
     }
   }
   html(res, V.page('404', `<h1>404</h1><p><a href="/">${t('appName')}</a></p>`, { t }), 404)
-}).listen(PORT, () => {
-  console.log(`padel-tournament-planner on :${PORT} (groups: ${groups.name})`)
-  startTelegram()
-})
+}
 
 /**
  * Let the club talk to the bot from its Telegram group.
