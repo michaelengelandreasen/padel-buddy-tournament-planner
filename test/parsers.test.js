@@ -109,11 +109,11 @@ test('dates: what the club reads', () => {
 // The sign-up board and the language layer.
 // ---------------------------------------------------------------------------
 const SIGNUPS = [
-  { id: 1, name: 'Mike', gender: 'M', partner: '' },
-  { id: 2, name: 'Paula Quevedo', gender: 'F', partner: 'Luís Miranda' },
-  { id: 3, name: 'Luís Miranda', gender: 'M', partner: 'Paula Quevedo' },
-  { id: 4, name: 'Adriana Osório', gender: 'F', partner: 'Manuel Lima' },
-  { id: 5, name: 'Manuel Lima', gender: 'M', partner: 'Adriana Osório' },
+  { id: 1, name: 'Nico', gender: 'M', partner: '' },
+  { id: 2, name: 'Laura Quintas', gender: 'F', partner: 'Hélio Varela' },
+  { id: 3, name: 'Hélio Varela', gender: 'M', partner: 'Laura Quintas' },
+  { id: 4, name: 'Daniela Seabra', gender: 'F', partner: 'Jaime Costa' },
+  { id: 5, name: 'Jaime Costa', gender: 'M', partner: 'Daniela Seabra' },
 ]
 
 test('board: four slots a court, alternating for a mixed level', () => {
@@ -126,10 +126,10 @@ test('board: four slots a court, alternating for a mixed level', () => {
   assert.deepEqual(board.slice(0, 4).map((s) => s.want), ['F', 'M', 'F', 'M'])
   // Pairs are seated first, woman first so she lands in the slot that wants her.
   assert.deepEqual(board.slice(0, 4).map((s) => s.player.name),
-    ['Paula Quevedo', 'Luís Miranda', 'Adriana Osório', 'Manuel Lima'])
+    ['Laura Quintas', 'Hélio Varela', 'Daniela Seabra', 'Jaime Costa'])
   // The partnerless player takes the next free slot his gender fits, not simply
   // the next free slot — that would put a man on a woman's line.
-  assert.equal(board[5].player.name, 'Mike')
+  assert.equal(board[5].player.name, 'Nico')
   assert.equal(board[4].player, null)
 })
 
@@ -256,12 +256,12 @@ test('rounds: a first name finds its pair, accents and case aside; two pairs sta
 
 test('telegram: chat markup becomes HTML that a name cannot break', () => {
   assert.equal(toHtml('*Court 1*\nAna_Rita & Rui <3'), '<b>Court 1</b>\nAna_Rita &amp; Rui &lt;3')
-  assert.equal(toHtml('Sign up: `!in Mike M partner Sofia`'), 'Sign up: <code>!in Mike M partner Sofia</code>')
+  assert.equal(toHtml('Sign up: `!in Nico M partner Sofia`'), 'Sign up: <code>!in Nico M partner Sofia</code>')
   assert.equal(toHtml('_note_ and a * on its own'), '<i>note</i> and a * on its own')
 })
 
 test('telegram: slash commands, with or without the bot name, are the club syntax', () => {
-  assert.equal(normalizeCommand('/where mike', 'padelbot'), '!where mike')
+  assert.equal(normalizeCommand('/where nico', 'padelbot'), '!where nico')
   assert.equal(normalizeCommand('/list@padelbot', 'padelbot'), '!list')
   assert.equal(normalizeCommand('/list@otherbot', 'padelbot'), '')
   assert.equal(normalizeCommand('/start', 'padelbot'), '!help')
@@ -292,11 +292,11 @@ test('import: the club message yields date, window, level, venue and roster', ()
 test('import: names are tidied and "(dupla)" pairs a line with the one above', () => {
   const r = parseBoard(MAIA, { now: NOW })
   const by = Object.fromEntries(r.players.map((p) => [p.n, p]))
-  assert.equal(by[8].name, 'Pedro')
-  assert.equal(by[9].name, 'Rafa Campos')
-  assert.equal(by[14].name, 'Tiago Delgado')
-  assert.equal(by[14].partner, 'Pedro Delgado')
-  assert.equal(by[13].partner, 'Tiago Delgado')
+  assert.equal(by[8].name, 'Bruno')
+  assert.equal(by[9].name, 'Zeca Ramos')
+  assert.equal(by[14].name, 'Caio Quaresma')
+  assert.equal(by[14].partner, 'Abel Quaresma')
+  assert.equal(by[13].partner, 'Caio Quaresma')
   assert.equal(by[15].partner, '')
   assert.equal(tidyName('maria de sousa'), 'Maria de sousa'.replace('sousa', 'Sousa'))
   assert.equal(tidyName('McDonald'), 'McDonald')
@@ -351,21 +351,21 @@ test('pairs: seats become partners both ways, and unknown or repeated names are 
 
 test('import: a desktop copy with WhatsApp prefixes, and a roster without the racket', () => {
   const copied = [
-    '[12/09/26, 10:15:23] Mike: 📅 13/09/26 - Domingo',
-    '[12/09/26, 10:15:23] Mike: ⏱️ 09:30- 11:30',
-    '[12/09/26, 10:15:23] Mike: M9 - MAIA',
-    '[12/09/26, 10:15:23] Mike: 1🎾 Rui Basto',
-    '[12/09/26, 10:15:23] Mike: 2🎾 Ana',
+    '[12/09/26, 10:15:23] Nico: 📅 13/09/26 - Domingo',
+    '[12/09/26, 10:15:23] Nico: ⏱️ 09:30- 11:30',
+    '[12/09/26, 10:15:23] Nico: M9 - MAIA',
+    '[12/09/26, 10:15:23] Nico: 1🎾 Ivo Lemos',
+    '[12/09/26, 10:15:23] Nico: 2🎾 Ana',
   ].join('\r\n')
   const r = parseBoard(copied, { now: NOW })
   assert.equal(r.date, '2026-09-13')
   assert.equal(r.time, '09:30')
   assert.equal(r.duration_min, 120)
   assert.equal(r.location, 'M9 - Maia')
-  assert.deepEqual(r.players.map((p) => p.name), ['Rui Basto', 'Ana'])
+  assert.deepEqual(r.players.map((p) => p.name), ['Ivo Lemos', 'Ana'])
 
-  const plain = parseBoard('📅 13/09/26\n⏱ 09:30-11:30\n1. Rui Basto\n2 - Ana\n3) Zé\n4. Bea\n5. Tó', { now: NOW })
-  assert.deepEqual(plain.players.map((p) => p.name), ['Rui Basto', 'Ana', 'Zé', 'Bea', 'Tó'])
+  const plain = parseBoard('📅 13/09/26\n⏱ 09:30-11:30\n1. Ivo Lemos\n2 - Ana\n3) Zé\n4. Bea\n5. Tó', { now: NOW })
+  assert.deepEqual(plain.players.map((p) => p.name), ['Ivo Lemos', 'Ana', 'Zé', 'Bea', 'Tó'])
   assert.equal(plain.courts, 2)
   assert.equal(plain.location, '')
 })
@@ -432,4 +432,44 @@ test('es: dates and clocks read in Spanish, and the parser takes Spanish days an
   assert.equal(parseWhen('viernes a las 20:30', { now }).time, '20:30')
   assert.equal(parseWhen('miércoles', { now }).date, '2026-09-16')
   assert.equal(translator('es')('whosIn'), '¿Quién se apunta?')
+})
+
+// ---- importing from Telegram ----
+test('import: the board the bot posts in Telegram — slots, genders, reserves, no prose', () => {
+  const board = [
+    'Nico, [07.10.26 21:15]',
+    '📆 Sunday 18/10/2026',
+    '🕒 10:00-12:00',
+    '📈 Nonstop MX4',
+    '',
+    '📍 Riverside Padel',
+    'https://maps.google.com/?q=Porto',
+    '',
+    '2 Courts',
+    '',
+    '👩🏻 Joana Freitas',
+    '👦🏼 Pedro Antunes',
+    '👩🏻',
+    '👦🏼 Bruno Castro',
+    '',
+    'Reserves (1)',
+    '• Teresa Vale',
+    '',
+    'Who’s in?',
+    '• not a player, part of the club rules',
+  ].join('\n')
+  const r = parseBoard(board, { now: NOW })
+  assert.equal(r.date, '2026-10-18')
+  assert.equal(r.time, '10:00')
+  assert.equal(r.duration_min, 120)
+  assert.equal(r.level, 'MX-4')
+  assert.equal(r.location, 'Riverside Padel')
+  assert.deepEqual(r.players.map((p) => [p.name, p.gender]),
+    [['Joana Freitas', 'F'], ['Pedro Antunes', 'M'], ['Bruno Castro', 'M'], ['Teresa Vale', '']])
+})
+
+test('import: a numbered list copied from Telegram Desktop drops the name-and-time headers', () => {
+  const r = parseBoard('Nico, [07.10.26 21:15]:\n📅 18/10/26\n⏱ 10:00-12:00\nMX4 - Riverside\n\nNico, [07.10.26 21:16]\n1🎾 Ana\n2🎾 Rui', { now: NOW })
+  assert.deepEqual(r.players.map((p) => p.name), ['Ana', 'Rui'])
+  assert.equal(r.location, 'Riverside')
 })

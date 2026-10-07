@@ -7,7 +7,7 @@ The point of it: the club runs its nights off a printed sheet, a PDF and a
 WhatsApp group, and between rounds twenty people walk to a wall to find their
 own name. Here the group gets one message per round saying who is on which
 court and where every pair goes next, posted the moment the previous round's
-last score is typed in — and anyone can ask `!where Mike` and get their own
+last score is typed in — and anyone can ask `!where Nico` and get their own
 answer. The TV view shows the same board on the clubhouse screen.
 
 Live (VPN): https://padel-tournament-planner.mikehome.users.ctx7.dev
@@ -55,7 +55,7 @@ cheap to reverse.
   how it learns which group it lives in. The sign-up board is one pinned message
   it edits in place on every `!in`/`!out`; round messages are posted fresh so
   they land on phones. Only group admins can open a tournament. Commands work
-  with a slash too (`/where mike`). Both channels run at once: every message goes
+  with a slash too (`/where nico`). Both channels run at once: every message goes
   to Telegram and into the WhatsApp outbox. `src/messaging/` — `transport.js` is
   the bus, `telegram.js` the live channel, `draft.js` the outbox.
 - **Google Sheets.** Not wired. The TV view does the job Sheets was wanted for —
@@ -78,12 +78,12 @@ https://maps.app.goo…      https://maps.app.goo…
 
 3 Courts                   3 Campos
 
-👩🏻 Paula Quevedo           👩🏻 Paula Quevedo
-👦🏼 Luís Miranda            👦🏼 Luís Miranda
-👩🏻 Adriana Osório          👩🏻 Adriana Osório
-👦🏼 Manuel Lima             👦🏼 Manuel Lima
+👩🏻 Laura Quintas           👩🏻 Laura Quintas
+👦🏼 Hélio Varela            👦🏼 Hélio Varela
+👩🏻 Daniela Seabra          👩🏻 Daniela Seabra
+👦🏼 Jaime Costa             👦🏼 Jaime Costa
 👩🏻                        👩🏻
-👦🏼 Mike                    👦🏼 Mike
+👦🏼 Nico                    👦🏼 Nico
 👩🏻                        👩🏻
 👦🏼                        👦🏼
 
@@ -123,7 +123,7 @@ start and duration from the time window (`09:30- 11:30` → 120 min), the level
 if the message has one (`MX4 - Padel Tribe`), the venue otherwise (`M9 - MAIA`
 is the club M9 in Maia, and the board then prints that instead of the club
 name), courts (players ÷ 4), and the numbered roster with names tidied
-(`rafa Campos` → Rafa Campos) and `(dupla)` lines paired with the line above. What it could
+(`zeca Ramos` → Zeca Ramos) and `(dupla)` lines paired with the line above. What it could
 not read is said per field and left for the host; *Create with 16 players*
 makes the tournament and signs everyone up in one go. `src/import.js`, tested
 against the real message in `test/fixtures/maia.txt`.
@@ -235,8 +235,8 @@ Old rows are dragged through the same parsers on boot (`migrate()` in
 
 ```
 !tournament non-stop level MX-4 date 2026-09-05 11:00 courts 3 duration 120
-!in Mike M partner Sofia
-!out Mike
+!in Nico M partner Sofia
+!out Nico
 !list
 !levels
 !help
@@ -249,7 +249,7 @@ recent, so `!table` still answers on Sunday for Saturday. A club announces
 Friday while Saturday is still on court, so "newest open" was never the answer.
 
 ```
-!where Mike      where you play now, and where you go next   (!onde)
+!where Nico      where you play now, and where you go next   (!onde)
 !round           the round being played, court by court      (!ronda)
 !next            where every pair goes for the next round    (!seguir)
 !table           the standings                               (!tabela)
@@ -262,21 +262,21 @@ A round message, generated from the stored matches:
 ⏱ 11:12AM → 11:24AM
 
 *Court 1*
-Paula Quevedo & Luís Miranda
-🆚 Sofia Marques & Tiago Ferreira
+Laura Quintas & Hélio Varela
+🆚 Raquel Dantas & Fausto Correia
 
 *Court 2*
-Adriana Osório & Manuel Lima
-🆚 Maria Aries & Filipe Herculano
+Daniela Seabra & Jaime Costa
+🆚 Lúcia Abreu & Rodrigo Barreira
 
-☕ Sitting out: Rita Bessa & André Pinto
+☕ Sitting out: Vera Sales & Simão Brito
 
 *⏭ Next round · 11:24AM*
-Court 1 — Paula Quevedo & Luís Miranda
-Court 1 — Rita Bessa & André Pinto
-Court 2 — Maria Aries & Filipe Herculano
-Court 2 — Sofia Marques & Tiago Ferreira
-☕ Adriana Osório & Manuel Lima
+Court 1 — Laura Quintas & Hélio Varela
+Court 1 — Vera Sales & Simão Brito
+Court 2 — Lúcia Abreu & Rodrigo Barreira
+Court 2 — Raquel Dantas & Fausto Correia
+☕ Daniela Seabra & Jaime Costa
 ```
 
 On nights of up to four courts the Rounds tab also offers **All rounds** — every
