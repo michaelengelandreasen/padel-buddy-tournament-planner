@@ -15,6 +15,7 @@
 import { categories, grades, isMixedLevel, levelLabel, levelShort, parseLevel } from './levels.js'
 import { clock, humanWhen, todayISO, humanDate } from './dates.js'
 import { courtName, courtsByTeam, currentRound, roundComplete, roundPlan, roundsOf } from './rounds.js'
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { LANGUAGES, translator } from './i18n.js'
 import { FORMATS, RULE_CHOICES, dynamic, individual, minimum, plannedRounds, rulesOf } from './formats/index.js'
 
@@ -810,6 +811,39 @@ pre.msg{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--surface-2);
   white-space:nowrap;display:inline-flex;align-items:center;gap:7px;transition:color .15s ease-out}
 .tabs button .i{width:18px;height:18px}
 .i.brand{stroke:none}
+header.top .me{flex:none;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;margin-left:8px;
+  background:var(--brand-deep);color:var(--brand-soft);font-weight:800;font-size:.85rem;text-decoration:none;position:relative}
+header.top .me.dot::after{content:'';position:absolute;top:0;right:0;width:9px;height:9px;border-radius:50%;background:var(--accent);
+  box-shadow:0 0 0 2px var(--surface)}
+header.top .signin{flex:none;display:inline-flex;align-items:center;gap:6px;margin-left:8px;font-weight:700;text-decoration:none;color:var(--ink)}
+.auth{max-width:560px;margin:0 auto}
+@media (max-width:440px){header.top:has(.me) .brand strong,header.top:has(.signin) .brand strong{display:none}}
+.auth .lede,.lede{color:var(--muted);margin:-4px 0 16px;max-width:60ch}
+fieldset.choices{border:0;padding:0;margin:0 0 6px;display:grid;gap:10px}
+fieldset.choices legend{font-weight:700;margin-bottom:8px;padding:0}
+.choice{display:block;margin:0;cursor:pointer;font-size:1rem;font-weight:400;letter-spacing:0;text-transform:none;color:var(--ink)}
+.choice .box strong{font-size:1.02rem}
+.choice input{position:absolute;opacity:0;pointer-events:none}
+.choice .box{display:grid;grid-template-columns:auto 1fr;column-gap:10px;row-gap:2px;align-items:center;padding:12px 14px;
+  border:1.5px solid var(--line);border-radius:12px;background:var(--surface-2);transition:border-color .15s ease-out,background .15s ease-out}
+.choice .box .i{grid-row:span 2;width:22px;height:22px;color:var(--muted)}
+.choice .box .muted{grid-column:2;font-size:.9rem}
+.choice input:checked+.box{border-color:var(--brand);background:color-mix(in oklab,var(--brand) 10%,var(--surface-2))}
+.choice input:checked+.box .i{color:var(--brand)}
+.choice input:focus-visible+.box{outline:2px solid var(--brand);outline-offset:2px}
+input.code{font-size:1.6rem;letter-spacing:.3em;font-variant-numeric:tabular-nums;text-align:center;max-width:12ch}
+.flash.demo{border-color:var(--accent)}
+.grid2{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr));align-items:start}
+.grid2>.card{margin:0}
+ul.roles,ul.nights{list-style:none;padding:0;margin:0 0 12px;display:grid;gap:8px}
+ul.roles li{display:flex;gap:10px;align-items:center}
+.inline-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.inline-row select{width:auto}
+.signout{margin-top:18px}
+.rolechip{display:inline-flex;align-items:center;gap:4px;padding:2px 4px 2px 10px;border-radius:999px;border:1px solid var(--line);margin:2px 4px 2px 0}
+.rolechip.pending{border-color:var(--accent)}
+.btn.small{min-height:30px;padding:0 10px;font-size:.85rem}
+.small{font-size:.85rem}
 .fh{display:none}.fh.on{display:block}
 form:has(#format) .fh{display:none}
 ${FORMATS.map((f) => `form:has(#format option[value="${f}"]:checked) .fh[data-f="${f}"]{display:block}`).join('')}
@@ -1071,6 +1105,23 @@ const langToggle = (lang, here) => `<form class="lang" method="post" action="/la
     LANGUAGES.map((l) => `<option value="${l.code}"${l.code === lang ? ' selected' : ''}>${esc(l.label)}</option>`).join('')}
   </select></label><noscript><button class="btn ghost">OK</button></noscript></form>`
 
+/**
+ * Who is looking, set once per request by the server: `{accounts, account}`.
+ * Read by the header and the nav, so no view has to be handed the account.
+ */
+export const viewer = new AsyncLocalStorage()
+const who = () => viewer.getStore() || {}
+const initials = (name) => String(name || '?').trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase()
+
+/** The header's account control: your initials, or a way in. */
+function accountLink(t) {
+  const { accounts, account } = who()
+  if (!accounts) return ''
+  return account
+    ? `<a class="me${account.pendingCount ? ' dot' : ''}" href="/me" title="${esc(account.name)}" aria-label="${esc(t('myAccount'))}">${esc(initials(account.name))}</a>`
+    : `<a class="signin" href="/login">${ic('user')}<span>${esc(t('signIn'))}</span></a>`
+}
+
 export function page(title, body, { nav = '', script = '', t = translator(), here = '', tab = '' } = {}) {
   return `<!doctype html><html lang="${t.lang}"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -1080,13 +1131,15 @@ export function page(title, body, { nav = '', script = '', t = translator(), her
   tab ? ` data-tab="${esc(tab)}"` : ''}>
 <header class="top"><a class="brand" href="/">${LOGO}
 <strong>Padel Buddy</strong><small>${esc(t('navTournaments'))}</small></a>
-<nav>${nav}</nav>${langToggle(t.lang, here)}</header>
+<nav>${nav}</nav>${langToggle(t.lang, here)}${accountLink(t)}</header>
 ${SPRITE}
 <div class="wrap">${body}</div><script>${AJAX_JS}</script><script>${TABS_JS}</script><script>${PAIRS_JS}</script><script>${COPY_JS}</script><script>${POST_JS}</script><script>${SCORES_JS}</script>${script ? `<script>${script}</script>` : ''}<script>pbBoot()</script></body></html>`
 }
 
 const navFor = (here, t) => [['/', 'navOverview', 'home'], ['/tournaments', 'navTournaments', 'trophy'],
   ['/players', 'navPlayers', 'user'], ['/settings', 'navSettings', 'sliders'], ['/groups', 'navGroups', 'send']]
+  // With accounts on, Settings belongs to the club role; organizers run nights.
+  .filter(([h]) => h !== '/settings' || !who().accounts || who().account?.active?.has('club'))
   .map(([h, key, icon]) => {
     // The phone tab bar gives each item a fifth of the screen; a label too long
     // for that has a short form (navTournamentsTab…), used there and only there.
@@ -2174,3 +2227,149 @@ export function playerPage({ player: p, notice = '', t }) {
 }
 
 export const _internal = { esc, parseLevel, statusLabel }
+
+
+// ---- accounts: register, sign in, your account, members ----
+
+const ROLE_KEYS = { player: ['rolePlayer', 'rolePlayerHelp', 'user'], organizer: ['roleOrganizer', 'roleOrganizerHelp', 'trophy'], club: ['roleClub', 'roleClubHelp', 'flag'] }
+const authPage = (title, body, t) => page(title, `<div class="auth">${body}</div>`, { t })
+const errLine = (error, t) => (error ? `<p class="err" role="alert">${ic('alert')} ${esc(t(error))}</p>` : '')
+
+/** Hand and side, the two things a partner wants to know before the first point. */
+const profileFields = (a, t) => `
+    <div class="row">
+      <div><label for="hand">${esc(t('hand'))}</label><select id="hand" name="hand">
+        <option value="">${esc(t('notSaying'))}</option>
+        ${['right', 'left'].map((h) => `<option value="${h}"${a.hand === h ? ' selected' : ''}>${esc(t(h === 'right' ? 'handRight' : 'handLeft'))}</option>`).join('')}
+      </select></div>
+      <div><label for="side">${esc(t('side'))}</label><select id="side" name="side">
+        <option value="">${esc(t('notSaying'))}</option>
+        ${['drive', 'backhand', 'either'].map((x) => `<option value="${x}"${a.side === x ? ' selected' : ''}>${esc(t(`side_${x}`))}</option>`).join('')}
+      </select></div>
+    </div>
+    <label for="instagram">${esc(t('instagram'))}</label>
+    <input id="instagram" name="instagram" value="${esc(a.instagram || '')}" placeholder="@" autocomplete="off" maxlength="40">`
+
+export function registerPage({ form = {}, error = '', t }) {
+  const roles = [].concat(form.roles || [])
+  return authPage(t('register'), `
+    <h1>${esc(t('register'))}</h1>
+    <p class="lede">${esc(t('registerLede'))}</p>
+    <form class="card" method="post" action="/register">
+      ${errLine(error, t)}
+      <fieldset class="choices"><legend>${esc(t('chooseRoles'))}</legend>
+        ${Object.entries(ROLE_KEYS).map(([r, [name, help, icon]]) => `<label class="choice">
+          <input type="checkbox" name="roles" value="${r}"${roles.includes(r) ? ' checked' : ''}>
+          <span class="box">${ic(icon)}<strong>${esc(t(name))}</strong><span class="muted">${esc(t(help))}</span></span>
+        </label>`).join('')}
+      </fieldset>
+      <label for="name">${esc(t('yourName'))}</label>
+      <input id="name" name="name" required maxlength="80" autocomplete="name" value="${esc(form.name || '')}">
+      <div class="row">
+        <div><label for="phone">${esc(t('phone'))}</label>
+          <input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="+351 912 345 678" value="${esc(form.phone || '')}"></div>
+        <div><label for="email">${esc(t('email'))}</label>
+          <input id="email" name="email" type="email" autocomplete="email" value="${esc(form.email || '')}"></div>
+      </div>
+      <p class="hint">${esc(t('contactHelp'))}</p>
+      ${profileFields(form, t)}
+      <div class="actions"><button>${ic('arrow')}${esc(t('registerGo'))}</button>
+        <a href="/login">${esc(t('haveAccount'))}</a></div>
+    </form>`, t)
+}
+
+export function loginPage({ form = {}, error = '', t }) {
+  return authPage(t('signIn'), `
+    <h1>${esc(t('signIn'))}</h1>
+    <p class="lede">${esc(t('signInLede'))}</p>
+    <form class="card" method="post" action="/login">
+      ${errLine(error, t)}
+      <label for="who">${esc(t('phoneOrEmail'))}</label>
+      <input id="who" name="who" required autocomplete="username" value="${esc(form.who || '')}" placeholder="+351 912 345 678">
+      <div class="actions"><button>${ic('send')}${esc(t('sendCode'))}</button>
+        <a href="/register">${esc(t('noAccount'))}</a></div>
+    </form>`, t)
+}
+
+const masked = (a, channel) => (channel === 'email'
+  ? a.email.replace(/^(.).*(@.*)$/, '$1…$2')
+  : a.phone.replace(/^(\+\d{3}).*(\d{3})$/, '$1 … $2'))
+const CHANNEL_KEY = { whatsapp: 'viaWhatsapp', sms: 'viaSms', email: 'viaEmail' }
+
+export function verifyPage({ account, channel, channels = [], shown = '', link = '', error = '', t }) {
+  return authPage(t('enterCode'), `
+    <h1>${esc(t('enterCode'))}</h1>
+    <p class="lede">${esc(t('codeSentTo', { where: masked(account, channel), how: t(CHANNEL_KEY[channel]) }))}</p>
+    ${shown ? `<div class="flash demo" role="status"><strong>${esc(t('demoCode', { code: shown }))}</strong>${
+      link ? `<a href="${esc(link)}">${esc(t('demoLink'))}</a>` : ''}</div>` : ''}
+    <form class="card" method="post" action="/verify">
+      ${errLine(error, t)}
+      <label for="code">${esc(t('sixDigits'))}</label>
+      <input id="code" name="code" class="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9 ]{6,7}" maxlength="7" required autofocus>
+      <div class="actions"><button>${ic('check')}${esc(t('signInGo'))}</button></div>
+    </form>
+    ${channels.length > 1 ? `<form class="card alt" method="post" action="/login/resend">
+      <p class="muted">${esc(t('otherWay'))}</p>
+      <div class="actions">${channels.filter((c) => c !== channel).map((c) => `<button class="btn ghost" name="channel" value="${c}">${
+        c === 'whatsapp' ? brand('whatsapp') : ic(c === 'sms' ? 'chat' : 'send')}${esc(t(CHANNEL_KEY[c]))}</button>`).join('')}</div>
+    </form>` : ''}`, t)
+}
+
+export function mePage({ account, nights = [], notice = '', t }) {
+  const roleRow = (r) => `<li><span class="pill${r.status === 'active' ? ' on' : ''}">${esc(t(ROLE_KEYS[r.role][0]))}</span>
+    <span class="muted">${esc(t(r.status === 'active' ? 'roleActive' : 'rolePending'))}</span></li>`
+  const missing = Object.keys(ROLE_KEYS).filter((r) => !account.roles.some((x) => x.role === r))
+  const can = (r) => account.active.has(r)
+  return page(t('myAccount'), `
+    <h1>${esc(account.name)}</h1>
+    <p class="meta">${account.phone ? `<span>${ic('chat')}${esc(account.phone)}</span>` : ''}${
+      account.email ? `<span>${ic('send')}${esc(account.email)}</span>` : ''}${
+      account.instagram ? `<a href="https://instagram.com/${esc(account.instagram)}" target="_blank" rel="noopener">@${esc(account.instagram)}</a>` : ''}</p>
+    ${notice ? `<div class="flash" role="status"><strong>${esc(notice)}</strong></div>` : ''}
+    <div class="grid2">
+      <div class="card"><h2>${ic('users')}${esc(t('yourRoles'))}</h2>
+        <ul class="roles">${account.roles.map(roleRow).join('')}</ul>
+        ${can('organizer') || can('club') ? `<p><a class="btn" href="/">${ic('arrow')}${esc(t('openConsole'))}</a></p>` : ''}
+        ${can('club') ? `<p><a href="/members">${esc(t('members'))}${account.pendingCount ? ` <span class="pill on">${account.pendingCount}</span>` : ''}</a></p>` : ''}
+        ${missing.length ? `<form method="post" action="/me/role" class="inline-row">
+          <select name="role" aria-label="${esc(t('addRole'))}">${missing.map((r) => `<option value="${r}">${esc(t(ROLE_KEYS[r][0]))}</option>`).join('')}</select>
+          <button class="btn ghost">${ic('plus')}${esc(t('addRole'))}</button></form>` : ''}
+      </div>
+      <form class="card" method="post" action="/me">
+        <h2>${ic('user')}${esc(t('profile'))}</h2>
+        <label for="name">${esc(t('yourName'))}</label>
+        <input id="name" name="name" required maxlength="80" value="${esc(account.name)}">
+        ${profileFields(account, t)}
+        <div class="actions"><button>${ic('check')}${esc(t('save'))}</button></div>
+      </form>
+    </div>
+    ${can('player') ? `<div class="card"><h2>${ic('trophy')}${esc(t('yourNights'))}</h2>
+      ${nights.length ? `<ul class="nights">${nights.map((n) => `<li><a href="/t/${n.id}/tv"><strong>${esc(n.level || '')}</strong> ${
+        esc(humanWhen(n, { lang: t.lang }))}</a>${n.venue ? ` <span class="muted">· ${esc(n.venue)}</span>` : ''}</li>`).join('')}</ul>`
+        : `<p class="muted">${esc(t('noNightsYet'))}</p>`}
+    </div>` : ''}
+    <form method="post" action="/logout" class="signout"><button class="btn ghost">${ic('x')}${esc(t('signOut'))}</button></form>`,
+  { nav: who().account && (who().account.active.has('organizer') || who().account.active.has('club')) ? navFor('/me', t) : '', t })
+}
+
+export function membersPage({ accounts, notice = '', t }) {
+  const row = (a) => `<tr><td class="lead">${esc(a.name)}<br><span class="muted small">${esc([a.phone, a.email].filter(Boolean).join(' · '))}</span></td>
+    <td>${a.roles.map((r) => `<span class="rolechip${r.status === 'pending' ? ' pending' : ''}">${esc(t(ROLE_KEYS[r.role][0]))}${
+      r.status === 'pending' ? `<form method="post" action="/members/${a.id}/${r.role}/active" class="inline"><button class="btn small">${ic('check')}${esc(t('approve'))}</button></form>` : ''}
+      <form method="post" action="/members/${a.id}/${r.role}/remove" class="inline"><button class="link" aria-label="${esc(t('removeRole'))}" title="${esc(t('removeRole'))}">${ic('x')}</button></form></span>`).join(' ')}</td></tr>`
+  const pending = accounts.filter((a) => a.roles.some((r) => r.status === 'pending'))
+  return page(t('members'), `
+    <h1>${esc(t('members'))}</h1>
+    <p class="muted">${esc(t('membersHelp'))}</p>
+    ${notice ? `<div class="flash" role="status"><strong>${esc(notice)}</strong></div>` : ''}
+    ${pending.length ? `<div class="card"><h2>${ic('hourglass')}${esc(t('waitingApproval'))} <span class="pill on">${pending.length}</span></h2>
+      ${wrapTable(`<tbody>${pending.map(row).join('')}</tbody>`, 'stack')}</div>` : ''}
+    <div class="card"><h2>${ic('users')}${esc(t('everyone'))} <span class="pill">${accounts.length}</span></h2>
+      ${wrapTable(`<tbody>${accounts.map(row).join('') || `<tr><td class="muted">${esc(t('nobodyYet'))}</td></tr>`}</tbody>`, 'stack')}</div>`,
+  { nav: navFor('/settings', t), t, here: '/settings' })
+}
+
+export const forbiddenPage = ({ need, t }) => page(t('notAllowed'), `
+    <h1>${esc(t('notAllowed'))}</h1>
+    <p class="lede">${esc(t(need === 'club' ? 'needClubRole' : 'needOrganizerRole'))}</p>
+    <p><a class="btn" href="/me">${ic('user')}${esc(t('myAccount'))}</a></p>`, { t })
