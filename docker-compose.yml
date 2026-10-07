@@ -32,6 +32,12 @@ services:
       # public URL. Share it inside the link: https://user:pass@host/ — no
       # accounts, no reset flow, the browser remembers it. Empty disables it.
       BASIC_AUTH: ${BASIC_AUTH:-padel:buddy}
+      # The demo runs with accounts: register as player, organizer or club and
+      # try each role. Nothing is sent from here, so the sign-in code is shown on
+      # the page, and every role is approved at once.
+      ACCOUNTS: "on"
+      SHOW_CODES: "1"
+      AUTO_APPROVE: "1"
     networks:
       web: {}
       private: { ipv4_address: 172.31.250.10 }
