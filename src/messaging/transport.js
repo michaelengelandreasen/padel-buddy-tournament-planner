@@ -25,6 +25,9 @@ import { telegram } from './telegram.js'
 export function buildChannels(env = process.env) {
   const want = String(env.MESSAGING_CHANNELS || env.WHATSAPP_TRANSPORT || '')
     .split(/[,\s]+/).filter(Boolean)
+  // Sandboxes are strangers' playgrounds: nothing typed in one may ever reach a
+  // real group, whatever token happens to be in the environment.
+  if (/^(on|1|true|yes)$/i.test(env.SANDBOX || '')) return [draft]
   const tg = telegram({ token: env.TELEGRAM_BOT_TOKEN || '' })
 
   if (!want.length) return [draft, tg].filter(Boolean)

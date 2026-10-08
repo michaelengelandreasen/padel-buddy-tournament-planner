@@ -16,9 +16,13 @@
  * lands in the Telegram group on its own and waits in the outbox for WhatsApp.
  */
 
+import { scoped } from '../scope.js'
+
 /** Messages the club still has to paste, newest first. Bounded so it can't grow. */
-const outbox = []
+const shared = []
 const MAX_OUTBOX = 50
+// A sandbox has an outbox of its own, so one visitor never reads another's messages.
+const box = () => scoped()?.outbox || shared
 
 export const draft = {
   name: 'draft',
@@ -26,9 +30,10 @@ export const draft = {
   live: false,
   configured: true,
   async send(text, meta = {}) {
-    outbox.unshift({ text, at: new Date().toISOString(), ...meta })
-    outbox.length = Math.min(outbox.length, MAX_OUTBOX)
+    const o = box()
+    o.unshift({ text, at: new Date().toISOString(), ...meta })
+    o.length = Math.min(o.length, MAX_OUTBOX)
     return { delivered: false, pending: true }
   },
-  outbox: () => outbox,
+  outbox: () => box(),
 }

@@ -17,6 +17,7 @@ import { clock, humanWhen, todayISO, humanDate } from './dates.js'
 import { courtName, courtsByTeam, currentRound, roundComplete, roundPlan, roundsOf } from './rounds.js'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { LANGUAGES, translator } from './i18n.js'
+import { scoped } from './scope.js'
 import { FORMATS, RULE_CHOICES, dynamic, individual, minimum, plannedRounds, rulesOf } from './formats/index.js'
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => (
@@ -62,6 +63,9 @@ const ICONS = {
   inbox: '<path d="M22 12h-6l-2 3h-4l-2-3H2"/>'
     + '<path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
   check: '<path d="M20 6 9 17l-5-5"/>',
+  flask: '<path d="M10 2v7.527a2 2 0 0 1-.211.896L4.72 20.55a1 1 0 0 0 .9 1.45h12.76a1 1 0 0 0 .9-1.45l-5.069-10.127A2 2 0 0 1 14 9.527V2"/><path d="M8.5 2h7"/><path d="M7 16h10"/>',
+  link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+  github: '<path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/>',
   shuffle: '<path d="M2 18h1.4c1.3 0 2.5-.6 3.3-1.7l6.1-8.6c.7-1.1 2-1.7 3.3-1.7H22"/>'
     + '<path d="m18 2 4 4-4 4"/><path d="M2 6h1.9c1.5 0 2.9.9 3.6 2.2"/>'
     + '<path d="M22 18h-5.9c-1.3 0-2.6-.7-3.3-1.8l-.5-.8"/><path d="m18 14 4 4-4 4"/>',
@@ -1068,6 +1072,31 @@ table.standings th .short{display:none}
     font-weight:700;font-size:1.05rem;overflow-wrap:anywhere}
   table.stack td.full{flex:1 1 100%}
 }
+/* The sandbox strip: one quiet line, never taller than it has to be. */
+.sbx{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;
+  margin:0;padding:6px max(16px,env(safe-area-inset-left)) 6px;background:var(--surface-2);
+  border-bottom:1px solid var(--line);font-size:.84rem;color:var(--muted)}
+.sbx p{margin:0 16px 0 0;display:flex;align-items:center;min-width:0}
+.sbx p .i{flex:0 0 auto;width:16px;height:16px;margin-right:8px;color:var(--accent)}
+.sbx b{color:var(--ink);font-weight:600;white-space:nowrap}
+.sbx div{display:flex;align-items:center}
+.sbx form{margin:0 0 0 14px}
+.sbx button.link{min-height:36px;font-size:.84rem;display:inline-flex;align-items:center}
+.sbx button.link .i{width:15px;height:15px;margin-right:6px}
+.sbx button.done{color:var(--brand)}
+.sbx .short{display:none}
+/* On a phone the sentence gives way to two words, so the strip stays one line. */
+@media (max-width:640px){
+  .sbx{flex-wrap:nowrap;padding-top:2px;padding-bottom:2px}
+  .sbx .long{display:none} .sbx .short{display:inline}
+  .sbx p{margin-right:8px;white-space:nowrap}
+  .sbx form{margin-left:2px}
+  .sbx button.link{padding:0 6px}
+  .sbx button.link span{display:none}
+  .sbx button.link .i{width:18px;height:18px;margin:0}
+  .sbx button.link{min-width:44px;min-height:44px;justify-content:center}
+}
+
 `
 
 /** Progressive enhancement only: the two level selects already say what they mean. */
@@ -1122,6 +1151,24 @@ function accountLink(t) {
     : `<a class="signin" href="/login">${ic('user')}<span>${esc(t('signIn'))}</span></a>`
 }
 
+/**
+ * Inside a sandbox, one line under the header says what this is and when it
+ * ends, and holds the two things only a sandbox has: the private link that
+ * opens it on another device, and the way to delete it now.
+ */
+function sandboxStrip(t) {
+  const box = scoped()?.box
+  if (!box) return ''
+  const date = humanDate(box.expires_at.slice(0, 10), { lang: t.lang })
+  const left = box.daysLeft > 1 ? t('sbBarDays', { n: box.daysLeft }) : t('sbBarDay')
+  return `<aside class="sbx" aria-label="Sandbox">
+<p>${ic('flask')}<span><span class="long">${esc(t('sbBar', { date }))}</span><span class="short">${esc(t('sbShort'))} ·</span> <b>${esc(left)}</b></span></p>
+<div><span id="sbx-link" hidden>${esc(box.link || '')}</span>
+<button type="button" class="link" data-copy="#sbx-link" data-done="${esc(t('copied'))}" title="${esc(t('sbCopyHelp'))}" aria-label="${esc(t('sbCopyLink'))}">${ic('link')}<span>${esc(t('sbCopyLink'))}</span></button>
+<form method="post" action="/sandbox/end" onsubmit="return confirm(${JSON.stringify(t('sbEndConfirm')).replace(/"/g, '&quot;')})">
+<button class="link" aria-label="${esc(t('sbEnd'))}" title="${esc(t('sbEnd'))}">${ic('trash')}<span>${esc(t('sbEnd'))}</span></button></form></div></aside>`
+}
+
 export function page(title, body, { nav = '', script = '', t = translator(), here = '', tab = '' } = {}) {
   return `<!doctype html><html lang="${t.lang}"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -1132,7 +1179,7 @@ export function page(title, body, { nav = '', script = '', t = translator(), her
 <header class="top"><a class="brand" href="/">${LOGO}
 <strong>Padel Buddy</strong><small>${esc(t('navTournaments'))}</small></a>
 <nav>${nav}</nav>${langToggle(t.lang, here)}${accountLink(t)}</header>
-${SPRITE}
+${sandboxStrip(t)}${SPRITE}
 <div class="wrap">${body}</div><script>${AJAX_JS}</script><script>${TABS_JS}</script><script>${PAIRS_JS}</script><script>${COPY_JS}</script><script>${POST_JS}</script><script>${SCORES_JS}</script>${script ? `<script>${script}</script>` : ''}<script>pbBoot()</script></body></html>`
 }
 
@@ -2061,6 +2108,242 @@ ${SPRITE}
 })();
 </script>
 </body></html>`
+}
+
+/**
+ * The sandbox site's front page.
+ *
+ * It has one job: get a club organizer from "what is this" to a sandbox of
+ * their own in one form. So the form is in the first screen, beside the thing
+ * the app is best at showing — the clubhouse board — and everything under it is
+ * the product itself, moving: the three things an organizer does on the day, as
+ * the real screens doing them. No testimonials, no feature grid.
+ *
+ * Same palette, logo and icons as the app, because a page that looks unlike the
+ * product it opens into is a small lie. The one thing it adds is a display
+ * face, self-hosted: a sandbox site should not make a visitor's browser ask a
+ * third party for anything.
+ */
+const GITHUB = 'https://github.com/michaelengelandreasen/padel-buddy-tournament-planner'
+
+const LANDING_CSS = `
+@font-face{font-family:Unbounded;src:url(/media/unbounded-latin.woff2) format('woff2');font-weight:400 900;font-display:swap;
+  unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+2000-206F,U+20AC,U+2122,U+2212}
+@font-face{font-family:Unbounded;src:url(/media/unbounded-cyrillic.woff2) format('woff2');font-weight:400 900;font-display:swap;
+  unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}
+:root{--bg:#0B1120;--surface:#121A2B;--surface-2:#1B2437;--line:#263247;--ink:#E7EDF5;--muted:#9AA4B2;
+  --brand:#34D399;--brand-ink:#00281B;--brand-soft:#A7F3D0;--court:#60A5FA;--accent:#FCD34D;--warn:#FFB4AB;--warn-bg:#5C1D18;
+  --display:Unbounded,system-ui,sans-serif;--ease:cubic-bezier(.16,1,.3,1);color-scheme:dark}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scrollbar-color:var(--line) var(--bg)}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  -webkit-font-smoothing:antialiased;overflow-x:hidden}
+::selection{background:var(--brand);color:var(--brand-ink)}
+a{color:var(--brand-soft);text-underline-offset:.2em;text-decoration-thickness:1px}
+a:hover{color:var(--brand)}
+:focus-visible{outline:2px solid var(--brand);outline-offset:3px;border-radius:4px}
+.i{width:1.1em;height:1.1em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;vertical-align:-.16em}
+h1,h2,h3{font-family:var(--display);line-height:1.08;letter-spacing:-.02em;margin:0;text-wrap:balance}
+p{margin:0}
+.in{max-width:1180px;margin:0 auto;padding:0 24px}
+
+.bar{display:flex;align-items:center;padding:18px 24px;max-width:1180px;margin:0 auto}
+.bar .brand{display:flex;align-items:center;color:var(--ink);text-decoration:none;font-family:var(--display);font-weight:700;font-size:1.02rem}
+.bar .mark{width:36px;height:36px;margin-right:10px;display:block}
+.bar nav{margin-left:auto;display:flex;align-items:center}
+.bar nav a{display:inline-flex;align-items:center;min-height:44px;padding:0 9px;color:var(--muted);text-decoration:none;font-weight:600;font-size:.88rem}
+.bar nav a[aria-current]{color:var(--ink)}
+.bar nav a:hover{color:var(--ink)}
+.bar nav .gh{margin-left:10px;padding-left:16px;border-left:1px solid var(--line)}
+.bar nav .gh .i{margin-right:7px}
+
+main{overflow-x:hidden;overflow-x:clip}
+.hero{max-width:1180px;margin:0 auto;padding:44px 24px 96px}
+.hero h1{font-size:clamp(1.7rem,5.2vw,4.4rem);font-weight:800;max-width:17em}
+.hero h1 em{font-style:normal;color:var(--brand);display:block}
+.hero .row{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);grid-column-gap:56px;align-items:start;margin-top:36px}
+.lead{color:var(--muted);font-size:1.08rem;max-width:34em}
+.start{margin-top:28px;padding:22px;background:var(--surface);border:1px solid var(--line);border-radius:18px;
+  box-shadow:0 18px 40px -22px rgba(0,0,0,.8)}
+.start h2{font-size:1.02rem;font-weight:700;letter-spacing:0;margin-bottom:16px}
+.fields{display:grid;grid-template-columns:1fr 1fr;grid-column-gap:12px}
+.start label{display:block;font-size:.8rem;font-weight:600;color:var(--muted);margin-bottom:6px}
+.start label small{font-weight:500;opacity:.8;margin-left:4px}
+.start input{width:100%;min-height:48px;padding:10px 14px;border-radius:12px;border:1px solid var(--line);
+  background:var(--bg);color:var(--ink);font:inherit;font-size:16px;caret-color:var(--brand)}
+.start input::placeholder{color:#8792A3}
+.start input:focus-visible{outline:2px solid var(--brand);outline-offset:1px;border-color:transparent}
+.go{margin-top:14px;width:100%;min-height:52px;border:0;border-radius:999px;background:var(--brand);color:var(--brand-ink);
+  font:inherit;font-weight:800;font-size:1.02rem;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;
+  transition:transform .25s var(--ease),box-shadow .25s var(--ease);box-shadow:0 10px 24px -12px rgba(52,211,153,.55)}
+.go .i{margin-left:10px;transition:transform .25s var(--ease)}
+.go:hover{transform:translateY(-1px);box-shadow:0 14px 28px -12px rgba(52,211,153,.6)}
+.go:hover .i{transform:translateX(4px)}
+.go:active{transform:translateY(0)}
+.go[disabled]{opacity:.6;cursor:progress}
+.terms{margin-top:12px;font-size:.84rem;color:var(--muted)}
+.alert{margin:0 0 14px;padding:10px 14px;border-radius:12px;background:var(--warn-bg);color:var(--warn);font-size:.92rem}
+
+/* The board runs off the right edge on purpose: it is a wall, not a thumbnail. */
+.board{margin:6px 0 0;width:150%;position:relative}
+.board img{display:block;width:100%;height:auto;border-radius:14px;border:1px solid var(--line);
+  box-shadow:0 40px 80px -40px rgba(0,0,0,.9),0 12px 28px -18px rgba(0,0,0,.7)}
+.board figcaption{margin-top:14px;font-size:.88rem;color:var(--muted)}
+@media (prefers-reduced-motion:no-preference){
+  .board img{animation:wipe 1.1s var(--ease) .15s both}
+  @keyframes wipe{from{clip-path:inset(0 100% 0 0 round 14px);filter:brightness(1.5)}to{clip-path:inset(0 0 0 0 round 14px);filter:none}}
+}
+
+.how{background:var(--surface);border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:88px 0 40px}
+.how>.in>h2,.facts>.in>h2{font-size:clamp(1.5rem,2.8vw,2.2rem);font-weight:800}
+.step{display:grid;grid-template-columns:minmax(0,4fr) minmax(0,7fr);grid-column-gap:56px;align-items:center;padding:56px 0}
+.step+.step{border-top:1px solid var(--line)}
+.step:nth-of-type(even){grid-template-columns:minmax(0,7fr) minmax(0,4fr)}
+.step:nth-of-type(even) .say{order:2}
+.step h3{font-size:clamp(1.25rem,2.1vw,1.7rem);font-weight:700}
+.step h3 span{color:var(--brand);margin-right:.5em;font-variant-numeric:tabular-nums}
+.step p{margin-top:14px;color:var(--muted);max-width:30em}
+.step video{display:block;width:100%;height:auto;border-radius:12px;border:1px solid var(--line);background:var(--bg)}
+
+.phones{display:grid;grid-template-columns:minmax(0,4fr) minmax(0,7fr);grid-column-gap:56px;align-items:center;
+  max-width:1180px;margin:0 auto;padding:96px 24px}
+.phones h2{font-size:clamp(1.5rem,2.8vw,2.2rem);font-weight:800}
+.phones p{margin-top:16px;color:var(--muted);max-width:30em}
+.trio{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-column-gap:18px;align-items:start}
+.trio img{display:block;width:100%;height:auto;border-radius:18px;border:1px solid var(--line);
+  box-shadow:0 30px 50px -30px rgba(0,0,0,.9)}
+.trio img:nth-child(2){margin-top:44px}
+.trio img:nth-child(3){margin-top:88px}
+
+.facts{border-top:1px solid var(--line);padding:88px 0}
+.facts dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-column-gap:56px;margin:36px 0 0}
+.facts dl>div{padding:22px 0;border-top:1px solid var(--line)}
+.facts dt{font-family:var(--display);font-weight:700;font-size:1.02rem}
+.facts dd{margin:8px 0 0;color:var(--muted);max-width:32em}
+.again{margin-top:44px;display:flex;flex-wrap:wrap;align-items:center}
+.again .go{width:auto;padding:0 28px;text-decoration:none;margin:0 24px 12px 0}
+.again span{color:var(--muted);font-size:.92rem;margin-bottom:12px}
+
+footer{border-top:1px solid var(--line);padding:28px 24px 44px;max-width:1180px;margin:0 auto;display:flex;flex-wrap:wrap;
+  color:var(--muted);font-size:.88rem}
+footer a{margin-left:auto}
+footer .i{margin-right:6px}
+
+@media (max-width:900px){
+  .hero .row,.step,.step:nth-of-type(even),.phones{grid-template-columns:minmax(0,1fr)}
+  .hero{padding:16px 20px 56px}
+  .hero .row{margin-top:22px}
+  .board{width:100%;margin-top:40px}
+  .step{padding:40px 0}
+  .step:nth-of-type(even) .say{order:0}
+  .step .show{margin-top:24px}
+  .how{padding:56px 0 16px}
+  .phones{padding:56px 20px}
+  .trio{margin-top:32px}
+  .trio img:nth-child(2){margin-top:22px}
+  .trio img:nth-child(3){margin-top:44px}
+  .facts{padding:56px 0}
+  .facts dl{grid-template-columns:minmax(0,1fr)}
+  .in{padding:0 20px}
+  .bar{padding:12px 20px}
+}
+@media (max-width:520px){
+  body{font-size:16px}
+  .fields{grid-template-columns:1fr}
+  .fields div+div{margin-top:12px}
+  .start{padding:18px}
+  .bar .brand span{display:none}
+  .bar nav a{padding:0 7px}
+  .bar nav .gh span{display:none}
+  .bar nav .gh .i{margin-right:0}
+  .trio{grid-column-gap:10px}
+  .trio img{border-radius:12px}
+  footer a{margin-left:0;flex-basis:100%;margin-top:8px}
+}
+`
+
+export function landingPage({ t, error = '', notice = '', form = {}, days = 7 }) {
+  const media = (f) => `/media/${f}`
+  const step = (n, key, clip) => `<div class="step">
+    <div class="say"><h3><span>${n}</span>${esc(t(key))}</h3><p>${esc(t(`${key}Text`))}</p></div>
+    <div class="show"><video muted loop playsinline preload="none" poster="${media(`${clip}-poster.png`)}"
+      width="1360" height="960" aria-label="${esc(t(key))}"><source src="${media(`${clip}.mp4`)}" type="video/mp4"></video></div>
+  </div>`
+  // The headline's last clause is the promise; it takes the brand colour.
+  const head = esc(t('sbHead')).replace(/, ([^,]+)$/, ', <em>$1</em>')
+  return `<!doctype html><html lang="${t.lang}"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="dark"><meta name="theme-color" content="#0B1120">
+<title>${esc(t('sbTitle'))}</title>
+<meta name="description" content="${esc(t('sbLead'))}">
+<meta property="og:title" content="${esc(t('sbTitle'))}"><meta property="og:description" content="${esc(t('sbLead'))}">
+<meta property="og:image" content="${media('tv.png')}">
+${FAVICON}<link rel="preload" href="${media(t.lang === 'uk' ? 'unbounded-cyrillic.woff2' : 'unbounded-latin.woff2')}" as="font" type="font/woff2" crossorigin>
+<style>${LANDING_CSS}</style></head><body>
+${SPRITE}
+<header class="bar"><a class="brand" href="/">${LOGO}<span>Padel Buddy</span></a>
+<nav aria-label="Language">${LANGUAGES.map((l) => `<a href="/?lang=${l.code}" hreflang="${l.code}" title="${esc(l.label)}"${
+    l.code === t.lang ? ' aria-current="true"' : ''}>${l.short}</a>`).join('')}
+<a class="gh" href="${GITHUB}" rel="noopener">${ic('github')}<span>GitHub</span></a></nav></header>
+
+<main>
+<section class="hero">
+  <h1>${head}</h1>
+  <div class="row"><div>
+    <p class="lead">${esc(t('sbLead'))}</p>
+    <form class="start" id="start" method="post" action="/sandbox">
+      <h2>${esc(t('sbFormHead'))}</h2>
+      ${error ? `<p class="alert" role="alert">${esc(t(error))}</p>` : notice ? `<p class="alert" role="status">${esc(t(notice))}</p>` : ''}
+      <input type="hidden" name="lang" value="${t.lang}">
+      <div class="fields">
+        <div><label for="sb-name">${esc(t('sbName'))}</label>
+          <input id="sb-name" name="name" required maxlength="60" autocomplete="given-name" autocapitalize="words"
+            value="${esc(form.name || '')}"${error === 'sbNeedName' ? ' aria-invalid="true"' : ''}></div>
+        <div><label for="sb-club">${esc(t('sbClub'))}<small>${esc(t('sbClubHint'))}</small></label>
+          <input id="sb-club" name="club" maxlength="60" autocomplete="organization" value="${esc(form.club || '')}"></div>
+      </div>
+      <button class="go">${esc(t('sbStart'))}${ic('arrow')}</button>
+      <p class="terms">${esc(t('sbTerms', { days }))}</p>
+    </form>
+  </div>
+  <figure class="board"><img src="${media('tv.png')}" width="1920" height="959" alt="${esc(t('sbBoardAlt'))}">
+    <figcaption>${esc(t('sbBoardCap'))}</figcaption></figure></div>
+</section>
+
+<section class="how"><div class="in">
+  <h2>${esc(t('sbHowHead'))}</h2>
+  ${step(1, 'sbStep1', 'v1-import')}${step(2, 'sbStep2', 'v3-pairs')}${step(3, 'sbStep3', 'v2-scores')}
+</div></section>
+
+<section class="phones">
+  <div><h2>${esc(t('sbPhoneHead'))}</h2><p>${esc(t('sbPhoneText'))}</p></div>
+  <div class="trio">${['phone-board', 'phone-pairs', 'phone-scores'].map((f) =>
+    `<img src="${media(`${f}.png`)}" width="441" height="954" loading="lazy" alt="">`).join('')}</div>
+</section>
+
+<section class="facts"><div class="in">
+  <h2>${esc(t('sbFactsHead'))}</h2>
+  <dl>${[1, 2, 3, 4].map((n) => `<div><dt>${esc(t(`sbFact${n}`, { days }))}</dt><dd>${esc(t(`sbFact${n}Text`, { days }))}</dd></div>`).join('')}</dl>
+  <div class="again"><a class="go" href="#start">${esc(t('sbAgain'))}${ic('arrow')}</a><span>${esc(t('sbTerms', { days }))}</span></div>
+</div></section>
+</main>
+
+<footer><span>Padel Buddy. ${esc(t('sbLicence'))}</span><a href="${GITHUB}" rel="noopener">${ic('github')}${esc(t('sbSource'))}</a></footer>
+<script>
+(function(){
+  // Clips play while they are on screen and rest when they are not.
+  var vids=[].slice.call(document.querySelectorAll('video'));
+  if('IntersectionObserver' in window&&!matchMedia('(prefers-reduced-motion: reduce)').matches){
+    var io=new IntersectionObserver(function(es){es.forEach(function(e){
+      if(e.isIntersecting){var p=e.target.play();if(p&&p.catch)p.catch(function(){})}else e.target.pause()})},{threshold:.35});
+    vids.forEach(function(v){io.observe(v)});
+  }else vids.forEach(function(v){v.controls=true});
+  var f=document.getElementById('start');
+  f.addEventListener('submit',function(){var b=f.querySelector('.go');setTimeout(function(){b.disabled=true},0)});
+  var again=document.querySelector('.again .go');
+  again.addEventListener('click',function(){setTimeout(function(){document.getElementById('sb-name').focus({preventScroll:true})},400)});
+})();
+</script></body></html>`
 }
 
 /**

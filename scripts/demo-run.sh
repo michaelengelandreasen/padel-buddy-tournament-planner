@@ -5,6 +5,9 @@
 # the day it was seeded. So the database is thrown away and seeded again at
 # start and every night at 05:00 (club time); the server restarts with it.
 set -u
+# Sandbox mode has no shared database to reset: every visitor has their own,
+# and each is deleted a week after it was started (see src/sandbox.js).
+case "${SANDBOX:-}" in on|1|true|yes) exec node src/server.js ;; esac
 DB="${DB_PATH:-/app/data/demo.db}"
 while true; do
   rm -f "$DB" "$DB-wal" "$DB-shm"

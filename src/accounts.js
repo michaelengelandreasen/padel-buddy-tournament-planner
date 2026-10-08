@@ -18,13 +18,14 @@
  * approves everything, so a visitor can try every role.
  */
 import { createHash, createHmac, randomBytes, randomInt, timingSafeEqual } from 'node:crypto'
-import { db, ensurePlayer } from './db.js'
+import { db, ensurePlayer, onInit } from './db.js'
+import { scoped } from './scope.js'
 
 export const ROLES = ['player', 'organizer', 'club']
 export const HANDS = ['right', 'left']
 export const SIDES = ['drive', 'backhand', 'either']
 
-db.exec(`
+onInit(() => db.exec(`
   CREATE TABLE IF NOT EXISTS accounts (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     name       TEXT NOT NULL,
@@ -65,7 +66,7 @@ db.exec(`
     expires_at TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
-`)
+`))
 
 const one = (sql, ...a) => db.prepare(sql).get(...a)
 const all = (sql, ...a) => db.prepare(sql).all(...a)
@@ -75,8 +76,10 @@ const inMinutes = (m) => new Date(Date.now() + m * 60000).toISOString()
 const nowIso = () => new Date().toISOString()
 
 /** Accounts switched on (ACCOUNTS=on) — off keeps the shared console login. */
-export const accountsOn = () => /^(on|1|true|yes)$/i.test(process.env.ACCOUNTS || '')
-const autoApprove = () => /^(1|true|yes|on)$/i.test(process.env.AUTO_APPROVE || '')
+// A sandbox always has accounts: its visitor is signed in as the club that owns
+// it, and anyone they invite is approved at once so every role can be tried.
+export const accountsOn = () => !!scoped()?.box || /^(on|1|true|yes)$/i.test(process.env.ACCOUNTS || '')
+const autoApprove = () => !!scoped()?.box || /^(1|true|yes|on)$/i.test(process.env.AUTO_APPROVE || '')
 
 // ---- cleaning what people type ----
 
@@ -259,7 +262,7 @@ export const can = (account, what) => {
 
 // ---- a signed value for a cookie (which account is mid-sign-in) ----
 
-db.exec('CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)')
+onInit(() => db.exec('CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)'))
 function secret() {
   if (process.env.SESSION_SECRET) return process.env.SESSION_SECRET
   const r = one("SELECT value FROM app_settings WHERE key = 'secret'")
