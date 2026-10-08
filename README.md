@@ -52,6 +52,8 @@ The last score of a round posts the next round to the group.
 The same pictures, as slides for a club organizer:
 [docs/deck/out/padel-buddy-for-organizers.pptx](docs/deck/out/padel-buddy-for-organizers.pptx).
 
+Live (VPN): https://padel-tournament-planner.mikehome.users.ctx7.dev
+
 **Try it:** https://padeladmin.webperfology.com — type a name and you get a
 sandbox of your own: a club with invented players and a tournament half played,
 private to you, deleted after a week. No email, no password.
