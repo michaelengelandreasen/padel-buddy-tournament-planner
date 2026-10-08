@@ -10,6 +10,48 @@ court and where every pair goes next, posted the moment the previous round's
 last score is typed in — and anyone can ask `!where Mike` and get their own
 answer. The TV view shows the same board on the clubhouse screen.
 
+## What it looks like
+
+Everything below is the app itself, running on invented players.
+
+**The clubhouse screen.** One row per pair, one column per round, the court in
+each cell — the round being played is filled, the next one outlined. Find your
+name, read across.
+
+![The TV board: every pair, every round, which court](docs/deck/media/tv.png)
+
+**From the group's message to a drawn night.** Paste the sign-up message the
+club already posts; the form fills itself in.
+
+![Pasting the club's sign-up message and getting a tournament](docs/readme/paste-the-message.gif)
+
+**Scores in, next round out.** Each team has its own score box on its own line.
+The last score of a round posts the next round to the group.
+
+![Typing scores and the next round appearing](docs/readme/scores-to-next-round.gif)
+
+**Pairs by drag, tap or shuffle.**
+
+![Making pairs on the pairs board](docs/readme/make-pairs.gif)
+
+**On a phone, courtside** — the sign-up board, the pairs, the scores:
+
+<p>
+  <img src="docs/deck/media/phone-board.png" width="30%" alt="Sign-up board on a phone">
+  <img src="docs/deck/media/phone-pairs.png" width="30%" alt="Pairs board on a phone">
+  <img src="docs/deck/media/phone-scores.png" width="30%" alt="Score entry on a phone">
+</p>
+
+**On a laptop** — the overview, a night's rounds, the table, and the player register:
+
+| | |
+|---|---|
+| ![Overview](docs/deck/media/overview.png) | ![Rounds and score entry](docs/deck/media/rounds.png) |
+| ![Standings](docs/deck/media/table.png) | ![Player register](docs/deck/media/players.png) |
+
+The same pictures, as slides for a club organizer:
+[docs/deck/out/padel-buddy-for-organizers.pptx](docs/deck/out/padel-buddy-for-organizers.pptx).
+
 Live (VPN): https://padel-tournament-planner.mikehome.users.ctx7.dev
 Public: https://padeladmin.webperfology.com — a Cloudflare Tunnel behind a shared login,
 see "Public domain" under Running.
