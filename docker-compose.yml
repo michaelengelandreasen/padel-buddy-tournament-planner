@@ -38,6 +38,11 @@ services:
       ACCOUNTS: "on"
       SHOW_CODES: "1"
       AUTO_APPROVE: "1"
+      # The public site: a front page, and a private sandbox for each visitor
+      # that is deleted after SANDBOX_DAYS. Set to "off" to go back to the one
+      # shared demo behind BASIC_AUTH, reseeded daily.
+      SANDBOX: ${SANDBOX:-on}
+      SANDBOX_DAYS: "7"
     networks:
       web: {}
       private: { ipv4_address: 172.31.250.10 }

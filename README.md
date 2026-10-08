@@ -378,6 +378,31 @@ on the host (unlike the broker) does not stamp it and the project vanishes.
 `TZ=Europe/Lisbon` in compose, because "has this date already been played" is a
 question about an evening in Matosinhos, not about UTC.
 
+## The sandbox site
+
+`SANDBOX=on` turns the app into a public site: a front page, and a private
+sandbox for anyone who types a name. A sandbox is a club of the visitor's own —
+sixteen invented players, a tournament half played, three more on the calendar —
+with the visitor signed in as the club. Nobody else can see it, and a week later
+(`SANDBOX_DAYS`) it is deleted.
+
+- **One SQLite file per sandbox** (`data/sandboxes/<id>.db`). A request is
+  scoped to its visitor's file (`src/scope.js`), so the data layer cannot name
+  another visitor's data; deleting a sandbox is deleting a file.
+- **No email, no password.** A signed cookie is the key. The strip at the top of
+  every page has *Copy my link* — the same sandbox on another device — and
+  *Delete now*.
+- **Limits**, because it is a public form that creates files: `SANDBOX_MAX`
+  sandboxes at once (300), `SANDBOX_PER_IP` new ones per address per day (5),
+  `SANDBOX_MAX_MB` each (8). Addresses are kept only as a salted hash.
+- **Nothing leaves it.** Messages a sandbox would post to a group are shown in
+  its outbox and never sent, whatever bot token is in the environment.
+- Expired sandboxes are swept at start and every hour, along with any database
+  file the registry does not know.
+
+`/healthz` reports how many are in use. `test/sandbox.test.js` covers the
+isolation, the limits and the expiry.
+
 ## The clubhouse tablet
 
 `/t/<id>/tv` is what stands by the courts all night. It answers one question —

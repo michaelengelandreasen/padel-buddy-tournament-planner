@@ -1,6 +1,7 @@
 import { DatabaseSync } from 'node:sqlite'
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
+import { scope, scoped } from './scope.js'
 import { parseWhen } from './dates.js'
 import { pickNight } from './rounds.js'
 import { parseLevel } from './levels.js'
@@ -10,7 +11,36 @@ import { FORMATS, cleanRules, isFormat } from './formats/index.js'
 const path = process.env.DB_PATH || './data/planner.db'
 mkdirSync(dirname(path), { recursive: true })
 
-export const db = new DatabaseSync(path)
+const base = new DatabaseSync(path)
+
+/**
+ * The database every function below talks to: the club's own, unless the
+ * request is running inside a sandbox scope (see scope.js), in which case it is
+ * that visitor's. A proxy rather than a parameter, so the hundred call sites
+ * stay as they are and cannot forget to pass it.
+ */
+export const db = new Proxy({}, {
+  get(_t, key) {
+    const h = scoped()?.db || base
+    const v = h[key]
+    return typeof v === 'function' ? v.bind(h) : v
+  },
+})
+
+/**
+ * Schema and migrations, as steps that can be run against any database: once
+ * here for the club's, and again for each sandbox when it is opened.
+ */
+const inits = []
+export function onInit(fn) { inits.push(fn); fn() }
+
+/** Open (or create) a database file with the full schema. The caller scopes to it. */
+export function openDb(file) {
+  mkdirSync(dirname(file), { recursive: true })
+  const h = new DatabaseSync(file)
+  scope.run({ db: h }, () => inits.forEach((fn) => fn()))
+  return h
+}
 
 /**
  * One club, many tournaments, and everything a tournament needs to run.
@@ -21,7 +51,7 @@ export const db = new DatabaseSync(path)
  * they called" are different questions — the WhatsApp message and the TV view
  * both name them, and "Court 3" and "Center" want to be equally sayable.
  */
-db.exec(`
+onInit(() => db.exec(`
   PRAGMA journal_mode = WAL;
 
   CREATE TABLE IF NOT EXISTS club (
@@ -149,7 +179,7 @@ db.exec(`
     score_b       INTEGER,
     UNIQUE (tournament_id, round, court)
   );
-`)
+`))
 
 /**
  * A tournament's courts, to start with: the club's defaults in order, padded
@@ -253,7 +283,7 @@ function migrate() {
     }
   }
 }
-migrate()
+onInit(migrate)
 
 const one = (sql, ...args) => db.prepare(sql).get(...args)
 const all = (sql, ...args) => db.prepare(sql).all(...args)

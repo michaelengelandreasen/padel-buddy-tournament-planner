@@ -1,4 +1,7 @@
 import { createServer } from 'node:http'
+import { createReadStream, statSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import * as S from './sandbox.js'
 import { timingSafeEqual } from 'node:crypto'
 import {
   activeTournament, addCourt, addSignup, addTournamentCourt, addVenue, addVenuesFromText, clubLanguage,
@@ -694,6 +697,21 @@ const routes = [
 
 createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x')
+  try {
+    // In sandbox mode nothing reaches the app except through a visitor's own sandbox.
+    return await (S.sandboxOn ? sandboxed(req, res, url) : serve(req, res, url))
+  } catch (err) {
+    console.error(err)
+    if (!res.headersSent) { res.writeHead(500, { 'content-type': 'text/plain; charset=utf-8' }); res.end('Something went wrong.') }
+  }
+}).listen(PORT, () => {
+  console.log(`padel-tournament-planner on :${PORT} (groups: ${groups.name}${
+    S.sandboxOn ? `, sandbox mode: ${S.DAYS} days` : A.accountsOn() ? ', accounts on' : ''})`)
+  if (S.sandboxOn) return S.startSweeper()
+  startTelegram()
+})
+
+async function serve(req, res, url) {
   // With accounts on, a signed-in person replaces the shared login, and what
   // they may open depends on their roles (see access()).
   const accountsOn = A.accountsOn()
@@ -713,10 +731,118 @@ createServer(async (req, res) => {
     }
   }
   return V.viewer.run({ accounts: accountsOn, account }, () => route(req, res, url))
-}).listen(PORT, () => {
-  console.log(`padel-tournament-planner on :${PORT} (groups: ${groups.name}${A.accountsOn() ? ', accounts on' : ''})`)
-  startTelegram()
-})
+}
+
+/**
+ * Sandbox mode: the public site.
+ *
+ * Without a sandbox there is one page — the front page, with the form that
+ * starts one. With one (a signed cookie, or the private link that sets it) the
+ * request runs the ordinary app, scoped to that visitor's own database. The
+ * shared login is not used: each sandbox's visitor is signed in as its club.
+ */
+const MEDIA_DIRS = ['../docs/deck/media/', '../docs/site/'].map((d) => fileURLToPath(new URL(d, import.meta.url)))
+const MEDIA_TYPES = { png: 'image/png', mp4: 'video/mp4', woff2: 'font/woff2' }
+
+/** A screenshot, a clip or the font — by bare file name only, so no path can be walked. */
+function media(req, res, name, ext) {
+  for (const dir of MEDIA_DIRS) {
+    let size
+    try { size = statSync(dir + name).size } catch { continue }
+    const head = { 'content-type': MEDIA_TYPES[ext], 'cache-control': 'public, max-age=86400', 'accept-ranges': 'bytes' }
+    // Safari will not play a video it cannot ask for in ranges.
+    const r = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '')
+    if (r && (r[1] || r[2])) {
+      const start = r[1] ? Number(r[1]) : Math.max(0, size - Number(r[2]))
+      const end = r[1] && r[2] ? Math.min(Number(r[2]), size - 1) : size - 1
+      if (start > end || start >= size) { res.writeHead(416, { 'content-range': `bytes */${size}` }); return res.end() }
+      res.writeHead(206, { ...head, 'content-range': `bytes ${start}-${end}/${size}`, 'content-length': end - start + 1 })
+      return createReadStream(dir + name, { start, end }).pipe(res)
+    }
+    res.writeHead(200, { ...head, 'content-length': size })
+    return req.method === 'HEAD' ? res.end() : createReadStream(dir + name).pipe(res)
+  }
+  res.writeHead(404); res.end()
+}
+
+const clientIp = (req) => String(req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'] || req.socket.remoteAddress || '')
+  .split(',')[0].trim()
+
+/** The front page's language: asked for, remembered, or the browser's own. */
+function visitorLang(req, url) {
+  const asked = url.searchParams.get('lang')
+  if (isLanguage(asked)) return asked
+  const kept = cookies(req).pb_lang
+  if (isLanguage(kept)) return kept
+  const prefers = String(req.headers['accept-language'] || '').split(',').map((x) => x.trim().slice(0, 2).toLowerCase())
+  return prefers.find((c) => isLanguage(c)) || 'en'
+}
+
+async function sandboxed(req, res, url) {
+  const path = url.pathname
+  const get = req.method === 'GET' || req.method === 'HEAD'
+  if (path === '/healthz') return json(res, { ok: true, sandbox: true, sandboxes: S.count(), days: S.DAYS })
+  if (path === '/robots.txt') { res.writeHead(200, { 'content-type': 'text/plain' }); return res.end('User-agent: *\nDisallow: /sandbox/\n') }
+  const file = /^\/media\/([\w-]+(?:\.[\w-]+)*\.(png|mp4|woff2))$/.exec(path)
+  if (get && file) return media(req, res, file[1], file[2])
+
+  const lang = visitorLang(req, url)
+  const t = translator(lang)
+  const jar = cookies(req)
+  const enter = (box, session) => {
+    const left = Math.max(60, Math.floor((Date.parse(box.expires_at) - Date.now()) / 1000))
+    res.setHeader('set-cookie', [cookie(req, 'pb_box', box.token, left), cookie(req, 'pb_session', session, left)])
+    return seeOther(res, '/')
+  }
+  const front = (extra = {}, code = 200) => {
+    const set = [cookie(req, 'pb_lang', lang, 365 * 86400)]
+    if (jar.pb_box) set.push(cookie(req, 'pb_box', '', 0), cookie(req, 'pb_session', '', 0))
+    res.setHeader('set-cookie', set)
+    return html(res, V.landingPage({ t, days: S.DAYS, ...extra }), code)
+  }
+
+  // The private link: the same sandbox on another phone or computer.
+  const link = /^\/sandbox\/open\/([\w.-]{10,80})$/.exec(path)
+  if (get && link) {
+    const box = S.find(link[1])
+    return box ? enter(box, S.signIn(box)) : front({ notice: 'sbExpired' }, 410)
+  }
+
+  if (req.method === 'POST' && path === '/sandbox') {
+    const f = await body(req)
+    const tl = translator(isLanguage(f.lang) ? f.lang : lang)
+    const r = S.create({ name: f.name, club: f.club, ip: clientIp(req) })
+    if (r.error) {
+      return html(res, V.landingPage({ t: tl, days: S.DAYS, error: r.error, form: { name: f.name, club: f.club } }),
+        r.error === 'sbNeedName' ? 400 : r.error === 'sbFull' ? 503 : 429)
+    }
+    // The sandbox opens in the language the visitor was reading.
+    S.inside(r.box, () => saveClub({ language: tl.lang }))
+    console.log(`sandbox: started (${S.count()} in use)`)
+    return enter(r.box, r.session)
+  }
+
+  const box = S.find(jar.pb_box)
+  if (!box) {
+    if (!get) { res.writeHead(401); return res.end() }
+    if (path !== '/') return seeOther(res, '/')
+    // A cookie that no longer opens anything means the week is up.
+    return front(jar.pb_box ? { notice: 'sbExpired' } : {})
+  }
+
+  if (req.method === 'POST' && path === '/sandbox/end') {
+    S.remove(box.id)
+    res.setHeader('set-cookie', [cookie(req, 'pb_box', '', 0), cookie(req, 'pb_session', '', 0)])
+    return seeOther(res, '/')
+  }
+  // A sandbox is for trying things, not for storing them.
+  if (!get && S.bytes(box.id) > S.MAX_BYTES) {
+    res.writeHead(413, { 'content-type': 'text/plain; charset=utf-8' })
+    return res.end('This sandbox is full. Delete it from the strip at the top and start a fresh one.')
+  }
+  box.link = `${baseUrl(req)}/sandbox/open/${box.token}`
+  return S.inside(box, () => serve(req, res, url))
+}
 
 async function route(req, res, url) {
   if (!A.accountsOn() && !OPEN_PATHS.has(url.pathname) && !authOk(req)) {
